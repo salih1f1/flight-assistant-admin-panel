@@ -1,0 +1,44 @@
+import { createBrowserRouter } from 'react-router-dom'
+import { AppLayout } from '@/components/layout/AppLayout'
+import { RequireAdmin } from '@/components/RequireAdmin'
+import { Dashboard } from '@/pages/Dashboard'
+import { TravelersPage } from '@/pages/travelers/TravelersPage'
+import { FlightsPage } from '@/pages/flights/FlightsPage'
+import { AirlinesPage } from '@/pages/airlines/AirlinesPage'
+import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
+import { AirportsPage } from '@/pages/airports/AirportsPage'
+import { AirportFormPage } from '@/pages/airports/AirportFormPage'
+import { CountriesPage } from '@/pages/countries/CountriesPage'
+import { LoyaltyProgramsPage } from '@/pages/loyalty/LoyaltyProgramsPage'
+import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
+import { LoungesPage } from '@/pages/lounges/LoungesPage'
+import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
+
+export const router = createBrowserRouter([
+  {
+    element: <RequireAdmin />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [
+          { path: '/', element: <Dashboard /> },
+          { path: '/travelers', element: <TravelersPage /> },
+          { path: '/flights', element: <FlightsPage /> },
+          { path: '/airlines', element: <AirlinesPage /> },
+          { path: '/airlines/new', element: <AirlineFormPage /> },
+          { path: '/airlines/:id/edit', element: <AirlineFormPage /> },
+          { path: '/airports', element: <AirportsPage /> },
+          { path: '/airports/new', element: <AirportFormPage /> },
+          { path: '/airports/:id/edit', element: <AirportFormPage /> },
+          { path: '/countries', element: <CountriesPage /> },
+          { path: '/loyalty', element: <LoyaltyProgramsPage /> },
+          { path: '/loyalty/new', element: <LoyaltyProgramFormPage /> },
+          { path: '/loyalty/:id/edit', element: <LoyaltyProgramFormPage /> },
+          { path: '/lounges', element: <LoungesPage /> },
+          { path: '/lounges/new', element: <LoungeFormPage /> },
+          { path: '/lounges/:id/edit', element: <LoungeFormPage /> },
+        ],
+      },
+    ],
+  },
+])
