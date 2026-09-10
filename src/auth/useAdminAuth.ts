@@ -7,12 +7,12 @@ export function useAdminAuth() {
 
   const account = accounts[0] ?? null
   const roles = (account?.idTokenClaims as Record<string, unknown>)?.roles as string[] | undefined
-  const isAdmin = roles?.includes('admin') ?? false
+  const isAdmin = roles?.some(r => r.toLowerCase() === 'admin') ?? false
 
-  const login = () => instance.loginPopup(loginRequest)
+  const login = () => instance.loginRedirect(loginRequest)
 
   const logout = () =>
-    instance.logoutPopup({ postLogoutRedirectUri: import.meta.env.VITE_REDIRECT_URI as string })
+    instance.logoutRedirect({ postLogoutRedirectUri: import.meta.env.VITE_REDIRECT_URI as string })
 
   const getAccessToken = async (): Promise<string> => {
     if (!account) throw new Error('No account found')
