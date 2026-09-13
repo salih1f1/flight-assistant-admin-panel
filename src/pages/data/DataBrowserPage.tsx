@@ -202,18 +202,23 @@ export function DataBrowserPage() {
     },
   }))
 
-  if (verifier && table) {
+  // The verify routes take a numeric id ({id:int}). Countries is verifiable but keyed by Code with
+  // no Id column, so it can't be verified from here; Number(undefined) used to send /NaN/verify.
+  const verifiableRows = verifier !== undefined && items.some(row => typeof row.Id === 'number')
+  if (verifiableRows && table) {
     columns.push({
       id: 'verify',
       header: () => <span className="sr-only">Verify</span>,
       cell: ({ row }) => {
+        const id = row.original.Id
+        if (typeof id !== 'number') return null
         const verified = row.original.IsVerified === true
         return (
           <Button
             size="sm"
             variant="outline"
             disabled={verify.isPending}
-            onClick={() => verify.mutate({ table, id: Number(row.original.Id), isVerified: !verified })}
+            onClick={() => verify.mutate({ table, id, isVerified: !verified })}
           >
             {verified ? 'Unverify' : 'Verify'}
           </Button>
@@ -281,6 +286,11 @@ export function DataBrowserPage() {
                     </button>
                   ))}
                 </div>
+              )}
+              {verifier && items.length > 0 && !verifiableRows && (
+                <p className="text-sm text-gray-500">
+                  {`Verifying isn't available for ${selected?.displayName ?? table}: the API's verify route takes a numeric id, and these rows have none.`}
+                </p>
               )}
               <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
               <FilterForm

@@ -14,7 +14,15 @@ vi.mock('@/api/client', () => ({
 // flight-statuses isn't.
 const TABLES = [
   { slug: 'airlines', displayName: 'Airlines', rowCount: 3 },
+  { slug: 'countries', displayName: 'Countries', rowCount: 2 },
   { slug: 'flight-statuses', displayName: 'Flight Statuses', rowCount: 1 },
+]
+
+// Countries is verifiable but keyed by Code (CountryConfiguration: HasKey(x => x.Code)) and has
+// no Id column, while PATCH /admin/countries/{id:int}/verify only takes a number.
+const COUNTRIES = [
+  { Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid' },
+  { Code: 'BG', Name: 'Bulgaria', IsVerified: false, VerifiedAt: null, VerifiedBy: null },
 ]
 
 // Shaped like GET /admin/data/airlines rows (trimmed to a few columns): IsVerified,
@@ -37,6 +45,11 @@ function install() {
     if (req.method === 'GET' && req.url === '/admin/data/airlines') {
       const filter = req.params?.filter as string | undefined
       const rows = filter?.startsWith('IsVerified:') ? airlines.filter(a => String(a.IsVerified) === filter.slice('IsVerified:'.length)) : airlines
+      return pagedResult(rows, req.params)
+    }
+    if (req.method === 'GET' && req.url === '/admin/data/countries') {
+      const filter = req.params?.filter as string | undefined
+      const rows = filter?.startsWith('IsVerified:') ? COUNTRIES.filter(c => String(c.IsVerified) === filter.slice('IsVerified:'.length)) : COUNTRIES
       return pagedResult(rows, req.params)
     }
     if (req.method === 'GET' && req.url === '/admin/data/flight-statuses') return pagedResult([{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null }], req.params)
@@ -89,6 +102,7 @@ describe('DataBrowserPage verify', () => {
 
     expect(within(await rowOf('Alpha Air')).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
+    expect(screen.queryByText(/Verifying isn't available/)).not.toBeInTheDocument()
   })
 
   it('Verify sends isVerified true and shows the row as verified without a reload', async () => {
@@ -157,6 +171,26 @@ describe('DataBrowserPage verify', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't verify row 2: it no longer exists. Refresh to see the current rows.")
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
+  })
+
+  it("offers no Verify on a table keyed by code, since the verify route only takes a number, and says why", async () => {
+    renderAt('/data/countries')
+
+    const row = await rowOf('Bulgaria')
+    expect(within(row).queryByRole('button', { name: /verify/i })).not.toBeInTheDocument()
+    expect(screen.getByText("Verifying isn't available for Countries: the API's verify route takes a numeric id, and these rows have none.")).toBeInTheDocument()
+    expect(verifies()).toHaveLength(0)
+  })
+
+  it('still filters a table keyed by code by verified state', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/countries')
+    await rowOf('Germany')
+
+    await user.click(screen.getByRole('button', { name: 'Unverified' }))
+
+    await waitFor(() => expect(screen.queryByText('Germany')).not.toBeInTheDocument())
+    expect(screen.getByText('Bulgaria')).toBeInTheDocument()
   })
 
   it('offers no verify controls or verified filter on a table that is not verifiable', async () => {
