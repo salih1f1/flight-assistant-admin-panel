@@ -1,28 +1,42 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiClient } from '@/api/client'
-import { fakePagedGet } from '@/test/fakePagedGet'
+import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import type { Airline } from '@/types'
 import { AirlinesPage } from './AirlinesPage'
 
-// Mocked at the HTTP boundary, not at airlinesApi, so the test runs the real api
-// module, hook, page and table against the response shape the API actually sends.
-vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn() } }))
-
-const AIRLINES: Airline[] = Array.from({ length: 692 }, (_, i) => ({
-  id: i + 1,
-  iata: null,
-  icao: null,
-  name: `Airline ${String(i + 1).padStart(3, '0')}`,
-  countryCode: 'XX',
-  allianceCode: null,
+// Mocked at the HTTP boundary, with every entry point the hand-written and the
+// generated client use, so the test runs the real api layer, hooks, page and table.
+vi.mock('@/api/client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
 }))
+
+// Shaped like AirlineAdminDto.
+const makeAirlines = () =>
+  Array.from({ length: 692 }, (_, i) => ({
+    id: i + 1,
+    iata: null,
+    icao: null,
+    name: `Airline ${String(i + 1).padStart(3, '0')}`,
+    countryCode: 'XX',
+    allianceCode: null,
+  }))
+
+let airlines: ReturnType<typeof makeAirlines>
+let sent: SentRequest[]
 
 describe('AirlinesPage', () => {
   beforeEach(() => {
-    vi.mocked(apiClient.get).mockReset().mockImplementation(fakePagedGet({ '/admin/airlines': AIRLINES }))
+    airlines = makeAirlines()
+    ;({ sent } = installFakeApi(req => {
+      if (req.method === 'GET' && req.url === '/admin/airlines') return pagedResult(airlines, req.params)
+      const byId = req.url.match(/^\/admin\/airlines\/(\d+)$/)
+      if (req.method === 'DELETE' && byId) {
+        airlines = airlines.filter(a => a.id !== Number(byId[1]))
+        return undefined
+      }
+      throw httpError(404)
+    }))
   })
 
   it('lists the airlines on the first page the API returns', async () => {
@@ -41,7 +55,9 @@ describe('AirlinesPage', () => {
   })
 
   it('shows why the list failed to load instead of "No results."', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Request failed with status code 500'))
+    installFakeApi(() => {
+      throw httpError(500)
+    })
     renderWithProviders(<AirlinesPage />)
 
     expect(await screen.findByText('Could not load: Request failed with status code 500')).toBeInTheDocument()
@@ -59,7 +75,9 @@ describe('AirlinesPage', () => {
     expect(await screen.findByText('Airline 051')).toBeInTheDocument()
     expect(screen.queryByText('Airline 001')).not.toBeInTheDocument()
     expect(screen.getByText('Page 2 of 14 · 692 total')).toBeInTheDocument()
-    expect(apiClient.get).toHaveBeenLastCalledWith('/admin/airlines', { params: { Page: 2, PageSize: 50 } })
+    expect(sent[sent.length - 1]).toEqual(
+      expect.objectContaining({ method: 'GET', url: '/admin/airlines', params: { Page: 2, PageSize: 50 } }),
+    )
   })
 
   it('reaches the last airline and stops there', async () => {
@@ -74,5 +92,19 @@ describe('AirlinesPage', () => {
 
     expect(await screen.findByText('Airline 692')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+
+  it('deleting an airline sends DELETE and drops it from the list without a reload', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<AirlinesPage />)
+    const row = (await screen.findByText('Airline 001')).closest('tr')!
+
+    // The row's actions are icon buttons: edit, then delete.
+    await user.click(within(row).getAllByRole('button')[1])
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(screen.queryByText('Airline 001')).not.toBeInTheDocument())
+    expect(screen.getByText('Page 1 of 14 · 691 total')).toBeInTheDocument()
+    expect(sent).toContainEqual(expect.objectContaining({ method: 'DELETE', url: '/admin/airlines/1' }))
   })
 })

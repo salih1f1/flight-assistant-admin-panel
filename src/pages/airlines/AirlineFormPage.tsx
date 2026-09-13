@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAirline, useCreateAirline, useUpdateAirline } from '@/hooks/useAirlines'
+import { useAdminCreateAirline, useAdminGetAirlineById, useAdminUpdateAirline } from '@/api/generated/admin'
+import { invalidateAirlines } from '@/api/airlinesCache'
 
 const schema = z.object({
   iata: z.string().max(3).optional(),
@@ -23,16 +25,26 @@ export function AirlineFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
-  const { data: existing } = useAirline(isEdit ? Number(id) : -1)
-  const createMutation = useCreateAirline()
-  const updateMutation = useUpdateAirline()
+  const queryClient = useQueryClient()
+  const { data: existing } = useAdminGetAirlineById(Number(id), { query: { enabled: isEdit } })
+  const createMutation = useAdminCreateAirline({ mutation: { onSuccess: () => invalidateAirlines(queryClient) } })
+  const updateMutation = useAdminUpdateAirline({
+    mutation: { onSuccess: (_, variables) => invalidateAirlines(queryClient, variables.id) },
+  })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
   useEffect(() => {
-    if (existing) reset({ iata: existing.iata ?? '', icao: existing.icao ?? '', name: existing.name, countryCode: existing.countryCode, allianceCode: existing.allianceCode ?? '' })
+    // The spec marks every field nullable, so even name and countryCode are defaulted.
+    if (existing) reset({
+      iata: existing.iata ?? '',
+      icao: existing.icao ?? '',
+      name: existing.name ?? '',
+      countryCode: existing.countryCode ?? '',
+      allianceCode: existing.allianceCode ?? '',
+    })
   }, [existing, reset])
 
   const onSubmit = (data: FormData) => {
@@ -40,7 +52,7 @@ export function AirlineFormPage() {
     if (isEdit) {
       updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/airlines') })
     } else {
-      createMutation.mutate(payload, { onSuccess: () => navigate('/airlines') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/airlines') })
     }
   }
 
