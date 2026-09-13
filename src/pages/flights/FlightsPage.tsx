@@ -12,7 +12,7 @@ const PAGE_SIZE = 50
 
 export function FlightsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useFlights(page, PAGE_SIZE)
+  const { data, isLoading, error } = useFlights(page, PAGE_SIZE)
   const deleteMutation = useDeleteFlight()
   const syncMutation = useSyncFlight()
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -66,6 +66,7 @@ export function FlightsPage() {
       <DataTable
         columns={columns}
         data={data?.items ?? []}
+        error={error}
         pagination={{ page, pageSize: PAGE_SIZE, total: data?.total ?? 0, onPageChange: setPage }}
       />
       <ConfirmDeleteDialog

@@ -40,6 +40,14 @@ describe('AirlinesPage', () => {
     expect(await screen.findByText('Page 1 of 14 · 692 total')).toBeInTheDocument()
   })
 
+  it('shows why the list failed to load instead of "No results."', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Request failed with status code 500'))
+    renderWithProviders(<AirlinesPage />)
+
+    expect(await screen.findByText('Could not load: Request failed with status code 500')).toBeInTheDocument()
+    expect(screen.queryByText(/no results/i)).not.toBeInTheDocument()
+  })
+
   it('Next requests page 2 from the API and replaces the rows', async () => {
     const user = userEvent.setup()
     renderWithProviders(<AirlinesPage />)

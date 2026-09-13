@@ -13,7 +13,7 @@ const PAGE_SIZE = 50
 
 export function LoyaltyProgramsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useLoyaltyPrograms(page, PAGE_SIZE)
+  const { data, isLoading, error } = useLoyaltyPrograms(page, PAGE_SIZE)
   const deleteMutation = useDeleteLoyaltyProgram()
   const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -55,6 +55,7 @@ export function LoyaltyProgramsPage() {
       <DataTable
         columns={columns}
         data={data?.items ?? []}
+        error={error}
         pagination={{ page, pageSize: PAGE_SIZE, total: data?.total ?? 0, onPageChange: setPage }}
       />
       <ConfirmDeleteDialog
