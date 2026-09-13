@@ -10,6 +10,7 @@ import { MaskedBadge } from '@/components/RevealableValue'
 import { useAdminGetAuditLog } from '@/api/generated/admin'
 import type { AdminAuditAction, AdminAuditDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
+import { auditEntityLabel, auditEntityPage } from '@/lib/auditEntities'
 import { formatUtcMinute } from '@/lib/formatUtc'
 
 const PAGE_SIZE = 50
@@ -19,16 +20,6 @@ const ACTIONS = ['Create', 'Update', 'Delete', 'Verify', 'Import', 'Reveal'] as 
 
 // SensitiveProperties.RedactedPlaceholder: the audit log stores sensitive values masked.
 const MASKED = '<redacted>'
-
-// Entity types (CLR names, as the audit rows carry them) the panel has a page for.
-const ENTITY_PAGES: Record<string, (id: string) => string> = {
-  Traveler: id => `/travelers/${id}`,
-  Flight: id => `/flights/${id}`,
-  Airline: id => `/airlines/${id}/edit`,
-  Airport: id => `/airports/${id}/edit`,
-  Lounge: id => `/lounges/${id}/edit`,
-  LoyaltyProgram: id => `/loyalty/${id}/edit`,
-}
 
 const FILTERS = ['action', 'entityType', 'entityId', 'actorId', 'from', 'to'] as const
 type Filters = Record<(typeof FILTERS)[number], string>
@@ -130,8 +121,8 @@ export function AuditLogPage() {
 
 function AuditRow({ row }: { row: AdminAuditDto }) {
   const [open, setOpen] = useState(false)
-  const entityLabel = `${row.entityType ?? 'Unknown'} ${row.entityId ?? '(pending id)'}`
-  const pageFor = row.entityType ? ENTITY_PAGES[row.entityType] : undefined
+  const entityLabel = auditEntityLabel(row)
+  const entityPage = auditEntityPage(row)
   const hasChanges = row.before != null || row.after != null
 
   return (
@@ -141,7 +132,7 @@ function AuditRow({ row }: { row: AdminAuditDto }) {
         <TableCell>{row.actorName ?? row.actorId ?? '—'}</TableCell>
         <TableCell>{row.action ?? '—'}</TableCell>
         <TableCell>
-          {pageFor && row.entityId ? <Link to={pageFor(row.entityId)} className="underline">{entityLabel}</Link> : entityLabel}
+          {entityPage ? <Link to={entityPage} className="underline">{entityLabel}</Link> : entityLabel}
         </TableCell>
         <TableCell>{row.summary ?? '—'}</TableCell>
         <TableCell className="text-right">

@@ -6,6 +6,7 @@ import {
 } from '@/api/generated/admin'
 import { AeroApiUsageSection } from './dashboard/AeroApiUsageSection'
 import { SystemHealthSection } from './dashboard/SystemHealthSection'
+import { RecentActivitySection } from './dashboard/RecentActivitySection'
 
 type Count = { count: number | undefined; isLoading: boolean }
 
@@ -48,6 +49,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map(s => <StatCard key={s.label} {...s} />)}
       </div>
+      <RecentActivitySection />
       <SystemHealthSection />
       <AeroApiUsageSection />
     </div>
