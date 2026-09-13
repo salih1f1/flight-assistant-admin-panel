@@ -1,7 +1,9 @@
-import { screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult } from '@/test/fakeApi'
-import { renderWithProviders } from '@/test/renderWithProviders'
 import { TravelersPage } from './TravelersPage'
 
 // List, paging and delete are covered in pagedListPages.test.
@@ -22,10 +24,25 @@ describe('TravelersPage', () => {
     })
   })
 
-  it('offers only delete on a row, with no link to a traveler page the panel does not have', async () => {
-    renderWithProviders(<TravelersPage />)
+  it("the view button opens the traveler's page", async () => {
+    const router = createMemoryRouter(
+      [
+        { path: '/travelers', element: <TravelersPage /> },
+        { path: '/travelers/:id', element: <p>traveler page</p> },
+      ],
+      { initialEntries: ['/travelers'] },
+    )
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+    const user = userEvent.setup()
     const tableRow = (await screen.findByText('one@example.com')).closest('tr')!
 
-    expect(within(tableRow).getAllByRole('button')).toHaveLength(1)
+    await user.click(within(tableRow).getByRole('button', { name: 'View traveler' }))
+
+    expect(await screen.findByText('traveler page')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/travelers/00000000-0000-0000-0000-000000000001')
   })
 })

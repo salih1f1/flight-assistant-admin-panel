@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -24,6 +24,8 @@ const EMAILS: Record<string, string> = Object.fromEntries(TRAVELERS.map((t, i) =
 
 let sent: SentRequest[]
 let revealAnswer: (req: SentRequest) => unknown
+let travelerRows: typeof TRAVELERS
+let queryClient: QueryClient
 
 /**
  * GET /admin/data/* as before, plus POST /admin/data/{table}/{id}/reveal, which answers
@@ -32,7 +34,7 @@ let revealAnswer: (req: SentRequest) => unknown
 function install() {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/data/tables') return TABLES
-    if (req.method === 'GET' && req.url === '/admin/data/travelers') return pagedResult(TRAVELERS, req.params)
+    if (req.method === 'GET' && req.url === '/admin/data/travelers') return pagedResult(travelerRows, req.params)
     if (req.method === 'POST' && /^\/admin\/data\/travelers\/[^/]+\/reveal$/.test(req.url)) return revealAnswer(req)
     throw httpError(404)
   }))
@@ -53,7 +55,7 @@ function renderAt(entry: string) {
     ],
     { initialEntries: [entry] },
   )
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -68,6 +70,7 @@ const reveals = () => sent.filter(r => r.method === 'POST')
 describe('DataBrowserPage reveal', () => {
   beforeEach(() => {
     revealAnswer = defaultReveal
+    travelerRows = TRAVELERS
     install()
   })
 
@@ -130,6 +133,42 @@ describe('DataBrowserPage reveal', () => {
     expect(within(await rowOf('Traveler 001')).getByText('Masked')).toBeInTheDocument()
     expect(screen.queryByText('traveler001@example.com')).not.toBeInTheDocument()
     expect(reveals()).toHaveLength(1)
+  })
+
+  it('keeps a revealed value when the rows refresh without the view changing', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/travelers')
+    await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
+    await screen.findByText('traveler001@example.com')
+
+    // Someone renamed another traveler: the same view, with new data.
+    travelerRows = TRAVELERS.map(t => (t.Id === idOf(2) ? { ...t, DisplayName: 'Traveler 002 (renamed)' } : t))
+    await act(async () => {
+      await queryClient.invalidateQueries()
+    })
+    await screen.findByText('Traveler 002 (renamed)')
+
+    expect(within(await rowOf('Traveler 001')).getByText('traveler001@example.com')).toBeInTheDocument()
+  })
+
+  it('never shows a revealed value on another row when the rows refresh in a different order', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/travelers')
+    await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
+    await screen.findByText('traveler001@example.com')
+
+    // The same view refreshes with the first two rows swapped: Traveler 002 now sits where 001 was.
+    travelerRows = [TRAVELERS[1], TRAVELERS[0], ...TRAVELERS.slice(2)]
+    await act(async () => {
+      await queryClient.invalidateQueries()
+    })
+    await waitFor(() => expect(screen.getAllByRole('row')[1]).toHaveTextContent('Traveler 002'))
+
+    const traveler2 = await rowOf('Traveler 002')
+    expect(within(traveler2).getByText('Masked')).toBeInTheDocument()
+    expect(within(traveler2).queryByText('traveler001@example.com')).not.toBeInTheDocument()
   })
 
   it("shows the API's reason when the row no longer exists, and reveals nothing", async () => {

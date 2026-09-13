@@ -1,21 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
-import { EyeOff, Lock } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
-import { Badge } from '@/components/ui/badge'
+import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   adminVerifyAirline, adminVerifyAirport, adminVerifyAlliance, adminVerifyCountry, adminVerifyLounge,
   adminVerifyLoungeProvider, adminVerifyLoyaltyProgram, adminVerifyLoyaltyProgramKind,
   getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
-  useAdminRevealValue,
 } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
@@ -52,9 +47,6 @@ type VerifyTarget = { table: string; id: number; isVerified: boolean }
 
 type Row = Record<string, unknown>
 
-/** A masked value the admin has asked to reveal, awaiting confirmation. */
-type RevealTarget = { id: string; column: string }
-
 /**
  * The read-only data browser over GET /admin/data/{table}. Rows arrive as
  * dictionaries keyed by the entity's PascalCase column names, in the API's column
@@ -64,10 +56,8 @@ type RevealTarget = { id: string; column: string }
  * view survives a reload and can be shared. Sort and filter column names go to the
  * API as they appear in the rows (the API matches them case-sensitively).
  *
- * A masked value can be revealed through POST /admin/data/{table}/{id}/reveal,
- * which writes an audit row before answering. Revealed values live only in this
- * page's state for the current view: never in the URL or the query cache, and gone
- * as soon as the table, page, sort or filter changes.
+ * A masked value can be revealed, audited (RevealableValue). Each is keyed by table, row id
+ * and column, so a different page, sort or filter mounts fresh, masked values.
  */
 export function DataBrowserPage() {
   const { table } = useParams<{ table: string }>()
@@ -90,18 +80,6 @@ export function DataBrowserPage() {
     },
   )
 
-  // Revealed values belong to one view and are discarded the moment it changes, so coming
-  // back to the same page later shows them masked again. Reset during render (React's
-  // pattern for state that follows a changing value) rather than in an effect, so no
-  // render ever shows a stale value.
-  const viewKey = [table, page, sort, filter].join('|')
-  const [revealed, setRevealed] = useState<{ viewKey: string; values: Record<string, unknown> }>({ viewKey, values: {} })
-  if (revealed.viewKey !== viewKey) setRevealed({ viewKey, values: {} })
-  const revealedValues = revealed.viewKey === viewKey ? revealed.values : {}
-  const [revealTarget, setRevealTarget] = useState<RevealTarget | null>(null)
-  // gcTime 0: the mutation cache must not keep a revealed value after this page lets go of it.
-  const reveal = useAdminRevealValue({ mutation: { gcTime: 0 } })
-
   const queryClient = useQueryClient()
   const verifier = table ? VERIFIERS[table] : undefined
   const verify = useMutation({
@@ -111,61 +89,36 @@ export function DataBrowserPage() {
   })
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
-  const updateView = (changes: { page?: number; sort?: string; filter?: string }) => {
+  const updateView = useCallback((changes: { page?: number; sort?: string; filter?: string }) => {
     const next = new URLSearchParams(searchParams)
     // page comes only from `changes`, so leaving it out resets to page 1.
-    const values = { page: changes.page, sort, filter, ...changes }
+    const values = {
+      page: changes.page,
+      sort: searchParams.get('sort') ?? undefined,
+      filter: searchParams.get('filter') ?? undefined,
+      ...changes,
+    }
     for (const [key, value] of Object.entries(values)) {
       if (value === undefined || value === '' || (key === 'page' && value === 1)) next.delete(key)
       else next.set(key, String(value))
     }
     setSearchParams(next)
-  }
-
-  const askToReveal = (target: RevealTarget) => {
-    reveal.reset()
-    setRevealTarget(target)
-  }
-
-  const cancelReveal = () => {
-    reveal.reset()
-    setRevealTarget(null)
-  }
-
-  const confirmReveal = () => {
-    if (!table || !revealTarget) return
-    const target = revealTarget
-    const forView = viewKey
-    reveal.mutate(
-      { table, id: target.id, data: { column: target.column } },
-      {
-        onSuccess: result => {
-          // A reveal that finishes after the view changed belongs to a view that's gone: drop it.
-          setRevealed(previous => previous.viewKey === forView
-            ? { viewKey: forView, values: { ...previous.values, [revealKey(target)]: result.value } }
-            : previous)
-          setRevealTarget(null)
-          reveal.reset()
-        },
-      },
-    )
-  }
-
-  const hide = (target: RevealTarget) =>
-    setRevealed(previous => {
-      const values = { ...previous.values }
-      delete values[revealKey(target)]
-      return { ...previous, values }
-    })
+  }, [searchParams, setSearchParams])
 
   const items = (rows.data?.items ?? []) as Row[]
   const columnNames = items.length > 0 ? Object.keys(items[0]) : []
   const selected = tables.data?.find(t => t.slug === table)
 
-  const toggleSort = (column: string) =>
-    updateView({ sort: sort === column ? `-${column}` : sort === `-${column}` ? undefined : column })
+  const toggleSort = useCallback(
+    (column: string) => updateView({ sort: sort === column ? `-${column}` : sort === `-${column}` ? undefined : column }),
+    [sort, updateView],
+  )
 
-  const columns: ColumnDef<Row>[] = columnNames.map(name => ({
+  // Memoized so cell renderers keep their identity until the view changes. The table mounts each
+  // renderer as a component, so a new function per render would remount every cell and drop a
+  // revealed value on any re-render, e.g. a refetch that brings changed rows into the same view.
+  const columnKey = columnNames.join('|')
+  const dataColumns = useMemo<ColumnDef<Row>[]>(() => (columnKey ? columnKey.split('|') : []).map(name => ({
     id: name,
     accessorFn: row => row[name],
     header: () => (
@@ -178,35 +131,19 @@ export function DataBrowserPage() {
       const value = row.original[name]
       // Every table with a sensitive column is keyed by a single Id, which is what the reveal endpoint takes.
       const id = row.original.Id
-      if (value !== MASKED || id === null || id === undefined) return <Cell value={value} />
-
-      const target = { id: String(id), column: name }
-      const key = revealKey(target)
-      if (key in revealedValues) {
-        return (
-          <span className="inline-flex items-center gap-1">
-            <span className="rounded bg-amber-50 px-1 text-amber-900">
-              <Cell value={revealedValues[key]} />
-            </span>
-            <button type="button" aria-label={`Hide ${name}`} title="Hide" onClick={() => hide(target)} className="text-gray-400 hover:text-gray-700">
-              <EyeOff className="h-3.5 w-3.5" />
-            </button>
-          </span>
-        )
-      }
-      return (
-        <button type="button" aria-label={`Reveal ${name}`} title="Reveal (audited)" onClick={() => askToReveal(target)}>
-          <Cell value={value} />
-        </button>
-      )
+      if (value !== MASKED || id === null || id === undefined || !table) return <Cell value={value} />
+      // Keyed so another row, page, sort or filter never inherits a revealed value.
+      return <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
     },
-  }))
+  })), [columnKey, table, sort, toggleSort])
 
   // The verify routes take a numeric id ({id:int}). Countries is verifiable but keyed by Code with
   // no Id column, so it can't be verified from here; Number(undefined) used to send /NaN/verify.
   const verifiableRows = verifier !== undefined && items.some(row => typeof row.Id === 'number')
-  if (verifiableRows && table) {
-    columns.push({
+  // A new array, never a push: dataColumns is memoized and must not grow a verify column per render.
+  const columns: ColumnDef<Row>[] = verifiableRows && table ? [
+    ...dataColumns,
+    {
       id: 'verify',
       header: () => <span className="sr-only">Verify</span>,
       cell: ({ row }) => {
@@ -224,8 +161,8 @@ export function DataBrowserPage() {
           </Button>
         )
       },
-    })
-  }
+    },
+  ] : dataColumns
 
   return (
     <div className="space-y-6">
@@ -322,75 +259,17 @@ export function DataBrowserPage() {
           )}
         </div>
       </div>
-
-      <RevealDialog
-        target={revealTarget}
-        loading={reveal.isPending}
-        error={reveal.error}
-        onCancel={cancelReveal}
-        onConfirm={confirmReveal}
-      />
     </div>
   )
 }
-
-const revealKey = ({ id, column }: RevealTarget) => `${id}|${column}`
 
 const rowCount = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'row' : 'rows'}`
 
 function Cell({ value }: { value: unknown }) {
-  if (value === MASKED) {
-    return (
-      <Badge variant="secondary" className="gap-1" title="Masked by the API">
-        <Lock className="h-3 w-3" />
-        Masked
-      </Badge>
-    )
-  }
+  if (value === MASKED) return <MaskedBadge />
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <span className="block max-w-xs truncate" title={text}>{text}</span>
-}
-
-function RevealDialog({ target, loading, error, onCancel, onConfirm }: {
-  target: RevealTarget | null
-  loading: boolean
-  error: unknown
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <Dialog open={target !== null} onOpenChange={open => !open && onCancel()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{`Reveal ${target?.column ?? 'value'}?`}</DialogTitle>
-          <DialogDescription>
-            {`Row ${target?.id ?? ''}. The value is shown in this view only, and the reveal is recorded in the admin audit log under your account.`}
-          </DialogDescription>
-        </DialogHeader>
-        {error ? <RevealError error={error} /> : null}
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={loading}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={loading}>{loading ? 'Revealing…' : 'Reveal'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function RevealError({ error }: { error: unknown }) {
-  // The reveal rate limiter answers with plain text rather than ProblemDetails, and its
-  // Retry-After header isn't exposed over CORS, so the reason has to be said here.
-  const status = (error as { response?: { status?: number } } | null)?.response?.status
-  const { title, detail } = status === 429
-    ? { title: 'Too many reveals in a short time.', detail: 'The API limits how often values can be revealed. Try again shortly.' }
-    : apiErrorMessage(error)
-  return (
-    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <p>{title}</p>
-      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
-    </div>
-  )
 }
 
 function VerifyError({ error, target }: { error: unknown; target: VerifyTarget }) {
