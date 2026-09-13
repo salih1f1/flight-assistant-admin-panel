@@ -1,61 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useMsal } from '@azure/msal-react'
 import { apiRequest } from './msalConfig'
+import { ADMIN_ROLE, asRoleArray, decodeJwtPayload, grantsAdmin } from './jwt'
 
 /**
- * Dev-only overlay that answers one question the panel cannot answer for itself:
- * does the ACCESS token carry the `roles` claim, and in what casing?
+ * Dev-only overlay showing what each token actually says about `roles`, and
+ * whether the API will authorise this user.
  *
- * Why this exists. `useAdminAuth` decides `isAdmin` from `idTokenClaims.roles`,
- * but the API validates the ACCESS token and enforces
- * `RequireRole("admin")` against a `roles` claim on it. Those are two different
- * tokens from the same app-role assignment, and the API app registration has to
- * be configured to emit the role on the access token specifically. When it
- * isn't, the panel renders the whole admin UI and every request behind it 403s —
- * which reads as a broken API rather than a claims problem.
- *
- * Casing matters just as much. ASP.NET Core's role comparison is ordinal, so a
- * claim value of "Admin" fails `RequireRole("admin")`. Verified against this
- * API: emitting "Admin" turns every /admin route into a 403 while a
- * case-insensitive check in this panel still reports the user as an admin.
+ * It exists because this tenant emits different casing on the two tokens — the
+ * id token carries `["Admin"]`, the access token `["admin"]` — which produced a
+ * genuinely confusing failure: the panel read the id token, compared exactly,
+ * and showed "Access Denied" to a user the API would have authorised. Seeing
+ * both values side by side is what turned that from guesswork into a one-line
+ * answer, so the overlay stays as the first thing to check when sign-in looks
+ * right but the panel disagrees.
  *
  * Rendered outside the router, because `RequireAdmin` gates every route on the
- * id-token check — mounting this inside would hide it in exactly the failure it
- * is meant to explain.
+ * role check — mounting this inside would hide it in exactly the failure it is
+ * meant to explain.
  *
- * The raw tokens are never printed or stored. Only the `roles` claim and a
- * couple of non-secret envelope fields are read out of them.
+ * Raw tokens are never printed or stored; only `roles` and `aud` are read out.
  */
 type ClaimReport = {
   idTokenRoles?: string[]
   accessTokenRoles?: string[]
   accessTokenAudience?: string
   error?: string
-}
-
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const normalised = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalised.padEnd(Math.ceil(normalised.length / 4) * 4, '=')
-    return JSON.parse(
-      decodeURIComponent(
-        atob(padded)
-          .split('')
-          .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
-          .join(''),
-      ),
-    ) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-function asStringArray(value: unknown): string[] | undefined {
-  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string')
-  if (typeof value === 'string') return [value]
-  return undefined
 }
 
 export function RoleClaimDiagnostic() {
@@ -70,7 +40,7 @@ export function RoleClaimDiagnostic() {
     let cancelled = false
 
     void (async () => {
-      const idTokenRoles = asStringArray(
+      const idTokenRoles = asRoleArray(
         (account.idTokenClaims as Record<string, unknown> | undefined)?.roles,
       )
 
@@ -80,7 +50,7 @@ export function RoleClaimDiagnostic() {
         if (cancelled) return
         setReport({
           idTokenRoles,
-          accessTokenRoles: asStringArray(payload?.roles),
+          accessTokenRoles: asRoleArray(payload?.roles),
           accessTokenAudience: typeof payload?.aud === 'string' ? payload.aud : undefined,
         })
       } catch (e) {
@@ -97,18 +67,17 @@ export function RoleClaimDiagnostic() {
   if (!import.meta.env.DEV || !account || dismissed) return null
 
   const accessRoles = report?.accessTokenRoles
-  // The exact check the API performs: ordinal match against "admin".
-  const apiWouldAllow = accessRoles?.includes('admin') ?? false
+  const apiWouldAllow = grantsAdmin(accessRoles)
 
   const verdict = !report
     ? 'Reading access token…'
     : report.error
       ? `Could not acquire an access token: ${report.error}`
       : accessRoles === undefined
-        ? 'NO `roles` claim on the access token. The API will 403 every /admin route. Fix: expose the app role on the API app registration so it is emitted on the access token.'
+        ? `No \`roles\` claim on the access token. The API will 403 every /admin route. Fix: expose the app role on the API app registration so it is emitted on the access token.`
         : apiWouldAllow
-          ? 'OK — the access token carries roles: ["admin"]. The API will authorise this user.'
-          : `Casing/value mismatch. Access token roles = ${JSON.stringify(accessRoles)}, but the API matches "admin" ordinally, so every /admin route will 403.`
+          ? `OK — the access token carries roles: ${JSON.stringify(accessRoles)}. The API will authorise this user.`
+          : `Mismatch. Access token roles = ${JSON.stringify(accessRoles)}, but the API matches "${ADMIN_ROLE}" ordinally, so every /admin route will 403.`
 
   const tone = !report || report.error ? '#7c5800' : apiWouldAllow ? '#0b5f2a' : '#8a1010'
   const bg = !report || report.error ? '#fff6d8' : apiWouldAllow ? '#e5f6ec' : '#fde8e8'
