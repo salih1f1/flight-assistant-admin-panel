@@ -13,14 +13,18 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   terminal: z.string().optional(),
   hours: z.string().optional(),
-  accessInfo: z.string().optional(),
+  // The API's name for this field (AdminLoungeDto, Create/UpdateLoungeRequest).
+  locationHint: z.string().optional(),
   amenities: z.string().optional(),
   isAirside: z.boolean(),
   isDomesticOnly: z.boolean(),
   isInternationalOnly: z.boolean(),
 })
 
-type FormValues = z.infer<typeof schema>
+// The form holds raw input values (coerced fields are `unknown` until parsed);
+// handleSubmit receives the parsed output.
+type FormInput = z.input<typeof schema>
+type FormValues = z.output<typeof schema>
 
 export function LoungeFormPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +34,7 @@ export function LoungeFormPage() {
   const createMutation = useCreateLounge()
   const updateMutation = useUpdateLounge()
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       isAirside: false,
@@ -46,7 +50,7 @@ export function LoungeFormPage() {
         name: lounge.name,
         terminal: lounge.terminal ?? '',
         hours: lounge.hours ?? '',
-        accessInfo: lounge.accessInfo ?? '',
+        locationHint: lounge.locationHint ?? '',
         amenities: lounge.amenities ?? '',
         isAirside: lounge.isAirside,
         isDomesticOnly: lounge.isDomesticOnly,
@@ -57,19 +61,15 @@ export function LoungeFormPage() {
 
   const onSubmit = (values: FormValues) => {
     const payload = {
-      airportId: values.airportId,
-      name: values.name,
-      terminal: values.terminal || null,
-      hours: values.hours || null,
-      accessInfo: values.accessInfo || null,
-      amenities: values.amenities || null,
-      isAirside: values.isAirside,
-      isDomesticOnly: values.isDomesticOnly,
-      isInternationalOnly: values.isInternationalOnly,
+      ...values,
+      terminal: values.terminal || undefined,
+      hours: values.hours || undefined,
+      locationHint: values.locationHint || undefined,
+      amenities: values.amenities || undefined,
     }
 
     if (isEdit) {
-      updateMutation.mutate({ id: Number(id), airportId: payload.airportId, name: payload.name, terminal: payload.terminal, hours: payload.hours, accessInfo: payload.accessInfo, amenities: payload.amenities, isAirside: payload.isAirside, isDomesticOnly: payload.isDomesticOnly, isInternationalOnly: payload.isInternationalOnly }, { onSuccess: () => navigate('/lounges') })
+      updateMutation.mutate({ id: Number(id), ...payload }, { onSuccess: () => navigate('/lounges') })
     } else {
       createMutation.mutate(payload, { onSuccess: () => navigate('/lounges') })
     }
@@ -102,8 +102,8 @@ export function LoungeFormPage() {
           <Input id="hours" placeholder="e.g. 05:00–23:00" {...register('hours')} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="accessInfo">Access info</Label>
-          <Input id="accessInfo" {...register('accessInfo')} />
+          <Label htmlFor="locationHint">Location hint</Label>
+          <Input id="locationHint" placeholder="e.g. After security, near gate A10" {...register('locationHint')} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="amenities">Amenities</Label>

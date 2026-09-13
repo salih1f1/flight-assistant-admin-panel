@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { PublicClientApplication } from '@azure/msal-browser'
-import { msalConfig, apiRequest } from '@/auth/msalConfig'
+import { apiRequest } from '@/auth/msalConfig'
 
 // Shared MSAL instance for the interceptor (outside React tree)
 let msalInstance: PublicClientApplication | null = null
