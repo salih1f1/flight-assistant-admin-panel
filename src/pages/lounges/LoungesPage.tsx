@@ -9,8 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { useLounges, useDeleteLounge } from '@/hooks/useLounges'
 import type { AdminLounge } from '@/types'
 
+const PAGE_SIZE = 50
+
 export function LoungesPage() {
-  const { data = [], isLoading } = useLounges()
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useLounges(page, PAGE_SIZE)
   const deleteMutation = useDeleteLounge()
   const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -56,7 +59,13 @@ export function LoungesPage() {
           <Plus className="h-4 w-4 mr-2" /> Add lounge
         </Button>
       </div>
-      <DataTable columns={columns} data={data} searchPlaceholder="Search lounges…" searchColumn="name" />
+      {/* No search box: the API has no search parameter, so it could only filter
+          the rows on the current page. */}
+      <DataTable
+        columns={columns}
+        data={data?.items ?? []}
+        pagination={{ page, pageSize: PAGE_SIZE, total: data?.total ?? 0, onPageChange: setPage }}
+      />
       <ConfirmDeleteDialog
         open={!!deleteId}
         onOpenChange={open => !open && setDeleteId(null)}

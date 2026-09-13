@@ -1,11 +1,23 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { loyaltyApi } from '@/api/loyalty'
 import type { CreateLoyaltyProgramRequest } from '@/types'
 
 export const LOYALTY_KEY = ['loyalty-programs']
 
-export function useLoyaltyPrograms() {
-  return useQuery({ queryKey: LOYALTY_KEY, queryFn: loyaltyApi.getAll })
+export function useLoyaltyPrograms(page: number, pageSize: number) {
+  return useQuery({
+    queryKey: [...LOYALTY_KEY, 'list', page, pageSize],
+    queryFn: () => loyaltyApi.list(page, pageSize),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useLoyaltyProgram(id: number | undefined) {
+  return useQuery({
+    queryKey: [...LOYALTY_KEY, id],
+    queryFn: () => loyaltyApi.findById(id!),
+    enabled: id != null,
+  })
 }
 
 export function useCreateLoyaltyProgram() {
