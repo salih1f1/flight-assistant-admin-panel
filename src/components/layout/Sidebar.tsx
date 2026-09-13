@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Plane, Building2, MapPin, Globe, Award, Sofa, Database, Upload, LogOut,
+  LayoutDashboard, Users, Plane, Building2, MapPin, Globe, Award, Sofa, Database, Upload, History, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAdminAuth } from '@/auth/useAdminAuth'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/lounges', label: 'Lounges', icon: Sofa },
   { to: '/data', label: 'Data', icon: Database },
   { to: '/import', label: 'Import', icon: Upload },
+  { to: '/audit', label: 'Audit log', icon: History },
 ]
 
 export function Sidebar() {
