@@ -18,6 +18,7 @@ import {
   useAdminRevealValue,
 } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
+import { ExportCsvButton } from './ExportCsvButton'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -281,6 +282,7 @@ export function DataBrowserPage() {
                   ))}
                 </div>
               )}
+              <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
               <FilterForm
                 // Remount when the applied filter or table changes, so the inputs show what's applied.
                 key={`${table}|${filter ?? ''}`}
