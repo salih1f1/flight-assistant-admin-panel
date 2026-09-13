@@ -202,5 +202,11 @@ describe('LoyaltyProgramFormPage', () => {
     // The form navigates back to /loyalty on success.
     expect(await screen.findByText('Renamed Program')).toBeInTheDocument()
     expect(screen.queryByText('Program 3')).not.toBeInTheDocument()
+
+    // Reopening the program must not show the looked-up copy cached before the save.
+    await act(async () => {
+      await router.navigate('/loyalty/3/edit')
+    })
+    expect(await screen.findByDisplayValue('Renamed Program')).toBeInTheDocument()
   })
 })

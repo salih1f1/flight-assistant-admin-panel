@@ -6,6 +6,7 @@ import {
   getAdminGetAllAirportsQueryKey,
   getAdminGetAllLoungesQueryKey,
   getAdminGetLoungeByIdQueryKey,
+  getAdminGetLoyaltyProgramsQueryKey,
 } from './generated/admin'
 
 /*
@@ -28,3 +29,8 @@ export const invalidateAirports = (queryClient: QueryClient, id?: number) =>
 
 export const invalidateLounges = (queryClient: QueryClient, id?: number) =>
   invalidate(queryClient, getAdminGetAllLoungesQueryKey(), id == null ? undefined : getAdminGetLoungeByIdQueryKey(id))
+
+// There is no loyalty detail endpoint; the form's program lookup (loyaltyLookups)
+// is keyed under the list key, so the list invalidation refreshes it too.
+export const invalidateLoyaltyPrograms = (queryClient: QueryClient) =>
+  invalidate(queryClient, getAdminGetLoyaltyProgramsQueryKey())
