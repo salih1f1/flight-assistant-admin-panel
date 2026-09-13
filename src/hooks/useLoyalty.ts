@@ -20,6 +20,10 @@ export function useLoyaltyProgram(id: number | undefined) {
   })
 }
 
+export function useLoyaltyProgramKinds() {
+  return useQuery({ queryKey: ['loyalty-program-kinds'], queryFn: loyaltyApi.listKinds })
+}
+
 export function useCreateLoyaltyProgram() {
   const qc = useQueryClient()
   return useMutation({

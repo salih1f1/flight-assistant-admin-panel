@@ -83,6 +83,12 @@ export interface LoyaltyProgram {
   tiers: LoyaltyTier[]
 }
 
+export interface LoyaltyProgramKind {
+  id: number
+  code: string
+  name: string
+}
+
 export interface AdminLounge {
   id: number
   airportId: number
