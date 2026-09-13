@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AirlineName, AirportName, LoyaltyProgramName, LoyaltyTierName } from '@/components/ReferenceNames'
 import { RevealableValue } from '@/components/RevealableValue'
 import { useAdminGetTravelerDetail } from '@/api/generated/admin'
 import type { AdminTravelerDetailDto } from '@/api/generated/model'
@@ -112,8 +113,8 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
                 <TableRow>
                   <TableHead>Flight</TableHead>
                   <TableHead>Service date</TableHead>
-                  <TableHead>Airline id</TableHead>
-                  <TableHead>Route (airport ids)</TableHead>
+                  <TableHead>Airline</TableHead>
+                  <TableHead>Route</TableHead>
                   <TableHead>Notifications</TableHead>
                 </TableRow>
               </TableHeader>
@@ -128,8 +129,12 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
                       )}
                     </TableCell>
                     <TableCell>{flight.serviceDate ?? '—'}</TableCell>
-                    <TableCell>{flight.airlineId ?? '—'}</TableCell>
-                    <TableCell>{`${flight.departureAirportId ?? '—'} → ${flight.arrivalAirportId ?? '—'}`}</TableCell>
+                    <TableCell><AirlineName id={flight.airlineId} /></TableCell>
+                    <TableCell>
+                      <AirportName id={flight.departureAirportId} />
+                      {' → '}
+                      <AirportName id={flight.arrivalAirportId} />
+                    </TableCell>
                     <TableCell>{flight.notify ? 'On' : 'Off'}</TableCell>
                   </TableRow>
                 ))}
@@ -146,9 +151,9 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Program id</TableHead>
+                <TableHead>Program</TableHead>
                 <TableHead>Account number</TableHead>
-                <TableHead>Tier id</TableHead>
+                <TableHead>Tier</TableHead>
                 <TableHead>Tier expiry</TableHead>
                 <TableHead>Points expiry</TableHead>
               </TableRow>
@@ -156,11 +161,11 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
             <TableBody>
               {memberships.map(membership => (
                 <TableRow key={membership.id}>
-                  <TableCell>{membership.programId ?? '—'}</TableCell>
+                  <TableCell><LoyaltyProgramName id={membership.programId} /></TableCell>
                   <TableCell>
                     <Sensitive value={membership.accountNumber} table="traveler-loyalty-memberships" id={membership.id ?? ''} column="AccountNumber" />
                   </TableCell>
-                  <TableCell>{membership.tierId ?? '—'}</TableCell>
+                  <TableCell><LoyaltyTierName programId={membership.programId} tierId={membership.tierId} /></TableCell>
                   <TableCell>{membership.tierExpiryDate ?? '—'}</TableCell>
                   <TableCell>{membership.pointsExpiryDate ?? '—'}</TableCell>
                 </TableRow>

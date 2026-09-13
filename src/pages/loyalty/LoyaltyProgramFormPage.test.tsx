@@ -40,7 +40,11 @@ let programs: ProgramRow[]
 let sent: SentRequest[]
 
 /** An in-memory loyalty API: create and update change what later reads return. */
+// Shaped like AirlineAdminDto, as GET /admin/airlines/{id} returns it.
+const BRITISH_AIRWAYS = { id: 42, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'ONEWORLD' }
+
 function loyaltyApi(req: SentRequest) {
+  if (req.method === 'GET' && req.url === '/admin/airlines/42') return BRITISH_AIRWAYS
   if (req.method === 'GET' && req.url === '/admin/loyalty/programs') return pagedResult(programs, req.params)
   if (req.method === 'GET' && req.url === '/admin/data/loyalty-program-kinds') return pagedResult(KINDS, req.params)
   const body = req.data as { code: string; name: string; kindId: number; airlineId?: number; allianceCode?: string }
@@ -183,6 +187,28 @@ describe('LoyaltyProgramFormPage', () => {
         expect.objectContaining({ url: '/admin/loyalty/programs/3', data: expect.objectContaining({ airlineId: 42 }) }),
       ),
     )
+  })
+
+  it('names the airline behind the Airline ID, and says when there is no such airline', async () => {
+    programs = programs.map(p => (p.id === 3 ? { ...p, airlineId: 42 } : p))
+    const user = userEvent.setup()
+    renderRoutes('/loyalty/3/edit')
+    const airlineId = await screen.findByPlaceholderText('optional')
+    await waitFor(() => expect(airlineId).toHaveValue(42))
+
+    expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/airlines/42/edit')
+
+    await user.clear(airlineId)
+    await user.type(airlineId, '999')
+
+    expect(await screen.findByText('#999, not found')).toBeInTheDocument()
+
+    await user.clear(airlineId)
+    await user.type(airlineId, '99999999999')
+
+    // Past int's range no route matches (and an unmatched /admin route fails CORS), so it isn't looked up.
+    expect(await screen.findByText('#99999999999, not found')).toBeInTheDocument()
+    expect(sent.some(r => r.url === '/admin/airlines/99999999999')).toBe(false)
   })
 
   it('after saving, the loyalty program list shows the change without a reload', async () => {

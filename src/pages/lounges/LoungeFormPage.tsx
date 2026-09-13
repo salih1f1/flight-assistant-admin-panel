@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AirportName } from '@/components/ReferenceNames'
 import { useAdminCreateLounge, useAdminGetLoungeById, useAdminUpdateLounge } from '@/api/generated/admin'
 import { invalidateLounges } from '@/api/cache'
 
@@ -39,7 +40,7 @@ export function LoungeFormPage() {
     mutation: { onSuccess: (_, variables) => invalidateLounges(queryClient, variables.id) },
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       isAirside: false,
@@ -98,6 +99,10 @@ export function LoungeFormPage() {
           <Label htmlFor="airportId">Airport ID</Label>
           {/* readOnly, not disabled: a disabled field is left out of the submitted values. */}
           <Input id="airportId" type="number" readOnly={isEdit} {...register('airportId')} />
+          {/* Which airport the number is, looked up as it's typed. */}
+          {Number(watch('airportId')) > 0 && (
+            <p className="text-xs text-gray-500"><AirportName id={Number(watch('airportId'))} /></p>
+          )}
           {isEdit && <p className="text-xs text-gray-500">A lounge's airport can't be changed after it's created.</p>}
           {errors.airportId && <p className="text-sm text-red-500">{errors.airportId.message}</p>}
         </div>

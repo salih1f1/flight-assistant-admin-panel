@@ -17,11 +17,15 @@ type LoungeRow = {
   hours: string | null; isAirside: boolean; isDomesticOnly: boolean; isInternationalOnly: boolean; amenities: string | null
 }
 
+// Shaped like AirportAdminDto, as GET /admin/airports/{id} returns it.
+const HEATHROW = { id: 5, iata: 'LHR', icao: 'EGLL', name: 'London Heathrow', city: 'London', countryCode: 'GB', latitude: null, longitude: null, elevationFt: null }
+
 let lounges: LoungeRow[]
 let sent: SentRequest[]
 
 /** An in-memory /admin/lounges: list, get, create and update change what later reads return. */
 function loungesApi(req: SentRequest) {
+  if (req.method === 'GET' && req.url === '/admin/airports/5') return HEATHROW
   if (req.method === 'GET' && req.url === '/admin/lounges') return pagedResult(lounges, req.params)
   if (req.method === 'POST' && req.url === '/admin/lounges') {
     const id = 100 + lounges.length
@@ -143,6 +147,25 @@ describe('LoungeFormPage', () => {
     // The form navigates back to /lounges on success.
     expect(await screen.findByText('Concorde Room')).toBeInTheDocument()
     expect(screen.queryByText('Galleries First')).not.toBeInTheDocument()
+  })
+
+  it("names the lounge's airport, linking to it, rather than showing only its id", async () => {
+    renderRoutes('/lounges/12/edit')
+    await waitFor(async () => expect(await screen.findByLabelText('Airport ID')).toHaveValue(5))
+
+    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/airports/5/edit')
+  })
+
+  it('names the airport for an id typed into a new lounge, and says when there is no such airport', async () => {
+    const user = userEvent.setup()
+    renderRoutes('/lounges/new')
+    const airportId = await screen.findByLabelText('Airport ID')
+
+    await user.type(airportId, '5')
+    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toBeInTheDocument()
+
+    await user.type(airportId, '7')
+    expect(await screen.findByText('#57, not found')).toBeInTheDocument()
   })
 
   it("editing shows the airport as read-only and does not send it, since the API can't change it", async () => {
