@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminGetAeroApiUsage } from '@/api/generated/admin'
 import type { AeroApiUsageDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
+import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
 
 // The API caches the upstream report for 10 minutes, so refetching sooner shows nothing new.
@@ -12,9 +13,6 @@ const SERVER_CACHE_MS = 10 * 60 * 1000
 const NEAR_BUDGET_PERCENT = 80
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-
-/** "2026-09-13 20:10", always in UTC: the budget is a UTC calendar month. */
-const utcMinute = (iso: string) => new Date(iso).toISOString().slice(0, 16).replace('T', ' ')
 
 function untilNextSlot(nextSlotUtc: string | null | undefined): string {
   const seconds = nextSlotUtc ? Math.ceil((new Date(nextSlotUtc).getTime() - Date.now()) / 1000) : 0
@@ -97,7 +95,7 @@ function UsageReport({ usage }: { usage: AeroApiUsageDto }) {
           <p className="text-sm text-gray-500">No monthly budget is configured.</p>
         )}
         {usage.rangeStartUtc && usage.rangeEndUtc && (
-          <p className="text-xs text-gray-400">{`${utcMinute(usage.rangeStartUtc)} – ${utcMinute(usage.rangeEndUtc)} UTC`}</p>
+          <p className="text-xs text-gray-400">{`${formatUtcMinute(usage.rangeStartUtc)} – ${formatUtcMinute(usage.rangeEndUtc)} UTC`}</p>
         )}
       </div>
 
