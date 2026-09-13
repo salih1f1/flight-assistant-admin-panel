@@ -1,9 +1,8 @@
 import type { ComponentType } from 'react'
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiClient } from '@/api/client'
-import { fakePagedGet } from '@/test/fakePagedGet'
+import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { AirportsPage } from './airports/AirportsPage'
 import { LoungesPage } from './lounges/LoungesPage'
@@ -11,21 +10,24 @@ import { LoyaltyProgramsPage } from './loyalty/LoyaltyProgramsPage'
 import { FlightsPage } from './flights/FlightsPage'
 import { TravelersPage } from './travelers/TravelersPage'
 
-// The same wiring runs on every paged list page: api module -> hook -> page ->
-// DataTable. Mocked at the HTTP boundary so all of it runs. AirlinesPage has its
-// own, fuller test, including the last-page boundary.
-vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn() } }))
+// The same wiring runs on every paged list page: api layer -> hook -> page ->
+// DataTable. Faked at the apiClient boundary (both the hand-written client's
+// get/delete and the generated client's request), so these tests hold while each
+// page moves onto the generated client. AirlinesPage has its own, fuller test.
+vi.mock('@/api/client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+}))
 
 const TOTAL = 120 // 3 pages at the panel's page size of 50
 const pad = (n: number) => String(n).padStart(3, '0')
 
-// Rows follow the API's DTOs in spec/openapi.json, not the panel's hand-written
+// Rows follow the API's DTOs in openapi/openapi.json, not the panel's hand-written
 // types, since the DTOs are what the endpoint really sends.
 const cases: {
   page: string
   Component: ComponentType
   url: string
-  row: (n: number) => Record<string, unknown>
+  row: (n: number) => Record<string, unknown> & { id: number | string }
   text: (n: number) => string
 }[] = [
   {
@@ -71,10 +73,20 @@ const cases: {
 ]
 
 describe.each(cases)('$page', ({ Component, url, row, text }) => {
-  const rows = Array.from({ length: TOTAL }, (_, i) => row(i + 1))
+  let rows: ReturnType<typeof row>[]
+  let sent: SentRequest[]
 
   beforeEach(() => {
-    vi.mocked(apiClient.get).mockReset().mockImplementation(fakePagedGet({ [url]: rows }))
+    rows = Array.from({ length: TOTAL }, (_, i) => row(i + 1))
+    ;({ sent } = installFakeApi(req => {
+      if (req.method === 'GET' && req.url === url) return pagedResult(rows, req.params)
+      if (req.method === 'DELETE' && req.url.startsWith(`${url}/`)) {
+        const id = req.url.slice(url.length + 1)
+        rows = rows.filter(r => String(r.id) !== id)
+        return undefined
+      }
+      throw httpError(404)
+    }))
   })
 
   it('lists the rows on the first page the API returns', async () => {
@@ -101,14 +113,32 @@ describe.each(cases)('$page', ({ Component, url, row, text }) => {
 
     expect(await screen.findByText(text(51))).toBeInTheDocument()
     expect(screen.queryByText(text(1))).not.toBeInTheDocument()
-    expect(apiClient.get).toHaveBeenLastCalledWith(url, { params: { Page: 2, PageSize: 50 } })
+    expect(sent[sent.length - 1]).toEqual(
+      expect.objectContaining({ method: 'GET', url, params: { Page: 2, PageSize: 50 } }),
+    )
   })
 
   it('shows why the list failed to load instead of "No results."', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Request failed with status code 500'))
+    installFakeApi(() => {
+      throw httpError(500)
+    })
     renderWithProviders(<Component />)
 
     expect(await screen.findByText('Could not load: Request failed with status code 500')).toBeInTheDocument()
     expect(screen.queryByText(/no results/i)).not.toBeInTheDocument()
+  })
+
+  it('deleting a row sends DELETE and drops it from the list without a reload', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<Component />)
+    const tableRow = (await screen.findByText(text(1))).closest('tr')!
+
+    // Every list's row actions end with the delete button, second of two.
+    await user.click(within(tableRow).getAllByRole('button')[1])
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(screen.queryByText(text(1))).not.toBeInTheDocument())
+    expect(screen.getByText(`Page 1 of 3 · ${TOTAL - 1} total`)).toBeInTheDocument()
+    expect(sent).toContainEqual(expect.objectContaining({ method: 'DELETE', url: `${url}/${row(1).id}` }))
   })
 })
