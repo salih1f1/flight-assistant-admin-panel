@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AirlineName, AirportName } from '@/components/ReferenceNames'
 import { useAdminGetFlightDetail } from '@/api/generated/admin'
 import type { AdminFlightDetailDto, AdminFlightStatusEventDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -54,8 +55,12 @@ function FlightDetail({ flight }: { flight: AdminFlightDetailDto }) {
 
       <Section id="flight-overview" title="Flight">
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Airline id">{flight.airlineId ?? '—'}</Fact>
-          <Fact label="Route (airport ids)">{`${flight.departureAirportId ?? '—'} → ${flight.arrivalAirportId ?? '—'}`}</Fact>
+          <Fact label="Airline"><AirlineName id={flight.airlineId} /></Fact>
+          <Fact label="Route">
+            <AirportName id={flight.departureAirportId} />
+            {' → '}
+            <AirportName id={flight.arrivalAirportId} />
+          </Fact>
           <Fact label="Aircraft">{flight.equipmentAircraftIcao ?? '—'}</Fact>
           <Fact label="External id"><span className="break-all font-mono text-xs">{flight.externalId ?? '—'}</span></Fact>
           <Fact label="Scheduled departure">{utc(flight.scheduledDepartureUtc)}</Fact>

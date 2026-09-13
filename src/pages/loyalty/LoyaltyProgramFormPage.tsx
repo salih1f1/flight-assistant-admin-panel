@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AirlineName } from '@/components/ReferenceNames'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdminCreateLoyaltyProgram, useAdminUpdateLoyaltyProgram } from '@/api/generated/admin'
 import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
@@ -38,7 +39,7 @@ export function LoyaltyProgramFormPage() {
   const createMutation = useAdminCreateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
   const updateMutation = useAdminUpdateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 
@@ -110,6 +111,10 @@ export function LoyaltyProgramFormPage() {
               <div className="space-y-1.5">
                 <Label>Airline ID</Label>
                 <Input type="number" {...register('airlineId')} placeholder="optional" />
+                {/* Which airline the number is, looked up as it's typed. */}
+                {Number(watch('airlineId')) > 0 && (
+                  <p className="text-xs text-gray-500"><AirlineName id={Number(watch('airlineId'))} /></p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Alliance code</Label>

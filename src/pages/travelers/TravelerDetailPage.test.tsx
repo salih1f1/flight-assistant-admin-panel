@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { httpError, installFakeApi, type SentRequest } from '@/test/fakeApi'
+import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { TravelerDetailPage } from './TravelerDetailPage'
 
 vi.mock('@/api/client', () => ({
@@ -37,11 +37,25 @@ const REVEALED: Record<string, string> = {
   [`traveler-loyalty-memberships|${MEMBERSHIP_ID}|AccountNumber`]: 'BA-12345678',
 }
 
+// The names behind the ids above, shaped like AirlineAdminDto, AirportAdminDto and LoyaltyProgramDto
+// (a program carries its tiers, which is where a membership's tier name comes from).
+const BRITISH_AIRWAYS = { id: 7, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'ONEWORLD' }
+const HEATHROW = { id: 11, iata: 'LHR', icao: 'EGLL', name: 'London Heathrow', city: 'London', countryCode: 'GB', latitude: null, longitude: null, elevationFt: null }
+const JFK = { id: 12, iata: 'JFK', icao: 'KJFK', name: 'New York JFK', city: 'New York', countryCode: 'US', latitude: null, longitude: null, elevationFt: null }
+const EXECUTIVE_CLUB = {
+  id: 3, code: 'EXEC_CLUB', name: 'Executive Club', kind: 'AIRLINE', airlineId: 7, allianceCode: 'ONEWORLD',
+  tiers: [{ id: 1, code: 'SILVER', name: 'Silver', rank: 2, allianceCode: null, allianceTierCode: null }, { id: 2, code: 'GOLD', name: 'Gold', rank: 3, allianceCode: null, allianceTierCode: null }],
+}
+
 let detail: ReturnType<typeof makeDetail>
 let sent: SentRequest[]
 
 function install() {
   ;({ sent } = installFakeApi(req => {
+    if (req.method === 'GET' && req.url === '/admin/airlines/7') return BRITISH_AIRWAYS
+    if (req.method === 'GET' && req.url === '/admin/airports/11') return HEATHROW
+    if (req.method === 'GET' && req.url === '/admin/airports/12') return JFK
+    if (req.method === 'GET' && req.url === '/admin/loyalty/programs') return pagedResult([EXECUTIVE_CLUB], req.params)
     const detailUrl = req.url.match(/^\/admin\/travelers\/([^/]+)\/detail$/)
     if (req.method === 'GET' && detailUrl) {
       // Results.NotFound(): an empty 404, not ProblemDetails.
@@ -127,7 +141,9 @@ describe('TravelerDetailPage', () => {
 
     const memberships = region('Loyalty memberships')
     const row = within(memberships).getAllByRole('row')[1]
-    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['3', 'Masked', '2', '2027-03-31', '—'])
+    // The program and tier by name, not their ids.
+    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['Executive Club (EXEC_CLUB)', 'Masked', 'Gold', '2027-03-31', '—']))
+    expect(within(row).getByRole('link', { name: 'Executive Club (EXEC_CLUB)' })).toHaveAttribute('href', '/loyalty/3/edit')
 
     await reveal(user, memberships, 'AccountNumber')
 
@@ -141,9 +157,19 @@ describe('TravelerDetailPage', () => {
 
     const flights = region('Tracked flights')
     const row = within(flights).getAllByRole('row')[1]
-    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['BA117', '2026-09-20', '7', '11 → 12', 'On'])
+    // The airline and airports by name, not their ids.
+    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['BA117', '2026-09-20', 'British Airways (BA)', 'London Heathrow (LHR) → New York JFK (JFK)', 'On']))
     expect(within(row).getByRole('link', { name: 'BA117' })).toHaveAttribute('href', '/flights/42')
     expect(flights).not.toHaveTextContent('most recent')
+  })
+
+  it("keeps the id and says it wasn't found when a program or tier no longer exists", async () => {
+    detail = { ...makeDetail(), loyaltyMemberships: [{ ...makeDetail().loyaltyMemberships[0], programId: 9, tierId: 5 }] }
+    renderAt(TRAVELER_ID)
+    await screen.findByRole('heading', { name: 'Ann Example' })
+
+    const row = within(region('Loyalty memberships')).getAllByRole('row')[1]
+    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['#9, not found', 'Masked', '#5, not found', '2027-03-31', '—']))
   })
 
   it('says when tracked flights were cut off, and links to all of them in the Data page', async () => {

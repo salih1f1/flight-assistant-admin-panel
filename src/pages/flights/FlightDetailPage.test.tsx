@@ -36,6 +36,11 @@ const makeDetail = () => ({
   statusHistoryTruncated: false,
 })
 
+// Shaped like AirlineAdminDto and AirportAdminDto, as GET /admin/airlines/{id} and /admin/airports/{id} return them.
+const BRITISH_AIRWAYS = { id: 7, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'ONEWORLD' }
+const HEATHROW = { id: 11, iata: 'LHR', icao: 'EGLL', name: 'London Heathrow', city: 'London', countryCode: 'GB', latitude: 51.47, longitude: -0.4543, elevationFt: 83 }
+const JFK = { id: 12, iata: 'JFK', icao: 'KJFK', name: 'New York JFK', city: 'New York', countryCode: 'US', latitude: 40.6413, longitude: -73.7781, elevationFt: 13 }
+
 let detail: ReturnType<typeof makeDetail>
 let sent: SentRequest[]
 
@@ -58,6 +63,9 @@ describe('FlightDetailPage', () => {
   beforeEach(() => {
     detail = makeDetail()
     ;({ sent } = installFakeApi(req => {
+      if (req.method === 'GET' && req.url === '/admin/airlines/7') return BRITISH_AIRWAYS
+      if (req.method === 'GET' && req.url === '/admin/airports/11') return HEATHROW
+      if (req.method === 'GET' && req.url === '/admin/airports/12') return JFK
       const match = req.url.match(/^\/admin\/flights\/(\d+)\/detail$/)
       // Results.NotFound(): an empty 404, not ProblemDetails.
       if (req.method === 'GET' && match) {
@@ -76,13 +84,32 @@ describe('FlightDetailPage', () => {
     expect(screen.getByRole('link', { name: 'Back to flights' })).toHaveAttribute('href', '/flights')
   })
 
-  it('shows the route, aircraft and the scheduled, estimated and actual times in UTC', async () => {
+  it('names the airline and airports, linking to them, rather than showing their ids', async () => {
     renderAt(String(FLIGHT_ID))
     await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
 
     const flight = region('Flight')
-    expect(fact(flight, 'Airline id')).toHaveTextContent('7')
-    expect(fact(flight, 'Route (airport ids)')).toHaveTextContent('11 → 12')
+    expect(await within(flight).findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/airlines/7/edit')
+    await waitFor(() => expect(fact(flight, 'Route')).toHaveTextContent('London Heathrow (LHR) → New York JFK (JFK)'))
+    expect(within(flight).getByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/airports/11/edit')
+    expect(within(flight).getByRole('link', { name: 'New York JFK (JFK)' })).toHaveAttribute('href', '/airports/12/edit')
+  })
+
+  it("keeps the id and says it wasn't found when an airline or airport no longer exists", async () => {
+    detail = { ...makeDetail(), airlineId: 999, arrivalAirportId: 998 }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    const flight = region('Flight')
+    await waitFor(() => expect(fact(flight, 'Airline')).toHaveTextContent('#999, not found'))
+    await waitFor(() => expect(fact(flight, 'Route')).toHaveTextContent('London Heathrow (LHR) → #998, not found'))
+  })
+
+  it('shows the aircraft and the scheduled, estimated and actual times in UTC', async () => {
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    const flight = region('Flight')
     expect(fact(flight, 'Aircraft')).toHaveTextContent('B77W')
     expect(fact(flight, 'External id')).toHaveTextContent('BAW117-1726822800-schedule-0001')
     expect(fact(flight, 'Scheduled departure')).toHaveTextContent('2026-09-20 10:00 UTC')
