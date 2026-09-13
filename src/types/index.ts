@@ -25,18 +25,6 @@ export interface AdminFlight {
   externalId: string | null
 }
 
-export interface Airport {
-  id: number
-  iata: string
-  icao: string | null
-  name: string
-  city: string
-  countryCode: string
-  latitude: number | null
-  longitude: number | null
-  elevationFt: number | null
-}
-
 export interface Country {
   code: string
   name: string
@@ -79,19 +67,6 @@ export interface LoyaltyProgramKind {
   name: string
 }
 
-export interface AdminLounge {
-  id: number
-  airportId: number
-  name: string
-  terminal: string | null
-  locationHint: string | null
-  hours: string | null
-  isAirside: boolean
-  isDomesticOnly: boolean
-  isInternationalOnly: boolean
-  amenities: string | null
-}
-
 /**
  * Envelope returned by every paged admin list (/admin/airlines, /admin/airports, …).
  * `total` counts all matching rows, not the ones in `items`.
@@ -104,33 +79,10 @@ export interface PagedResult<T> {
 }
 
 // Request types
-export interface CreateAirportRequest {
-  iata: string
-  icao?: string
-  name: string
-  city: string
-  countryCode: string
-  latitude?: number
-  longitude?: number
-  elevationFt?: number
-}
-
 export interface CreateLoyaltyProgramRequest {
   code: string
   name: string
   kindId: number
   airlineId?: number
   allianceCode?: string
-}
-
-export interface CreateLoungeRequest {
-  airportId: number
-  name: string
-  terminal?: string
-  locationHint?: string
-  hours?: string
-  isAirside: boolean
-  isDomesticOnly: boolean
-  isInternationalOnly: boolean
-  amenities?: string
 }

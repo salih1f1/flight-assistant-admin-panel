@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAirport, useCreateAirport, useUpdateAirport } from '@/hooks/useAirports'
+import { useAdminCreateAirport, useAdminGetAirportById, useAdminUpdateAirport } from '@/api/generated/admin'
+import { invalidateAirports } from '@/api/cache'
 import { optionalInt, optionalNumber } from '@/lib/formNumbers'
 
 const schema = z.object({
@@ -30,16 +32,29 @@ export function AirportFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
-  const { data: existing } = useAirport(isEdit ? Number(id) : -1)
-  const createMutation = useCreateAirport()
-  const updateMutation = useUpdateAirport()
+  const queryClient = useQueryClient()
+  const { data: existing } = useAdminGetAirportById(Number(id), { query: { enabled: isEdit } })
+  const createMutation = useAdminCreateAirport({ mutation: { onSuccess: () => invalidateAirports(queryClient) } })
+  const updateMutation = useAdminUpdateAirport({
+    mutation: { onSuccess: (_, variables) => invalidateAirports(queryClient, variables.id) },
+  })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 
   useEffect(() => {
-    if (existing) reset({ ...existing, icao: existing.icao ?? '' })
+    // The spec marks every field nullable, so text fields are defaulted to ''.
+    if (existing) reset({
+      iata: existing.iata ?? '',
+      icao: existing.icao ?? '',
+      name: existing.name ?? '',
+      city: existing.city ?? '',
+      countryCode: existing.countryCode ?? '',
+      latitude: existing.latitude,
+      longitude: existing.longitude,
+      elevationFt: existing.elevationFt,
+    })
   }, [existing, reset])
 
   const onSubmit = (data: FormData) => {
@@ -47,7 +62,7 @@ export function AirportFormPage() {
     if (isEdit) {
       updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/airports') })
     } else {
-      createMutation.mutate(payload, { onSuccess: () => navigate('/airports') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/airports') })
     }
   }
 

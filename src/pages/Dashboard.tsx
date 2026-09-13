@@ -2,10 +2,8 @@ import { Users, Plane, Building2, MapPin, Award, Sofa } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTravelers } from '@/hooks/useTravelers'
 import { useFlights } from '@/hooks/useFlights'
-import { useAdminGetAllAirlines } from '@/api/generated/admin'
-import { useAirports } from '@/hooks/useAirports'
+import { useAdminGetAllAirlines, useAdminGetAllAirports, useAdminGetAllLounges } from '@/api/generated/admin'
 import { useLoyaltyPrograms } from '@/hooks/useLoyalty'
-import { useLounges } from '@/hooks/useLounges'
 
 type Count = { count: number | undefined; isLoading: boolean }
 
@@ -19,9 +17,9 @@ const stats = [
   { label: 'Travelers', icon: Users, useCount: () => totalOf(useTravelers(1, 1)), color: 'text-blue-600' },
   { label: 'Flights', icon: Plane, useCount: () => totalOf(useFlights(1, 1)), color: 'text-green-600' },
   { label: 'Airlines', icon: Building2, useCount: () => totalOf(useAdminGetAllAirlines({ Page: 1, PageSize: 1 })), color: 'text-purple-600' },
-  { label: 'Airports', icon: MapPin, useCount: () => totalOf(useAirports(1, 1)), color: 'text-orange-600' },
+  { label: 'Airports', icon: MapPin, useCount: () => totalOf(useAdminGetAllAirports({ Page: 1, PageSize: 1 })), color: 'text-orange-600' },
   { label: 'Loyalty Programs', icon: Award, useCount: () => totalOf(useLoyaltyPrograms(1, 1)), color: 'text-yellow-600' },
-  { label: 'Lounges', icon: Sofa, useCount: () => totalOf(useLounges(1, 1)), color: 'text-pink-600' },
+  { label: 'Lounges', icon: Sofa, useCount: () => totalOf(useAdminGetAllLounges({ Page: 1, PageSize: 1 })), color: 'text-pink-600' },
 ]
 
 function StatCard({ label, icon: Icon, useCount, color }: (typeof stats)[0]) {

@@ -1,24 +1,30 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useAirports, useDeleteAirport } from '@/hooks/useAirports'
-import type { Airport } from '@/types'
+import { useAdminDeleteAirport, useAdminGetAllAirports } from '@/api/generated/admin'
+import type { AirportAdminDto } from '@/api/generated/model'
+import { invalidateAirports } from '@/api/cache'
 
 const PAGE_SIZE = 50
 
 export function AirportsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading, error } = useAirports(page, PAGE_SIZE)
-  const deleteMutation = useDeleteAirport()
+  const queryClient = useQueryClient()
+  const { data, isLoading, error } = useAdminGetAllAirports(
+    { Page: page, PageSize: PAGE_SIZE },
+    { query: { placeholderData: keepPreviousData } },
+  )
+  const deleteMutation = useAdminDeleteAirport({ mutation: { onSuccess: () => invalidateAirports(queryClient) } })
   const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const columns: ColumnDef<Airport>[] = [
+  const columns: ColumnDef<AirportAdminDto>[] = [
     { accessorKey: 'iata', header: 'IATA', cell: ({ row }) => <Badge variant="outline">{row.original.iata}</Badge> },
     { accessorKey: 'icao', header: 'ICAO', cell: ({ row }) => row.original.icao ?? '—' },
     { accessorKey: 'name', header: 'Name' },
@@ -32,7 +38,7 @@ export function AirportsPage() {
           <Button size="sm" variant="ghost" onClick={() => navigate(`/airports/${row.original.id}/edit`)}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id)}>
+          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id ?? null)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -65,7 +71,7 @@ export function AirportsPage() {
         description="This will permanently delete this airport record."
         loading={deleteMutation.isPending}
         onConfirm={() => {
-          if (deleteId != null) deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) })
+          if (deleteId != null) deleteMutation.mutate({ id: deleteId }, { onSuccess: () => setDeleteId(null) })
         }}
       />
     </div>

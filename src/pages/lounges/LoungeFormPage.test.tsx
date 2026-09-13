@@ -144,4 +144,18 @@ describe('LoungeFormPage', () => {
     expect(await screen.findByText('Concorde Room')).toBeInTheDocument()
     expect(screen.queryByText('Galleries First')).not.toBeInTheDocument()
   })
+
+  it("editing shows the airport as read-only and does not send it, since the API can't change it", async () => {
+    const user = userEvent.setup()
+    renderRoutes('/lounges/12/edit')
+    const airportId = await screen.findByLabelText('Airport ID')
+    await waitFor(() => expect(airportId).toHaveValue(5))
+
+    expect(airportId).toHaveAttribute('readonly')
+    expect(screen.getByText("A lounge's airport can't be changed after it's created.")).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(sent.some(r => r.method === 'PUT')).toBe(true))
+    expect(sent.find(r => r.method === 'PUT')!.data).not.toHaveProperty('airportId')
+  })
 })

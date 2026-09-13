@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAdminDeleteAirline, useAdminGetAllAirlines } from '@/api/generated/admin'
 import type { AirlineAdminDto } from '@/api/generated/model'
-import { invalidateAirlines } from '@/api/airlinesCache'
+import { invalidateAirlines } from '@/api/cache'
 
 const PAGE_SIZE = 50
 
