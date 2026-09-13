@@ -1,10 +1,12 @@
 import { screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiClient } from '@/api/client'
+import { httpError, installFakeApi, type SentRequest } from '@/test/fakeApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { CountriesPage } from './CountriesPage'
 
-vi.mock('@/api/client', () => ({ apiClient: { get: vi.fn() } }))
+vi.mock('@/api/client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+}))
 
 // Shaped like CountryAdminDto. GET /admin/refdata/countries returns a plain
 // array, not a PagedResult.
@@ -13,15 +15,15 @@ const COUNTRIES = [
   { code: 'GB', name: 'United Kingdom', alpha3: 'GBR', numericCode: 826, region: 'Europe', subregion: 'Northern Europe', isEU: false, isSchengen: false, isEEA: false },
 ]
 
-/** Only the route the API really maps answers; anything else is a 404, as on the server. */
-function fakeGet(url: string) {
-  if (url === '/admin/refdata/countries') return Promise.resolve({ data: COUNTRIES })
-  return Promise.reject(Object.assign(new Error('Request failed with status code 404'), { response: { status: 404 } }))
-}
+let sent: SentRequest[]
 
 describe('CountriesPage', () => {
   beforeEach(() => {
-    vi.mocked(apiClient.get).mockReset().mockImplementation(fakeGet as typeof apiClient.get)
+    // Only the route the API really maps answers; anything else is a 404, as on the server.
+    ;({ sent } = installFakeApi(req => {
+      if (req.method === 'GET' && req.url === '/admin/refdata/countries') return COUNTRIES
+      throw httpError(404)
+    }))
   })
 
   it('lists the countries from /admin/refdata/countries', async () => {
@@ -29,11 +31,21 @@ describe('CountriesPage', () => {
 
     expect(await screen.findByText('Germany')).toBeInTheDocument()
     expect(screen.getByText('United Kingdom')).toBeInTheDocument()
-    expect(apiClient.get).toHaveBeenCalledWith('/admin/refdata/countries')
+    expect(sent).toContainEqual(expect.objectContaining({ method: 'GET', url: '/admin/refdata/countries' }))
+  })
+
+  it("shows each country's memberships", async () => {
+    renderWithProviders(<CountriesPage />)
+
+    const germany = (await screen.findByText('Germany')).closest('tr')!
+    expect(germany).toHaveTextContent('EUSchengenEEA')
+    expect(screen.getByText('United Kingdom').closest('tr')).not.toHaveTextContent(/EU|Schengen|EEA/)
   })
 
   it('shows why the list failed to load instead of "No results."', async () => {
-    vi.mocked(apiClient.get).mockRejectedValue(new Error('Request failed with status code 500'))
+    installFakeApi(() => {
+      throw httpError(500)
+    })
     renderWithProviders(<CountriesPage />)
 
     expect(await screen.findByText('Could not load: Request failed with status code 500')).toBeInTheDocument()
