@@ -1,23 +1,29 @@
 import { useState } from 'react'
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Trash2, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useFlights, useDeleteFlight, useSyncFlight } from '@/hooks/useFlights'
-import type { AdminFlight } from '@/types'
+import { useAdminDeleteFlight, useAdminGetAllFlights, useAdminSyncFlightStatus } from '@/api/generated/admin'
+import type { AdminFlightDto } from '@/api/generated/model'
+import { invalidateFlights } from '@/api/cache'
 
 const PAGE_SIZE = 50
 
 export function FlightsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading, error } = useFlights(page, PAGE_SIZE)
-  const deleteMutation = useDeleteFlight()
-  const syncMutation = useSyncFlight()
+  const queryClient = useQueryClient()
+  const { data, isLoading, error } = useAdminGetAllFlights(
+    { Page: page, PageSize: PAGE_SIZE },
+    { query: { placeholderData: keepPreviousData } },
+  )
+  const deleteMutation = useAdminDeleteFlight({ mutation: { onSuccess: () => invalidateFlights(queryClient) } })
+  const syncMutation = useAdminSyncFlightStatus({ mutation: { onSuccess: () => invalidateFlights(queryClient) } })
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
-  const columns: ColumnDef<AdminFlight>[] = [
+  const columns: ColumnDef<AdminFlightDto>[] = [
     { accessorKey: 'flightNumber', header: 'Flight #' },
     { accessorKey: 'serviceDate', header: 'Date', cell: ({ row }) => row.original.serviceDate },
     {
@@ -33,7 +39,10 @@ export function FlightsPage() {
     {
       id: 'departure',
       header: 'Departure',
-      cell: ({ row }) => new Date(row.original.scheduledDepartureUtc).toLocaleString(),
+      cell: ({ row }) => {
+        const departure = row.original.scheduledDepartureUtc
+        return departure ? new Date(departure).toLocaleString() : '—'
+      },
     },
     {
       id: 'actions',
@@ -42,13 +51,15 @@ export function FlightsPage() {
         <div className="flex gap-2 justify-end">
           <Button
             size="sm" variant="ghost"
-            onClick={() => syncMutation.mutate(row.original.id)}
+            onClick={() => {
+              if (row.original.id != null) syncMutation.mutate({ id: row.original.id })
+            }}
             disabled={syncMutation.isPending}
             title="Sync status"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id)}>
+          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id ?? null)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -76,7 +87,7 @@ export function FlightsPage() {
         description="This will remove the flight record and all tracking links."
         loading={deleteMutation.isPending}
         onConfirm={() => {
-          if (deleteId != null) deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) })
+          if (deleteId != null) deleteMutation.mutate({ id: deleteId }, { onSuccess: () => setDeleteId(null) })
         }}
       />
     </div>

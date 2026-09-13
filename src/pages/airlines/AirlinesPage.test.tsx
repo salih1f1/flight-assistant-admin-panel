@@ -5,10 +5,9 @@ import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { AirlinesPage } from './AirlinesPage'
 
-// Mocked at the HTTP boundary, with every entry point the hand-written and the
-// generated client use, so the test runs the real api layer, hooks, page and table.
+// Mocked at the HTTP boundary, so the test runs the real generated client, hooks, page and table.
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 // Shaped like AirlineAdminDto.

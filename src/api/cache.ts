@@ -4,7 +4,9 @@ import {
   getAdminGetAirportByIdQueryKey,
   getAdminGetAllAirlinesQueryKey,
   getAdminGetAllAirportsQueryKey,
+  getAdminGetAllFlightsQueryKey,
   getAdminGetAllLoungesQueryKey,
+  getAdminGetAllTravelersQueryKey,
   getAdminGetLoungeByIdQueryKey,
   getAdminGetLoyaltyProgramsQueryKey,
 } from './generated/admin'
@@ -29,6 +31,11 @@ export const invalidateAirports = (queryClient: QueryClient, id?: number) =>
 
 export const invalidateLounges = (queryClient: QueryClient, id?: number) =>
   invalidate(queryClient, getAdminGetAllLoungesQueryKey(), id == null ? undefined : getAdminGetLoungeByIdQueryKey(id))
+
+// The panel has no flight or traveler detail page, so only the lists need refreshing.
+export const invalidateFlights = (queryClient: QueryClient) => invalidate(queryClient, getAdminGetAllFlightsQueryKey())
+
+export const invalidateTravelers = (queryClient: QueryClient) => invalidate(queryClient, getAdminGetAllTravelersQueryKey())
 
 // There is no loyalty detail endpoint; the form's program lookup (loyaltyLookups)
 // is keyed under the list key, so the list invalidation refreshes it too.

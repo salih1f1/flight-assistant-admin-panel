@@ -1,30 +1,39 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Trash2, Eye } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { Button } from '@/components/ui/button'
-import { useTravelers, useDeleteTraveler } from '@/hooks/useTravelers'
-import type { AdminTraveler } from '@/types'
+import { useAdminDeleteTraveler, useAdminGetAllTravelers } from '@/api/generated/admin'
+import type { AdminTravelerDto } from '@/api/generated/model'
+import { invalidateTravelers } from '@/api/cache'
 
 const PAGE_SIZE = 50
 
 export function TravelersPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading, error } = useTravelers(page, PAGE_SIZE)
-  const deleteMutation = useDeleteTraveler()
+  const queryClient = useQueryClient()
+  const { data, isLoading, error } = useAdminGetAllTravelers(
+    { Page: page, PageSize: PAGE_SIZE },
+    { query: { placeholderData: keepPreviousData } },
+  )
+  const deleteMutation = useAdminDeleteTraveler({ mutation: { onSuccess: () => invalidateTravelers(queryClient) } })
   const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const columns: ColumnDef<AdminTraveler>[] = [
+  // No country column: AdminTravelerDto has no country field.
+  const columns: ColumnDef<AdminTravelerDto>[] = [
     { accessorKey: 'email', header: 'Email' },
     { accessorKey: 'displayName', header: 'Display Name', cell: ({ row }) => row.original.displayName ?? '—' },
-    { accessorKey: 'countryCode', header: 'Country', cell: ({ row }) => row.original.countryCode ?? '—' },
     {
       accessorKey: 'createdUtc',
       header: 'Registered',
-      cell: ({ row }) => new Date(row.original.createdUtc).toLocaleDateString(),
+      cell: ({ row }) => {
+        const created = row.original.createdUtc
+        return created ? new Date(created).toLocaleDateString() : '—'
+      },
     },
     {
       id: 'actions',
@@ -34,7 +43,7 @@ export function TravelersPage() {
           <Button size="sm" variant="ghost" onClick={() => navigate(`/travelers/${row.original.id}`)}>
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id)}>
+          <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id ?? null)}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -62,7 +71,7 @@ export function TravelersPage() {
         description="This will permanently delete the traveler and all their data."
         loading={deleteMutation.isPending}
         onConfirm={() => {
-          if (deleteId) deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) })
+          if (deleteId) deleteMutation.mutate({ id: deleteId }, { onSuccess: () => setDeleteId(null) })
         }}
       />
     </div>

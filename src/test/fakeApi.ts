@@ -15,33 +15,19 @@ export function httpError(status: number) {
 }
 
 /**
- * Fakes the API at the apiClient boundary, however the code under test calls it:
- * the hand-written modules use apiClient.get/post/put/delete, the orval-generated
- * client uses apiClient.request. Each call becomes one SentRequest, is recorded in
- * `sent`, and is answered by `handler` (throw httpError(...) for a failure). Tests
- * assert on what was sent rather than on which method sent it, so they hold while
- * pages move from the hand-written client to the generated one.
+ * Fakes the API at the apiClient boundary. The orval-generated client sends every
+ * call through apiClient.request; each call becomes one SentRequest, is recorded
+ * in `sent`, and is answered by `handler` (throw httpError(...) for a failure).
  *
- * The test file must mock '@/api/client' with get, post, put, delete and request.
+ * The test file must mock '@/api/client' with { apiClient: { request: vi.fn() } }.
  */
 export function installFakeApi(handler: (req: SentRequest) => unknown) {
   const sent: SentRequest[] = []
-  const respond = async (req: SentRequest) => {
+  vi.mocked(apiClient.request).mockReset().mockImplementation((async (config: AxiosRequestConfig) => {
+    const req = { method: (config.method ?? 'GET').toUpperCase(), url: config.url ?? '', params: config.params, data: config.data }
     sent.push(req)
     return { data: await handler(req) }
-  }
-  const client = vi.mocked(apiClient)
-
-  client.get.mockReset().mockImplementation(((url: string, config?: AxiosRequestConfig) =>
-    respond({ method: 'GET', url, params: config?.params })) as never)
-  client.delete.mockReset().mockImplementation(((url: string, config?: AxiosRequestConfig) =>
-    respond({ method: 'DELETE', url, params: config?.params })) as never)
-  client.post.mockReset().mockImplementation(((url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    respond({ method: 'POST', url, data, params: config?.params })) as never)
-  client.put.mockReset().mockImplementation(((url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    respond({ method: 'PUT', url, data, params: config?.params })) as never)
-  client.request.mockReset().mockImplementation(((config: AxiosRequestConfig) =>
-    respond({ method: (config.method ?? 'GET').toUpperCase(), url: config.url ?? '', params: config.params, data: config.data })) as never)
+  }) as never)
 
   return { sent }
 }

@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { Dashboard } from './Dashboard'
 
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 // A different total per list, so a tile wired to the wrong endpoint shows the wrong number.

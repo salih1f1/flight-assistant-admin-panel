@@ -10,19 +10,17 @@ import { LoyaltyProgramsPage } from './loyalty/LoyaltyProgramsPage'
 import { FlightsPage } from './flights/FlightsPage'
 import { TravelersPage } from './travelers/TravelersPage'
 
-// The same wiring runs on every paged list page: api layer -> hook -> page ->
-// DataTable. Faked at the apiClient boundary (both the hand-written client's
-// get/delete and the generated client's request), so these tests hold while each
-// page moves onto the generated client. AirlinesPage has its own, fuller test.
+// The same wiring runs on every paged list page: generated client -> page ->
+// DataTable, faked at the apiClient boundary. AirlinesPage has its own, fuller test.
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 const TOTAL = 120 // 3 pages at the panel's page size of 50
 const pad = (n: number) => String(n).padStart(3, '0')
 
-// Rows follow the API's DTOs in openapi/openapi.json, not the panel's hand-written
-// types, since the DTOs are what the endpoint really sends.
+// Rows follow the API's DTOs in openapi/openapi.json, since the DTOs are what the
+// endpoint really sends.
 const cases: {
   page: string
   Component: ComponentType

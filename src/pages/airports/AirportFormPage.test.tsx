@@ -8,7 +8,7 @@ import { AirportFormPage } from './AirportFormPage'
 import { AirportsPage } from './AirportsPage'
 
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 // Shaped like AirportAdminDto.
