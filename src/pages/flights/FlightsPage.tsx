@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Trash2, RefreshCw } from 'lucide-react'
+import { Eye, Trash2, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ export function FlightsPage() {
   )
   const deleteMutation = useAdminDeleteFlight({ mutation: { onSuccess: () => invalidateFlights(queryClient) } })
   const syncMutation = useAdminSyncFlightStatus({ mutation: { onSuccess: () => invalidateFlights(queryClient) } })
+  const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const columns: ColumnDef<AdminFlightDto>[] = [
@@ -59,6 +61,9 @@ export function FlightsPage() {
             title="Sync status"
           >
             <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="ghost" aria-label="View flight" title="View" onClick={() => navigate(`/flights/${row.original.id}`)}>
+            <Eye className="h-4 w-4" />
           </Button>
           <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id ?? null)}>
             <Trash2 className="h-4 w-4" />

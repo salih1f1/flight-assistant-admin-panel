@@ -5,6 +5,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { TravelersPage } from '@/pages/travelers/TravelersPage'
 import { TravelerDetailPage } from '@/pages/travelers/TravelerDetailPage'
 import { FlightsPage } from '@/pages/flights/FlightsPage'
+import { FlightDetailPage } from '@/pages/flights/FlightDetailPage'
 import { AirlinesPage } from '@/pages/airlines/AirlinesPage'
 import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
 import { AirportsPage } from '@/pages/airports/AirportsPage'
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
           { path: '/travelers', element: <TravelersPage /> },
           { path: '/travelers/:id', element: <TravelerDetailPage /> },
           { path: '/flights', element: <FlightsPage /> },
+          { path: '/flights/:id', element: <FlightDetailPage /> },
           { path: '/airlines', element: <AirlinesPage /> },
           { path: '/airlines/new', element: <AirlineFormPage /> },
           { path: '/airlines/:id/edit', element: <AirlineFormPage /> },

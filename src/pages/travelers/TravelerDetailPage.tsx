@@ -120,7 +120,13 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
               <TableBody>
                 {flights.map(flight => (
                   <TableRow key={flight.trackingId}>
-                    <TableCell>{flight.flightNumber ?? '—'}</TableCell>
+                    <TableCell>
+                      {flight.flightId != null ? (
+                        <Link to={`/flights/${flight.flightId}`} className="underline">{flight.flightNumber ?? `Flight ${flight.flightId}`}</Link>
+                      ) : (
+                        flight.flightNumber ?? '—'
+                      )}
+                    </TableCell>
                     <TableCell>{flight.serviceDate ?? '—'}</TableCell>
                     <TableCell>{flight.airlineId ?? '—'}</TableCell>
                     <TableCell>{`${flight.departureAirportId ?? '—'} → ${flight.arrivalAirportId ?? '—'}`}</TableCell>
