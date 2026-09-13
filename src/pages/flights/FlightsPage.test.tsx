@@ -50,4 +50,41 @@ describe('FlightsPage', () => {
     expect(sent).toContainEqual(expect.objectContaining({ method: 'POST', url: '/admin/flights/2/sync' }))
     expect(within(screen.getByText('FA001').closest('tr')!).getByText('Scheduled')).toBeInTheDocument()
   })
+
+  it("shows the API's reason when a sync fails", async () => {
+    // As the API answers when AeroAPI rejects the lookup (GlobalExceptionHandler, outside Production).
+    const problem = {
+      title: 'The flight status request was rejected.',
+      status: 400,
+      detail: 'AeroAPI returned HTTP 400: invalid ident',
+      instance: '/admin/flights/2/sync',
+    }
+    installFakeApi(req => {
+      if (req.method === 'GET' && req.url === '/admin/flights') return pagedResult(flights, req.params)
+      throw httpError(400, problem)
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<FlightsPage />)
+    const tableRow = (await screen.findByText('FA002')).closest('tr')!
+
+    await user.click(within(tableRow).getAllByRole('button')[0])
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Could not sync FA002: The flight status request was rejected.')
+    expect(alert).toHaveTextContent('AeroAPI returned HTTP 400: invalid ident')
+  })
+
+  it('falls back to the error message when the failure has no problem details', async () => {
+    installFakeApi(req => {
+      if (req.method === 'GET' && req.url === '/admin/flights') return pagedResult(flights, req.params)
+      throw httpError(502)
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<FlightsPage />)
+    const tableRow = (await screen.findByText('FA001')).closest('tr')!
+
+    await user.click(within(tableRow).getAllByRole('button')[0])
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sync FA001: Request failed with status code 502')
+  })
 })

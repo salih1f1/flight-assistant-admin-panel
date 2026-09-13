@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAdminDeleteFlight, useAdminGetAllFlights, useAdminSyncFlightStatus } from '@/api/generated/admin'
 import type { AdminFlightDto } from '@/api/generated/model'
 import { invalidateFlights } from '@/api/cache'
+import { apiErrorMessage } from '@/lib/apiError'
 
 const PAGE_SIZE = 50
 
@@ -67,11 +68,22 @@ export function FlightsPage() {
     },
   ]
 
+  // A sync can fail upstream (e.g. AeroAPI rejecting the lookup); say so rather
+  // than leaving the error in the console. The next sync clears it.
+  const syncError = syncMutation.isError ? apiErrorMessage(syncMutation.error) : null
+  const syncedFlight = data?.items?.find(f => f.id === syncMutation.variables?.id)
+
   if (isLoading) return <p className="text-gray-400">Loading…</p>
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Flights</h1>
+      {syncError && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p>Could not sync {syncedFlight?.flightNumber ?? `flight ${syncMutation.variables?.id}`}: {syncError.title}</p>
+          {syncError.detail && <p className="mt-1 text-xs text-red-600">{syncError.detail}</p>}
+        </div>
+      )}
       {/* No search box: the API has no search parameter, so it could only filter
           the rows on the current page. */}
       <DataTable

@@ -131,8 +131,9 @@ describe.each(cases)('$page', ({ Component, url, row, text }) => {
     renderWithProviders(<Component />)
     const tableRow = (await screen.findByText(text(1))).closest('tr')!
 
-    // Every list's row actions end with the delete button, second of two.
-    await user.click(within(tableRow).getAllByRole('button')[1])
+    // Every list's row actions end with the delete button.
+    const rowButtons = within(tableRow).getAllByRole('button')
+    await user.click(rowButtons[rowButtons.length - 1])
     await user.click(await screen.findByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(screen.queryByText(text(1))).not.toBeInTheDocument())
