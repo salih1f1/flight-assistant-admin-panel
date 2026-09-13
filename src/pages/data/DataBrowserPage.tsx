@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { EyeOff, Lock } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
@@ -11,6 +12,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
+  adminVerifyAirline, adminVerifyAirport, adminVerifyAlliance, adminVerifyCountry, adminVerifyLounge,
+  adminVerifyLoungeProvider, adminVerifyLoyaltyProgram, adminVerifyLoyaltyProgramKind,
   getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
   useAdminRevealValue,
 } from '@/api/generated/admin'
@@ -21,6 +24,30 @@ const PAGE_SIZE = 50
 
 // SensitiveProperties.RedactedPlaceholder: what the API sends in place of a sensitive value.
 const MASKED = '<redacted>'
+
+/**
+ * The reference data tables that can be verified: PATCH /admin/{slug}/{id}/verify exists for
+ * exactly these slugs, and their data browser rows carry IsVerified, VerifiedAt and VerifiedBy.
+ * The typed admin DTOs have no verified state, which is why verifying lives here.
+ */
+const VERIFIERS: Record<string, (id: number, body: { isVerified: boolean }) => Promise<void>> = {
+  airports: adminVerifyAirport,
+  airlines: adminVerifyAirline,
+  alliances: adminVerifyAlliance,
+  countries: adminVerifyCountry,
+  lounges: adminVerifyLounge,
+  'lounge-providers': adminVerifyLoungeProvider,
+  'loyalty-programs': adminVerifyLoyaltyProgram,
+  'loyalty-program-kinds': adminVerifyLoyaltyProgramKind,
+}
+
+const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
+  { label: 'All', filter: undefined },
+  { label: 'Verified', filter: 'IsVerified:true' },
+  { label: 'Unverified', filter: 'IsVerified:false' },
+]
+
+type VerifyTarget = { table: string; id: number; isVerified: boolean }
 
 type Row = Record<string, unknown>
 
@@ -73,6 +100,14 @@ export function DataBrowserPage() {
   const [revealTarget, setRevealTarget] = useState<RevealTarget | null>(null)
   // gcTime 0: the mutation cache must not keep a revealed value after this page lets go of it.
   const reveal = useAdminRevealValue({ mutation: { gcTime: 0 } })
+
+  const queryClient = useQueryClient()
+  const verifier = table ? VERIFIERS[table] : undefined
+  const verify = useMutation({
+    mutationFn: ({ table: slug, id, isVerified }: VerifyTarget) => VERIFIERS[slug](id, { isVerified }),
+    // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
+    onSuccess: (_, { table: slug }) => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) }),
+  })
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
   const updateView = (changes: { page?: number; sort?: string; filter?: string }) => {
@@ -166,6 +201,26 @@ export function DataBrowserPage() {
     },
   }))
 
+  if (verifier && table) {
+    columns.push({
+      id: 'verify',
+      header: () => <span className="sr-only">Verify</span>,
+      cell: ({ row }) => {
+        const verified = row.original.IsVerified === true
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={verify.isPending}
+            onClick={() => verify.mutate({ table, id: Number(row.original.Id), isVerified: !verified })}
+          >
+            {verified ? 'Unverify' : 'Verify'}
+          </Button>
+        )
+      },
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -210,6 +265,22 @@ export function DataBrowserPage() {
           ) : (
             <>
               <h2 className="text-lg font-semibold text-gray-900">{selected?.displayName ?? table}</h2>
+              {verifier && (
+                // The API takes one filter, so choosing one of these replaces any column filter.
+                <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
+                  {VERIFIED_FILTERS.map(option => (
+                    <button
+                      key={option.label}
+                      type="button"
+                      aria-pressed={filter === option.filter}
+                      onClick={() => updateView({ filter: option.filter })}
+                      className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <FilterForm
                 // Remount when the applied filter or table changes, so the inputs show what's applied.
                 key={`${table}|${filter ?? ''}`}
@@ -218,6 +289,9 @@ export function DataBrowserPage() {
                 onApply={value => updateView({ filter: value })}
                 onClear={() => updateView({ filter: undefined })}
               />
+              {verify.error && verify.variables?.table === table && (
+                <VerifyError error={verify.error} target={verify.variables} />
+              )}
               {rows.error ? (
                 // In place of the table: an empty grid would read as "no rows match".
                 <ErrorAlert what="rows" error={rows.error} />
@@ -302,6 +376,20 @@ function RevealError({ error }: { error: unknown }) {
   return (
     <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       <p>{title}</p>
+      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
+    </div>
+  )
+}
+
+function VerifyError({ error, target }: { error: unknown; target: VerifyTarget }) {
+  // The verify endpoints answer a missing row with an empty 404 (Results.NotFound()), not ProblemDetails.
+  const status = (error as { response?: { status?: number } } | null)?.response?.status
+  const { title, detail } = status === 404
+    ? { title: 'it no longer exists. Refresh to see the current rows.', detail: undefined }
+    : apiErrorMessage(error)
+  return (
+    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p>{`Couldn't ${target.isVerified ? 'verify' : 'unverify'} row ${target.id}: ${title}`}</p>
       {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
     </div>
   )
