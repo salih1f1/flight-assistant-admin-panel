@@ -1,11 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { loungesApi } from '@/api/lounges'
 import type { CreateLoungeRequest } from '@/types'
 
 export const LOUNGES_KEY = ['lounges']
 
-export function useLounges() {
-  return useQuery({ queryKey: LOUNGES_KEY, queryFn: loungesApi.getAll })
+export function useLounges(page: number, pageSize: number) {
+  return useQuery({
+    queryKey: [...LOUNGES_KEY, 'list', page, pageSize],
+    queryFn: () => loungesApi.list(page, pageSize),
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useLounge(id: number | undefined) {

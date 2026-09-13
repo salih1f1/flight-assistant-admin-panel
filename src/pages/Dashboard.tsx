@@ -9,24 +9,19 @@ import { useLounges } from '@/hooks/useLounges'
 
 type Count = { count: number | undefined; isLoading: boolean }
 
-const lengthOf = ({ data, isLoading }: { data?: unknown[]; isLoading: boolean }): Count => ({
-  count: data?.length,
+const totalOf = ({ data, isLoading }: { data?: { total: number }; isLoading: boolean }): Count => ({
+  count: data?.total,
   isLoading,
 })
 
-function useAirlineCount(): Count {
-  // Only the total is needed, so ask for a single row.
-  const { data, isLoading } = useAirlines(1, 1)
-  return { count: data?.total, isLoading }
-}
-
+// Only the totals are needed, so each tile asks for a single row.
 const stats = [
-  { label: 'Travelers', icon: Users, useCount: () => lengthOf(useTravelers()), color: 'text-blue-600' },
-  { label: 'Flights', icon: Plane, useCount: () => lengthOf(useFlights()), color: 'text-green-600' },
-  { label: 'Airlines', icon: Building2, useCount: useAirlineCount, color: 'text-purple-600' },
-  { label: 'Airports', icon: MapPin, useCount: () => lengthOf(useAirports()), color: 'text-orange-600' },
-  { label: 'Loyalty Programs', icon: Award, useCount: () => lengthOf(useLoyaltyPrograms()), color: 'text-yellow-600' },
-  { label: 'Lounges', icon: Sofa, useCount: () => lengthOf(useLounges()), color: 'text-pink-600' },
+  { label: 'Travelers', icon: Users, useCount: () => totalOf(useTravelers(1, 1)), color: 'text-blue-600' },
+  { label: 'Flights', icon: Plane, useCount: () => totalOf(useFlights(1, 1)), color: 'text-green-600' },
+  { label: 'Airlines', icon: Building2, useCount: () => totalOf(useAirlines(1, 1)), color: 'text-purple-600' },
+  { label: 'Airports', icon: MapPin, useCount: () => totalOf(useAirports(1, 1)), color: 'text-orange-600' },
+  { label: 'Loyalty Programs', icon: Award, useCount: () => totalOf(useLoyaltyPrograms(1, 1)), color: 'text-yellow-600' },
+  { label: 'Lounges', icon: Sofa, useCount: () => totalOf(useLounges(1, 1)), color: 'text-pink-600' },
 ]
 
 function StatCard({ label, icon: Icon, useCount, color }: (typeof stats)[0]) {

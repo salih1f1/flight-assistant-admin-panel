@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useLoyaltyPrograms, useCreateLoyaltyProgram, useUpdateLoyaltyProgram } from '@/hooks/useLoyalty'
+import { useLoyaltyProgram, useCreateLoyaltyProgram, useUpdateLoyaltyProgram } from '@/hooks/useLoyalty'
 
 const schema = z.object({
   code: z.string().min(1, 'Required'),
@@ -23,8 +23,7 @@ export function LoyaltyProgramFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
-  const { data: programs = [] } = useLoyaltyPrograms()
-  const existing = programs.find(p => p.id === Number(id))
+  const { data: existing } = useLoyaltyProgram(isEdit ? Number(id) : undefined)
   const createMutation = useCreateLoyaltyProgram()
   const updateMutation = useUpdateLoyaltyProgram()
 

@@ -1,10 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { flightsApi } from '@/api/flights'
 
 export const FLIGHTS_KEY = ['flights']
 
-export function useFlights() {
-  return useQuery({ queryKey: FLIGHTS_KEY, queryFn: flightsApi.getAll })
+export function useFlights(page: number, pageSize: number) {
+  return useQuery({
+    queryKey: [...FLIGHTS_KEY, 'list', page, pageSize],
+    queryFn: () => flightsApi.list(page, pageSize),
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useFlight(id: number) {

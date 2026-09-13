@@ -1,11 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { airportsApi } from '@/api/airports'
 import type { CreateAirportRequest } from '@/types'
 
 export const AIRPORTS_KEY = ['airports']
 
-export function useAirports() {
-  return useQuery({ queryKey: AIRPORTS_KEY, queryFn: airportsApi.getAll })
+export function useAirports(page: number, pageSize: number) {
+  return useQuery({
+    queryKey: [...AIRPORTS_KEY, 'list', page, pageSize],
+    queryFn: () => airportsApi.list(page, pageSize),
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useAirport(id: number) {
