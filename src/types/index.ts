@@ -44,7 +44,6 @@ export interface Airport {
   latitude: number | null
   longitude: number | null
   elevationFt: number | null
-  timezone: string | null
 }
 
 export interface Country {
@@ -131,7 +130,6 @@ export interface CreateAirportRequest {
   latitude?: number
   longitude?: number
   elevationFt?: number
-  timezone?: string
 }
 
 export interface CreateLoyaltyProgramRequest {

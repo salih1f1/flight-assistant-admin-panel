@@ -18,10 +18,12 @@ const schema = z.object({
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
   elevationFt: z.coerce.number().int().optional(),
-  timezone: z.string().optional(),
 })
 
-type FormData = z.infer<typeof schema>
+// The form holds raw input values (coerced fields are `unknown` until parsed);
+// handleSubmit receives the parsed output.
+type FormInput = z.input<typeof schema>
+type FormData = z.output<typeof schema>
 
 export function AirportFormPage() {
   const { id } = useParams<{ id: string }>()
@@ -31,16 +33,16 @@ export function AirportFormPage() {
   const createMutation = useCreateAirport()
   const updateMutation = useUpdateAirport()
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 
   useEffect(() => {
-    if (existing) reset({ ...existing, icao: existing.icao ?? '', timezone: existing.timezone ?? '' })
+    if (existing) reset({ ...existing, icao: existing.icao ?? '' })
   }, [existing, reset])
 
   const onSubmit = (data: FormData) => {
-    const payload = { ...data, icao: data.icao || undefined, timezone: data.timezone || undefined }
+    const payload = { ...data, icao: data.icao || undefined }
     if (isEdit) {
       updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/airports') })
     } else {
@@ -92,15 +94,9 @@ export function AirportFormPage() {
                 <Input type="number" step="any" {...register('longitude')} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Elevation (ft)</Label>
-                <Input type="number" {...register('elevationFt')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Timezone</Label>
-                <Input {...register('timezone')} placeholder="Europe/London" />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Elevation (ft)</Label>
+              <Input type="number" {...register('elevationFt')} />
             </div>
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>

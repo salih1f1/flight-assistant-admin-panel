@@ -21,7 +21,10 @@ const schema = z.object({
   allianceCode: z.string().optional(),
 })
 
-type FormData = z.infer<typeof schema>
+// The form holds raw input values (coerced fields are `unknown` until parsed);
+// handleSubmit receives the parsed output.
+type FormInput = z.input<typeof schema>
+type FormData = z.output<typeof schema>
 
 export function LoyaltyProgramFormPage() {
   const { id } = useParams<{ id: string }>()
@@ -32,7 +35,7 @@ export function LoyaltyProgramFormPage() {
   const createMutation = useCreateLoyaltyProgram()
   const updateMutation = useUpdateLoyaltyProgram()
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 
