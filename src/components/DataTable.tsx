@@ -24,9 +24,14 @@ interface DataTableProps<TData> {
   searchPlaceholder?: string
   searchColumn?: string
   pagination?: ServerPagination
+  /**
+   * The list request's error, if it failed. Shown in place of the rows, because a
+   * failed request otherwise hands the table [] and reads as "No results."
+   */
+  error?: unknown
 }
 
-export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn, pagination }: DataTableProps<TData>) {
+export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn, pagination, error }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
@@ -69,7 +74,13 @@ export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length ? (
+            {error ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-red-600">
+                  {`Could not load: ${error instanceof Error ? error.message : 'unknown error'}`}
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map(row => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map(cell => (

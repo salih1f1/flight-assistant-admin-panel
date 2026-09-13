@@ -103,4 +103,12 @@ describe.each(cases)('$page', ({ Component, url, row, text }) => {
     expect(screen.queryByText(text(1))).not.toBeInTheDocument()
     expect(apiClient.get).toHaveBeenLastCalledWith(url, { params: { Page: 2, PageSize: 50 } })
   })
+
+  it('shows why the list failed to load instead of "No results."', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Request failed with status code 500'))
+    renderWithProviders(<Component />)
+
+    expect(await screen.findByText('Could not load: Request failed with status code 500')).toBeInTheDocument()
+    expect(screen.queryByText(/no results/i)).not.toBeInTheDocument()
+  })
 })
