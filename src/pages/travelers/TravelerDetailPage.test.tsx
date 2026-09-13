@@ -142,6 +142,7 @@ describe('TravelerDetailPage', () => {
     const flights = region('Tracked flights')
     const row = within(flights).getAllByRole('row')[1]
     expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['BA117', '2026-09-20', '7', '11 → 12', 'On'])
+    expect(within(row).getByRole('link', { name: 'BA117' })).toHaveAttribute('href', '/flights/42')
     expect(flights).not.toHaveTextContent('most recent')
   })
 

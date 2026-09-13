@@ -1,4 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
@@ -49,6 +51,28 @@ describe('FlightsPage', () => {
     await waitFor(() => expect(within(screen.getByText('FA002').closest('tr')!).getByText('Departed')).toBeInTheDocument())
     expect(sent).toContainEqual(expect.objectContaining({ method: 'POST', url: '/admin/flights/2/sync' }))
     expect(within(screen.getByText('FA001').closest('tr')!).getByText('Scheduled')).toBeInTheDocument()
+  })
+
+  it("the view button opens the flight's page", async () => {
+    const router = createMemoryRouter(
+      [
+        { path: '/flights', element: <FlightsPage /> },
+        { path: '/flights/:id', element: <p>flight page</p> },
+      ],
+      { initialEntries: ['/flights'] },
+    )
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+    const user = userEvent.setup()
+    const tableRow = (await screen.findByText('FA002')).closest('tr')!
+
+    await user.click(within(tableRow).getByRole('button', { name: 'View flight' }))
+
+    expect(await screen.findByText('flight page')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/flights/2')
   })
 
   it("shows the API's reason when a sync fails", async () => {
