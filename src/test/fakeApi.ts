@@ -7,6 +7,8 @@ export type SentRequest = {
   url: string
   params?: Record<string, unknown>
   data?: unknown
+  /** Set when the caller asked axios for a non-JSON body, e.g. 'blob' for a CSV download. */
+  responseType?: string
 }
 
 /** An axios-shaped error, as the panel sees a non-2xx response; `data` is the response body. */
@@ -24,7 +26,7 @@ export function httpError(status: number, data?: unknown) {
 export function installFakeApi(handler: (req: SentRequest) => unknown) {
   const sent: SentRequest[] = []
   vi.mocked(apiClient.request).mockReset().mockImplementation((async (config: AxiosRequestConfig) => {
-    const req = { method: (config.method ?? 'GET').toUpperCase(), url: config.url ?? '', params: config.params, data: config.data }
+    const req = { method: (config.method ?? 'GET').toUpperCase(), url: config.url ?? '', params: config.params, data: config.data, responseType: config.responseType }
     sent.push(req)
     return { data: await handler(req) }
   }) as never)
