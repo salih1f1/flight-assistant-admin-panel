@@ -8,7 +8,7 @@ import { LoyaltyProgramFormPage } from './LoyaltyProgramFormPage'
 import { LoyaltyProgramsPage } from './LoyaltyProgramsPage'
 
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 // Shaped like GET /admin/data/loyalty-program-kinds: rows keyed by the entity's

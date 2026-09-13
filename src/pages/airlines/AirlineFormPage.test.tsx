@@ -8,7 +8,7 @@ import { AirlineFormPage } from './AirlineFormPage'
 import { AirlinesPage } from './AirlinesPage'
 
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 type AirlineRow = { id: number; iata: string | null; icao: string | null; name: string; countryCode: string; allianceCode: string | null }

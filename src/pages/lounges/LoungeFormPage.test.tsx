@@ -8,7 +8,7 @@ import { LoungeFormPage } from './LoungeFormPage'
 import { LoungesPage } from './LoungesPage'
 
 vi.mock('@/api/client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), request: vi.fn() },
+  apiClient: { request: vi.fn() },
 }))
 
 // Shaped like AdminLoungeDto. The API calls this field locationHint; there is no accessInfo.

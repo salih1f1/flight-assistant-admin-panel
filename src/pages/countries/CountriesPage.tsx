@@ -1,13 +1,13 @@
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/DataTable'
 import { Badge } from '@/components/ui/badge'
-import { useCountries } from '@/hooks/useRefData'
-import type { Country } from '@/types'
+import { useAdminGetAllCountries } from '@/api/generated/admin'
+import type { CountryAdminDto } from '@/api/generated/model'
 
 export function CountriesPage() {
-  const { data = [], isLoading, error } = useCountries()
+  const { data = [], isLoading, error } = useAdminGetAllCountries()
 
-  const columns: ColumnDef<Country>[] = [
+  const columns: ColumnDef<CountryAdminDto>[] = [
     { accessorKey: 'code', header: 'Code', cell: ({ row }) => <Badge variant="outline">{row.original.code}</Badge> },
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'alpha3', header: 'Alpha-3', cell: ({ row }) => row.original.alpha3 ?? '—' },
