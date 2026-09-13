@@ -17,6 +17,7 @@ import { LoungesPage } from '@/pages/lounges/LoungesPage'
 import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
 import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 import { ImportPage } from '@/pages/import/ImportPage'
+import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: '/data', element: <DataBrowserPage /> },
           { path: '/data/:table', element: <DataBrowserPage /> },
           { path: '/import', element: <ImportPage /> },
+          { path: '/audit', element: <AuditLogPage /> },
         ],
       },
     ],
