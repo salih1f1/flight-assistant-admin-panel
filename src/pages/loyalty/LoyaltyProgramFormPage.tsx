@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,9 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  useLoyaltyProgram, useLoyaltyProgramKinds, useCreateLoyaltyProgram, useUpdateLoyaltyProgram,
-} from '@/hooks/useLoyalty'
+import { useAdminCreateLoyaltyProgram, useAdminUpdateLoyaltyProgram } from '@/api/generated/admin'
+import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
+import { invalidateLoyaltyPrograms } from '@/api/cache'
 import { optionalInt } from '@/lib/formNumbers'
 
 const schema = z.object({
@@ -31,10 +32,11 @@ export function LoyaltyProgramFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: existing } = useLoyaltyProgram(isEdit ? Number(id) : undefined)
   const { data: kinds, isError: kindsFailed } = useLoyaltyProgramKinds()
-  const createMutation = useCreateLoyaltyProgram()
-  const updateMutation = useUpdateLoyaltyProgram()
+  const createMutation = useAdminCreateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
+  const updateMutation = useAdminUpdateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
@@ -46,8 +48,8 @@ export function LoyaltyProgramFormPage() {
   useEffect(() => {
     // Waits for the kinds as well as the program, so the kind can be matched.
     if (existing && kinds) reset({
-      code: existing.code,
-      name: existing.name,
+      code: existing.code ?? '',
+      name: existing.name ?? '',
       // No fallback: an unmatched kind stays unselected, so the admin must pick
       // one rather than the form silently saving a different kind.
       kindId: kinds.find(k => k.code === existing.kind)?.id,
@@ -61,7 +63,7 @@ export function LoyaltyProgramFormPage() {
     if (isEdit) {
       updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/loyalty') })
     } else {
-      createMutation.mutate(payload, { onSuccess: () => navigate('/loyalty') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/loyalty') })
     }
   }
 

@@ -42,31 +42,6 @@ export interface Alliance {
   name: string
 }
 
-export interface LoyaltyTier {
-  id: number
-  code: string
-  name: string
-  rank: number
-  allianceCode: string | null
-  allianceTierCode: string | null
-}
-
-export interface LoyaltyProgram {
-  id: number
-  code: string
-  name: string
-  kind: string
-  airlineId: number | null
-  allianceCode: string | null
-  tiers: LoyaltyTier[]
-}
-
-export interface LoyaltyProgramKind {
-  id: number
-  code: string
-  name: string
-}
-
 /**
  * Envelope returned by every paged admin list (/admin/airlines, /admin/airports, …).
  * `total` counts all matching rows, not the ones in `items`.
@@ -76,13 +51,4 @@ export interface PagedResult<T> {
   total: number
   page: number
   pageSize: number
-}
-
-// Request types
-export interface CreateLoyaltyProgramRequest {
-  code: string
-  name: string
-  kindId: number
-  airlineId?: number
-  allianceCode?: string
 }
