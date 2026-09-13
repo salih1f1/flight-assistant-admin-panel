@@ -25,15 +25,6 @@ export interface AdminFlight {
   externalId: string | null
 }
 
-export interface Airline {
-  id: number
-  iata: string | null
-  icao: string | null
-  name: string
-  countryCode: string
-  allianceCode: string | null
-}
-
 export interface Airport {
   id: number
   iata: string
@@ -113,14 +104,6 @@ export interface PagedResult<T> {
 }
 
 // Request types
-export interface CreateAirlineRequest {
-  iata?: string
-  icao?: string
-  name: string
-  countryCode: string
-  allianceCode?: string
-}
-
 export interface CreateAirportRequest {
   iata: string
   icao?: string
