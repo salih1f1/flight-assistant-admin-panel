@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAirport, useCreateAirport, useUpdateAirport } from '@/hooks/useAirports'
+import { optionalInt, optionalNumber } from '@/lib/formNumbers'
 
 const schema = z.object({
   iata: z.string().length(3, 'Must be 3 letters'),
@@ -15,9 +16,9 @@ const schema = z.object({
   name: z.string().min(1, 'Required'),
   city: z.string().min(1, 'Required'),
   countryCode: z.string().length(2, 'Must be 2 letters'),
-  latitude: z.coerce.number().optional(),
-  longitude: z.coerce.number().optional(),
-  elevationFt: z.coerce.number().int().optional(),
+  latitude: optionalNumber(),
+  longitude: optionalNumber(),
+  elevationFt: optionalInt(),
 })
 
 // The form holds raw input values (coerced fields are `unknown` until parsed);
