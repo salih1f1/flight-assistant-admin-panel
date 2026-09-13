@@ -9,9 +9,9 @@ export type SentRequest = {
   data?: unknown
 }
 
-/** An axios-shaped error, as the panel sees a non-2xx response. */
-export function httpError(status: number) {
-  return Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } })
+/** An axios-shaped error, as the panel sees a non-2xx response; `data` is the response body. */
+export function httpError(status: number, data?: unknown) {
+  return Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data } })
 }
 
 /**
