@@ -7,14 +7,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+/**
+ * Paging owned by the API. The table renders exactly the rows it is given, and the
+ * footer reports the API's total instead of counting rows on screen.
+ */
+export interface ServerPagination {
+  page: number
+  pageSize: number
+  total: number
+  onPageChange: (page: number) => void
+}
+
 interface DataTableProps<TData> {
   columns: ColumnDef<TData>[]
   data: TData[]
   searchPlaceholder?: string
   searchColumn?: string
+  pagination?: ServerPagination
 }
 
-export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn }: DataTableProps<TData>) {
+export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn, pagination }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
@@ -23,10 +35,15 @@ export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    manualPagination: pagination !== undefined,
     state: { globalFilter },
     onGlobalFilterChange: setGlobalFilter,
     initialState: { pagination: { pageSize: 20 } },
   })
+
+  const pageCount = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize)) : 0
+  const canPrevious = pagination ? pagination.page > 1 : table.getCanPreviousPage()
+  const canNext = pagination ? pagination.page < pageCount : table.getCanNextPage()
 
   return (
     <div className="space-y-4">
@@ -73,12 +90,26 @@ export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…
         </Table>
       </div>
       <div className="flex items-center justify-between text-sm text-gray-500">
-        <span>{table.getFilteredRowModel().rows.length} row(s)</span>
+        <span>
+          {pagination
+            ? `Page ${pagination.page} of ${pageCount} · ${pagination.total} total`
+            : `${table.getFilteredRowModel().rows.length} row(s)`}
+        </span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => (pagination ? pagination.onPageChange(pagination.page - 1) : table.previousPage())}
+            disabled={!canPrevious}
+          >
             Previous
           </Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => (pagination ? pagination.onPageChange(pagination.page + 1) : table.nextPage())}
+            disabled={!canNext}
+          >
             Next
           </Button>
         </div>

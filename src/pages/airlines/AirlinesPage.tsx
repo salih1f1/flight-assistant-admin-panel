@@ -9,8 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { useAirlines, useDeleteAirline } from '@/hooks/useAirlines'
 import type { Airline } from '@/types'
 
+const PAGE_SIZE = 50
+
 export function AirlinesPage() {
-  const { data = [], isLoading } = useAirlines()
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useAirlines(page, PAGE_SIZE)
   const deleteMutation = useDeleteAirline()
   const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -47,7 +50,13 @@ export function AirlinesPage() {
           <Plus className="h-4 w-4 mr-2" /> Add airline
         </Button>
       </div>
-      <DataTable columns={columns} data={data} searchPlaceholder="Search airlines…" searchColumn="name" />
+      {/* No search box: the API has no search parameter, so it could only filter
+          the rows on the current page. */}
+      <DataTable
+        columns={columns}
+        data={data?.items ?? []}
+        pagination={{ page, pageSize: PAGE_SIZE, total: data?.total ?? 0, onPageChange: setPage }}
+      />
       <ConfirmDeleteDialog
         open={!!deleteId}
         onOpenChange={open => !open && setDeleteId(null)}
