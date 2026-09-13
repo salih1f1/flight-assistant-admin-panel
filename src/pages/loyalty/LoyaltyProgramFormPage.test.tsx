@@ -115,4 +115,34 @@ describe('LoyaltyProgramFormPage', () => {
     expect(await screen.findByText('Choose a kind')).toBeInTheDocument()
     expect(apiClient.put).not.toHaveBeenCalled()
   })
+
+  it('saving a program with no airline does not send airlineId 0', async () => {
+    const user = userEvent.setup()
+    renderAt('/loyalty/250/edit')
+    await screen.findByDisplayValue('Hotel (HOTEL)')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalledTimes(1))
+    const body = vi.mocked(apiClient.put).mock.calls[0][1] as Record<string, unknown>
+    expect(body.airlineId).toBeUndefined()
+  })
+
+  it("saving keeps a program's airline", async () => {
+    vi.mocked(apiClient.get).mockImplementation(
+      fakePagedGet({
+        '/admin/loyalty/programs': PROGRAMS.map(p => (p.id === 3 ? { ...p, airlineId: 42 } : p)),
+        '/admin/data/loyalty-program-kinds': KINDS,
+      }),
+    )
+    const user = userEvent.setup()
+    renderAt('/loyalty/3/edit')
+    await screen.findByDisplayValue('Alliance (ALLIANCE)')
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(apiClient.put).toHaveBeenCalledWith('/admin/loyalty/programs/3', expect.objectContaining({ airlineId: 42 })),
+    )
+  })
 })

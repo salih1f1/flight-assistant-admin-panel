@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   useLoyaltyProgram, useLoyaltyProgramKinds, useCreateLoyaltyProgram, useUpdateLoyaltyProgram,
 } from '@/hooks/useLoyalty'
+import { optionalInt } from '@/lib/formNumbers'
 
 const schema = z.object({
   code: z.string().min(1, 'Required'),
@@ -17,7 +18,7 @@ const schema = z.object({
   // An unselected kind coerces to 0 and fails here, so the form never submits
   // a kind the admin did not choose.
   kindId: z.coerce.number().int().min(1, 'Choose a kind'),
-  airlineId: z.coerce.number().int().optional(),
+  airlineId: optionalInt(),
   allianceCode: z.string().optional(),
 })
 
