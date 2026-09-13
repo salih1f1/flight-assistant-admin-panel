@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdminCreateAirline, useAdminGetAirlineById, useAdminUpdateAirline } from '@/api/generated/admin'
-import { invalidateAirlines } from '@/api/airlinesCache'
+import { invalidateAirlines } from '@/api/cache'
 
 const schema = z.object({
   iata: z.string().max(3).optional(),

@@ -1,12 +1,14 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useLounge, useCreateLounge, useUpdateLounge } from '@/hooks/useLounges'
+import { useAdminCreateLounge, useAdminGetLoungeById, useAdminUpdateLounge } from '@/api/generated/admin'
+import { invalidateLounges } from '@/api/cache'
 
 const schema = z.object({
   airportId: z.coerce.number().int().positive('Airport ID is required'),
@@ -30,9 +32,12 @@ export function LoungeFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
   const navigate = useNavigate()
-  const { data: lounge, isLoading } = useLounge(isEdit ? Number(id) : undefined)
-  const createMutation = useCreateLounge()
-  const updateMutation = useUpdateLounge()
+  const queryClient = useQueryClient()
+  const { data: lounge, isLoading } = useAdminGetLoungeById(Number(id), { query: { enabled: isEdit } })
+  const createMutation = useAdminCreateLounge({ mutation: { onSuccess: () => invalidateLounges(queryClient) } })
+  const updateMutation = useAdminUpdateLounge({
+    mutation: { onSuccess: (_, variables) => invalidateLounges(queryClient, variables.id) },
+  })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
@@ -44,17 +49,18 @@ export function LoungeFormPage() {
   })
 
   useEffect(() => {
+    // The spec marks every field optional/nullable, so each one is defaulted.
     if (lounge) {
       reset({
         airportId: lounge.airportId,
-        name: lounge.name,
+        name: lounge.name ?? '',
         terminal: lounge.terminal ?? '',
         hours: lounge.hours ?? '',
         locationHint: lounge.locationHint ?? '',
         amenities: lounge.amenities ?? '',
-        isAirside: lounge.isAirside,
-        isDomesticOnly: lounge.isDomesticOnly,
-        isInternationalOnly: lounge.isInternationalOnly,
+        isAirside: lounge.isAirside ?? false,
+        isDomesticOnly: lounge.isDomesticOnly ?? false,
+        isInternationalOnly: lounge.isInternationalOnly ?? false,
       })
     }
   }, [lounge, reset])
@@ -69,9 +75,14 @@ export function LoungeFormPage() {
     }
 
     if (isEdit) {
-      updateMutation.mutate({ id: Number(id), ...payload }, { onSuccess: () => navigate('/lounges') })
+      // UpdateLoungeRequest has no airportId: a lounge's airport is fixed at creation.
+      const { name, terminal, hours, locationHint, amenities, isAirside, isDomesticOnly, isInternationalOnly } = payload
+      updateMutation.mutate(
+        { id: Number(id), data: { name, terminal, hours, locationHint, amenities, isAirside, isDomesticOnly, isInternationalOnly } },
+        { onSuccess: () => navigate('/lounges') },
+      )
     } else {
-      createMutation.mutate(payload, { onSuccess: () => navigate('/lounges') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/lounges') })
     }
   }
 
@@ -85,7 +96,9 @@ export function LoungeFormPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1">
           <Label htmlFor="airportId">Airport ID</Label>
-          <Input id="airportId" type="number" {...register('airportId')} />
+          {/* readOnly, not disabled: a disabled field is left out of the submitted values. */}
+          <Input id="airportId" type="number" readOnly={isEdit} {...register('airportId')} />
+          {isEdit && <p className="text-xs text-gray-500">A lounge's airport can't be changed after it's created.</p>}
           {errors.airportId && <p className="text-sm text-red-500">{errors.airportId.message}</p>}
         </div>
         <div className="space-y-1">
