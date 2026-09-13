@@ -178,6 +178,24 @@ describe('DataBrowserPage', () => {
     expect(search(router).get('filter')).toBeNull()
   })
 
+  it('sorting keeps a filter applied after the page loaded', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await user.type(screen.getByLabelText('Filter value'), '04')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    // Contains "04": Traveler 004, 040-049 and 104.
+    await screen.findByText('Page 1 of 1 · 12 total')
+
+    await user.click(screen.getByRole('button', { name: /^DisplayName/ }))
+
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, sort: 'DisplayName', filter: 'DisplayName:04' }))
+    expect(search(router).get('filter')).toBe('DisplayName:04')
+    expect(search(router).get('sort')).toBe('DisplayName')
+  })
+
   it('opens a shared link with its page, sort and filter', async () => {
     renderAt('/data/travelers?page=2&sort=-DisplayName&filter=DisplayName:Traveler')
 

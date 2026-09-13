@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { keepPreviousData, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Trash2 } from 'lucide-react'
+import { Eye, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ export function TravelersPage() {
     { query: { placeholderData: keepPreviousData } },
   )
   const deleteMutation = useAdminDeleteTraveler({ mutation: { onSuccess: () => invalidateTravelers(queryClient) } })
+  const navigate = useNavigate()
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   // No country column: AdminTravelerDto has no country field.
@@ -33,12 +35,14 @@ export function TravelersPage() {
         return created ? new Date(created).toLocaleDateString() : '—'
       },
     },
-    // No view button: the panel has no traveler page yet.
     {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
         <div className="flex gap-2 justify-end">
+          <Button size="sm" variant="ghost" aria-label="View traveler" title="View" onClick={() => navigate(`/travelers/${row.original.id}`)}>
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeleteId(row.original.id ?? null)}>
             <Trash2 className="h-4 w-4" />
           </Button>
