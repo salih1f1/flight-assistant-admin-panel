@@ -96,6 +96,17 @@ export interface AdminLounge {
   amenities: string | null
 }
 
+/**
+ * Envelope returned by every paged admin list (/admin/airlines, /admin/airports, …).
+ * `total` counts all matching rows, not the ones in `items`.
+ */
+export interface PagedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 // Request types
 export interface CreateAirlineRequest {
   iata?: string
