@@ -14,6 +14,7 @@ import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { LoungesPage } from '@/pages/lounges/LoungesPage'
 import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
 import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
+import { ImportPage } from '@/pages/import/ImportPage'
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: '/lounges/:id/edit', element: <LoungeFormPage /> },
           { path: '/data', element: <DataBrowserPage /> },
           { path: '/data/:table', element: <DataBrowserPage /> },
+          { path: '/import', element: <ImportPage /> },
         ],
       },
     ],
