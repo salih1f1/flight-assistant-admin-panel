@@ -89,10 +89,10 @@ describe('FlightDetailPage', () => {
     await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
 
     const flight = region('Flight')
-    expect(await within(flight).findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/airlines/7/edit')
+    expect(await within(flight).findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/data/airlines/7')
     await waitFor(() => expect(fact(flight, 'Route')).toHaveTextContent('London Heathrow (LHR) → New York JFK (JFK)'))
-    expect(within(flight).getByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/airports/11/edit')
-    expect(within(flight).getByRole('link', { name: 'New York JFK (JFK)' })).toHaveAttribute('href', '/airports/12/edit')
+    expect(within(flight).getByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/data/airports/11')
+    expect(within(flight).getByRole('link', { name: 'New York JFK (JFK)' })).toHaveAttribute('href', '/data/airports/12')
   })
 
   it("keeps the id and says it wasn't found when an airline or airport no longer exists", async () => {

@@ -196,7 +196,7 @@ describe('LoyaltyProgramFormPage', () => {
     const airlineId = await screen.findByPlaceholderText('optional')
     await waitFor(() => expect(airlineId).toHaveValue(42))
 
-    expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/airlines/42/edit')
+    expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/data/airlines/42')
 
     await user.clear(airlineId)
     await user.type(airlineId, '999')

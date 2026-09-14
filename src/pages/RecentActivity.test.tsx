@@ -74,7 +74,7 @@ describe('Dashboard recent activity', () => {
     const section = await activity()
 
     const airline = (await within(section).findByText('Update Airline 7')).closest('li')!
-    expect(within(airline).getByRole('link', { name: 'Airline 7' })).toHaveAttribute('href', '/airlines/7/edit')
+    expect(within(airline).getByRole('link', { name: 'Airline 7' })).toHaveAttribute('href', '/data/airlines/7')
     const seed = within(section).getByText('Delete SeedVersion 9').closest('li')!
     expect(within(seed).queryByRole('link')).not.toBeInTheDocument()
   })

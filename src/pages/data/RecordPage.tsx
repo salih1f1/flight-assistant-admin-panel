@@ -1,0 +1,193 @@
+import type { ComponentType, ReactNode } from 'react'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AirlineName, AirportName, LoyaltyProgramName } from '@/components/ReferenceNames'
+import { RevealableValue } from '@/components/RevealableValue'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
+} from '@/api/generated/admin'
+import { apiErrorMessage } from '@/lib/apiError'
+import { cn } from '@/lib/utils'
+import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
+import { AirportForm } from '@/pages/airports/AirportFormPage'
+import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
+import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
+import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, VERIFIERS } from './records'
+
+/** The tables the API can update, each with the form that edits one record. */
+const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void }>> = {
+  airlines: AirlineForm,
+  airports: AirportForm,
+  lounges: LoungeForm,
+  'loyalty-programs': LoyaltyProgramForm,
+}
+
+/** Columns holding another record's id, shown by that record's name. */
+const REFERENCES: Record<string, (id: number) => ReactNode> = {
+  AirlineId: id => <AirlineName id={id} />,
+  AirportId: id => <AirportName id={id} />,
+  DepartureAirportId: id => <AirportName id={id} />,
+  ArrivalAirportId: id => <AirportName id={id} />,
+  ProgramId: id => <LoyaltyProgramName id={id} />,
+}
+
+/**
+ * One record of a raw table at /data/{table}/{id}: every column the API exposes, read through
+ * GET /admin/data/{table} filtered on the table's key. Masked values can be revealed (audited), and
+ * a verifiable record verified. A table the API can update gets a Read | Edit toggle, kept in the
+ * URL as ?mode=edit, which swaps the fields for that entity's form.
+ */
+export function RecordPage() {
+  const { table = '', id = '' } = useParams<{ table: string; id: string }>()
+  const ownPage = lookup(OWN_DETAIL_PAGES, table)
+  if (ownPage) return <Navigate to={ownPage(id)} replace />
+  return <Record key={`${table}|${id}`} table={table} id={id} />
+}
+
+/** The old /{entity}/:id/edit links: the record, opened in Edit. */
+export function RedirectToRecord({ table }: { table: string }) {
+  const { id = '' } = useParams<{ id: string }>()
+  return <Navigate to={`/data/${table}/${encodeURIComponent(id)}?mode=edit`} replace />
+}
+
+function Record({ table, id }: { table: string; id: string }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const queryClient = useQueryClient()
+  const key = recordKey(table)
+  const tables = useAdminListBrowsableTables()
+  // The key's string filter is a contains match (Countries' Code), so the exact row is picked below.
+  const rows = useAdminGetBrowsableTableData(
+    table,
+    { Page: 1, PageSize: 50, filter: key ? `${key}:${id}` : undefined },
+    { query: { enabled: key !== undefined } },
+  )
+  const verifier = lookup(VERIFIERS, table)
+  const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
+  const verify = useMutation({
+    // Only offered when there's a verifier (below).
+    mutationFn: (isVerified: boolean) => verifier!(Number(id), { isVerified }),
+    onSuccess: refresh,
+  })
+
+  const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
+  const Form = lookup(EDIT_FORMS, table)
+  const editing = Form !== undefined && searchParams.get('mode') === 'edit'
+  const setEditing = (edit: boolean) => {
+    const next = new URLSearchParams(searchParams)
+    if (edit) next.set('mode', 'edit')
+    else next.delete('mode')
+    setSearchParams(next)
+  }
+
+  const back = <Link to={`/data/${table}`} className="text-sm text-gray-500 hover:text-gray-900">{`Back to ${displayName}`}</Link>
+
+  if (key === undefined) {
+    return (
+      <div className="space-y-6">
+        {back}
+        <p className="text-sm text-gray-500">{`${displayName} records can't be opened one at a time: the table has no single key.`}</p>
+      </div>
+    )
+  }
+
+  const row = rows.data?.items?.find(r => String(r[key]) === id)
+
+  return (
+    <div className="space-y-6">
+      {back}
+      {rows.error ? (
+        <ErrorAlert text={`Could not load ${displayName} ${id}`} error={rows.error} />
+      ) : rows.isLoading || tables.isLoading ? (
+        <p className="text-gray-400">Loading…</p>
+      ) : !row ? (
+        <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {`No ${displayName} record with ${key} ${id}.`}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
+              <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* The verify routes take a numeric id, so a record keyed otherwise (Countries) can't be verified. */}
+              {verifier && typeof row.Id === 'number' && 'IsVerified' in row && (
+                <Button variant="outline" disabled={verify.isPending} onClick={() => verify.mutate(row.IsVerified !== true)}>
+                  {row.IsVerified === true ? 'Unverify' : 'Verify'}
+                </Button>
+              )}
+              {Form && (
+                <div role="group" aria-label="Mode" className="inline-flex overflow-hidden rounded-md border border-gray-200">
+                  {[{ label: 'Read', edit: false }, { label: 'Edit', edit: true }].map(option => (
+                    <button
+                      key={option.label}
+                      type="button"
+                      aria-pressed={editing === option.edit}
+                      onClick={() => setEditing(option.edit)}
+                      className={cn('px-3 py-1.5 text-sm', editing === option.edit ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {verify.error && <ErrorAlert text={`Couldn't ${verify.variables ? 'verify' : 'unverify'} this record`} error={verify.error} />}
+
+          {editing && Form ? (
+            <div className="max-w-xl">
+              <Form
+                id={Number(id)}
+                onDone={() => {
+                  // The form refreshes its entity's typed caches; the fields here come from the raw table.
+                  void refresh()
+                  setEditing(false)
+                }}
+              />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.entries(row).map(([column, value]) => (
+                    <div key={column} className="min-w-0">
+                      <dt className="text-xs font-medium text-gray-500">{column}</dt>
+                      <dd className="mt-1 break-words text-gray-900">
+                        <FieldValue table={table} id={id} column={column} value={value} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function FieldValue({ table, id, column, value }: { table: string; id: string; column: string; value: unknown }) {
+  if (value === MASKED) return <RevealableValue key={`${table}|${id}|${column}`} table={table} id={id} column={column} />
+  if (value === null || value === undefined) return <span className="text-gray-400">—</span>
+  const reference = lookup(REFERENCES, column)
+  if (reference && typeof value === 'number') return <>{reference(value)}</>
+  if (typeof value === 'boolean') return <>{value ? 'Yes' : 'No'}</>
+  if (typeof value === 'object') return <code className="text-xs">{JSON.stringify(value)}</code>
+  return <>{String(value)}</>
+}
+
+function ErrorAlert({ text, error }: { text: string; error: unknown }) {
+  const { title, detail } = apiErrorMessage(error)
+  return (
+    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p>{`${text}: ${title}`}</p>
+      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
+    </div>
+  )
+}

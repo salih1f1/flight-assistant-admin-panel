@@ -33,8 +33,23 @@ export function LoyaltyProgramFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit loyalty program' : 'New loyalty program'}</h1>
+      <LoyaltyProgramForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/loyalty')} />
+    </div>
+  )
+}
+
+/**
+ * The loyalty program form: edits loyalty program `id`, or creates one when there's no id. `onDone` runs after a
+ * successful save and on Cancel, so the page around it decides where the admin goes next.
+ */
+export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => void }) {
+  const isEdit = id !== undefined
   const queryClient = useQueryClient()
-  const { data: existing } = useLoyaltyProgram(isEdit ? Number(id) : undefined)
+  const { data: existing } = useLoyaltyProgram(id)
   const { data: kinds, isError: kindsFailed } = useLoyaltyProgramKinds()
   const createMutation = useAdminCreateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
   const updateMutation = useAdminUpdateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
@@ -61,75 +76,72 @@ export function LoyaltyProgramFormPage() {
 
   const onSubmit = (data: FormData) => {
     const payload = { ...data, allianceCode: data.allianceCode || undefined }
-    if (isEdit) {
-      updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/loyalty') })
+    if (id !== undefined) {
+      updateMutation.mutate({ id, data: payload }, { onSuccess: () => onDone() })
     } else {
-      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/loyalty') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => onDone() })
     }
   }
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit loyalty program' : 'New loyalty program'}</h1>
-      <Card>
-        <CardHeader><CardTitle className="text-base">Program details</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Code <span className="text-red-500">*</span></Label>
-                <Input {...register('code')} placeholder="e.g. EXEC_CLUB" />
-                {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="kindId">Kind <span className="text-red-500">*</span></Label>
-                <select
-                  id="kindId"
-                  {...register('kindId')}
-                  className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                >
-                  <option value="">Choose a kind…</option>
-                  {kinds?.map(k => (
-                    <option key={k.id} value={k.id}>{k.name} ({k.code})</option>
-                  ))}
-                </select>
-                {errors.kindId && <p className="text-xs text-red-500">{errors.kindId.message}</p>}
-                {kindsFailed && <p className="text-xs text-red-500">Could not load loyalty program kinds.</p>}
-                {kindUnresolved && (
-                  <p className="text-xs text-amber-600">
-                    This program's kind "{existing?.kind}" isn't in the kinds list. Choose its kind before saving.
-                  </p>
-                )}
-              </div>
+    <Card>
+      <CardHeader><CardTitle className="text-base">Program details</CardTitle></CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Code <span className="text-red-500">*</span></Label>
+              <Input {...register('code')} placeholder="e.g. EXEC_CLUB" />
+              {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Name <span className="text-red-500">*</span></Label>
-              <Input {...register('name')} />
-              {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+              <Label htmlFor="kindId">Kind <span className="text-red-500">*</span></Label>
+              <select
+                id="kindId"
+                {...register('kindId')}
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                <option value="">Choose a kind…</option>
+                {kinds?.map(k => (
+                  <option key={k.id} value={k.id}>{k.name} ({k.code})</option>
+                ))}
+              </select>
+              {errors.kindId && <p className="text-xs text-red-500">{errors.kindId.message}</p>}
+              {kindsFailed && <p className="text-xs text-red-500">Could not load loyalty program kinds.</p>}
+              {kindUnresolved && (
+                <p className="text-xs text-amber-600">
+                  This program's kind "{existing?.kind}" isn't in the kinds list. Choose its kind before saving.
+                </p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Airline ID</Label>
-                <Input type="number" {...register('airlineId')} placeholder="optional" />
-                {/* Which airline the number is, looked up as it's typed. */}
-                {Number(watch('airlineId')) > 0 && (
-                  <p className="text-xs text-gray-500"><AirlineName id={Number(watch('airlineId'))} /></p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Alliance code</Label>
-                <Input {...register('allianceCode')} placeholder="STAR / OW / ST" />
-              </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Name <span className="text-red-500">*</span></Label>
+            <Input {...register('name')} />
+            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Airline ID</Label>
+              <Input type="number" {...register('airlineId')} placeholder="optional" />
+              {/* Which airline the number is, looked up as it's typed. */}
+              {Number(watch('airlineId')) > 0 && (
+                <p className="text-xs text-gray-500"><AirlineName id={Number(watch('airlineId'))} /></p>
+              )}
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {isEdit ? 'Save changes' : 'Create program'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/loyalty')}>Cancel</Button>
+            <div className="space-y-1.5">
+              <Label>Alliance code</Label>
+              <Input {...register('allianceCode')} placeholder="STAR / OW / ST" />
             </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+              {isEdit ? 'Save changes' : 'Create program'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onDone()}>Cancel</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
