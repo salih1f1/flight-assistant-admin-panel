@@ -5,6 +5,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Eye, Trash2, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
+import { ViewTabs } from '@/components/ViewTabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAdminDeleteFlight, useAdminGetAllFlights, useAdminSyncFlightStatus } from '@/api/generated/admin'
@@ -83,6 +84,7 @@ export function FlightsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Flights</h1>
+      <ViewTabs table="flights" />
       {syncError && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <p>Could not sync {syncedFlight?.flightNumber ?? `flight ${syncMutation.variables?.id}`}: {syncError.title}</p>

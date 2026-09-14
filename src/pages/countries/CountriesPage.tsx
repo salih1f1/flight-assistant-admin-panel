@@ -1,5 +1,6 @@
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/DataTable'
+import { ViewTabs } from '@/components/ViewTabs'
 import { Badge } from '@/components/ui/badge'
 import { useAdminGetAllCountries } from '@/api/generated/admin'
 import type { CountryAdminDto } from '@/api/generated/model'
@@ -31,6 +32,7 @@ export function CountriesPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Countries</h1>
       <p className="text-sm text-gray-500">Read-only reference data seeded from OpenFlights.</p>
+      <ViewTabs table="countries" />
       {/* Not server-paged: the API returns every country, so client-side search covers them all. */}
       <DataTable columns={columns} data={data} error={error} searchPlaceholder="Search countries…" searchColumn="name" />
     </div>

@@ -47,6 +47,14 @@ describe('AirlinesPage', () => {
     expect(screen.queryByText(/no results/i)).not.toBeInTheDocument()
   })
 
+  it('links to the airlines raw table from the Manage | Raw data tabs', async () => {
+    renderWithProviders(<AirlinesPage />)
+    await screen.findByText('Airline 001')
+
+    const views = screen.getByRole('navigation', { name: 'Views' })
+    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('href', '/data/airlines')
+  })
+
   it('shows the position and total from the API, not the number of rows on screen', async () => {
     renderWithProviders(<AirlinesPage />)
 

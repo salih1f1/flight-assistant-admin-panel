@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/DataTable'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ViewTabs } from '@/components/ViewTabs'
 import {
   adminVerifyAirline, adminVerifyAirport, adminVerifyAlliance, adminVerifyCountry, adminVerifyLounge,
   adminVerifyLoungeProvider, adminVerifyLoyaltyProgram, adminVerifyLoyaltyProgramKind,
@@ -164,106 +164,71 @@ export function DataBrowserPage() {
     },
   ] : dataColumns
 
+  // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
+  if (!table) return null
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Data browser</h1>
-        <p className="text-sm text-gray-500">Read-only. Sensitive columns are masked by the API; revealing one is audited.</p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{selected?.displayName ?? table}</h1>
+          <p className="text-sm text-gray-500">Read-only. Sensitive columns are masked by the API; revealing one is audited.</p>
+        </div>
+        <ViewTabs table={table} />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[14rem_1fr]">
-        <Card>
-          <CardContent className="p-2">
-            {tables.error ? (
-              <ErrorAlert what="tables" error={tables.error} />
-            ) : tables.isLoading ? (
-              <p className="p-2 text-sm text-gray-400">Loading tables…</p>
-            ) : (
-              <nav>
-                <ul className="space-y-0.5">
-                  {(tables.data ?? []).map(t => (
-                    <li key={t.slug}>
-                      {/* A bare path: switching tables drops the previous table's page, sort and filter. */}
-                      <Link
-                        to={`/data/${t.slug}`}
-                        className={cn(
-                          'flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm',
-                          t.slug === table ? 'bg-gray-100 font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-50',
-                        )}
-                      >
-                        <span>{t.displayName}</span>
-                        <span className="text-xs text-gray-400">{rowCount(t.rowCount ?? 0)}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="min-w-0 space-y-4">
-          {!table ? (
-            <p className="text-sm text-gray-500">Pick a table to browse its rows.</p>
-          ) : (
-            <>
-              <h2 className="text-lg font-semibold text-gray-900">{selected?.displayName ?? table}</h2>
-              {verifier && (
-                // The API takes one filter, so choosing one of these replaces any column filter.
-                <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
-                  {VERIFIED_FILTERS.map(option => (
-                    <button
-                      key={option.label}
-                      type="button"
-                      aria-pressed={filter === option.filter}
-                      onClick={() => updateView({ filter: option.filter })}
-                      className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {verifier && items.length > 0 && !verifiableRows && (
-                <p className="text-sm text-gray-500">
-                  {`Verifying isn't available for ${selected?.displayName ?? table}: the API's verify route takes a numeric id, and these rows have none.`}
-                </p>
-              )}
-              <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
-              <FilterForm
-                // Remount when the applied filter or table changes, so the inputs show what's applied.
-                key={`${table}|${filter ?? ''}`}
-                columns={columnNames}
-                filter={filter}
-                onApply={value => updateView({ filter: value })}
-                onClear={() => updateView({ filter: undefined })}
-              />
-              {verify.error && verify.variables?.table === table && (
-                <VerifyError error={verify.error} target={verify.variables} />
-              )}
-              {rows.error ? (
-                // In place of the table: an empty grid would read as "no rows match".
-                <ErrorAlert what="rows" error={rows.error} />
-              ) : rows.isLoading ? (
-                <p className="text-sm text-gray-400">Loading rows…</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <DataTable
-                    columns={columns}
-                    data={items}
-                    pagination={{ page, pageSize: PAGE_SIZE, total: rows.data?.total ?? 0, onPageChange: p => updateView({ page: p }) }}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </div>
+      <div className="min-w-0 space-y-4">
+        {verifier && (
+          // The API takes one filter, so choosing one of these replaces any column filter.
+          <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
+            {VERIFIED_FILTERS.map(option => (
+              <button
+                key={option.label}
+                type="button"
+                aria-pressed={filter === option.filter}
+                onClick={() => updateView({ filter: option.filter })}
+                className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {verifier && items.length > 0 && !verifiableRows && (
+          <p className="text-sm text-gray-500">
+            {`Verifying isn't available for ${selected?.displayName ?? table}: the API's verify route takes a numeric id, and these rows have none.`}
+          </p>
+        )}
+        <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
+        <FilterForm
+          // Remount when the applied filter or table changes, so the inputs show what's applied.
+          key={`${table}|${filter ?? ''}`}
+          columns={columnNames}
+          filter={filter}
+          onApply={value => updateView({ filter: value })}
+          onClear={() => updateView({ filter: undefined })}
+        />
+        {verify.error && verify.variables?.table === table && (
+          <VerifyError error={verify.error} target={verify.variables} />
+        )}
+        {rows.error ? (
+          // In place of the table: an empty grid would read as "no rows match".
+          <ErrorAlert what="rows" error={rows.error} />
+        ) : rows.isLoading ? (
+          <p className="text-sm text-gray-400">Loading rows…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={columns}
+              data={items}
+              pagination={{ page, pageSize: PAGE_SIZE, total: rows.data?.total ?? 0, onPageChange: p => updateView({ page: p }) }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
-const rowCount = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'row' : 'rows'}`
 
 function Cell({ value }: { value: unknown }) {
   if (value === MASKED) return <MaskedBadge />

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, type SentRequest } from '@/test/fakeApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -32,6 +32,14 @@ describe('CountriesPage', () => {
     expect(await screen.findByText('Germany')).toBeInTheDocument()
     expect(screen.getByText('United Kingdom')).toBeInTheDocument()
     expect(sent).toContainEqual(expect.objectContaining({ method: 'GET', url: '/admin/refdata/countries' }))
+  })
+
+  it('links to the countries raw table from the Manage | Raw data tabs', async () => {
+    renderWithProviders(<CountriesPage />)
+    await screen.findByText('Germany')
+
+    const views = screen.getByRole('navigation', { name: 'Views' })
+    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('href', '/data/countries')
   })
 
   it("shows each country's memberships", async () => {

@@ -5,6 +5,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Eye, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
+import { ViewTabs } from '@/components/ViewTabs'
 import { Button } from '@/components/ui/button'
 import { useAdminDeleteTraveler, useAdminGetAllTravelers } from '@/api/generated/admin'
 import type { AdminTravelerDto } from '@/api/generated/model'
@@ -56,6 +57,7 @@ export function TravelersPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Travelers</h1>
+      <ViewTabs table="travelers" />
       {/* No search box: the API has no search parameter, so it could only filter
           the rows on the current page. */}
       <DataTable

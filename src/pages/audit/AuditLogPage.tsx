@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { MaskedBadge } from '@/components/RevealableValue'
+import { ViewTabs } from '@/components/ViewTabs'
 import { useAdminGetAuditLog } from '@/api/generated/admin'
 import type { AdminAuditAction, AdminAuditDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -74,6 +75,7 @@ export function AuditLogPage() {
         <h1 className="text-2xl font-bold text-gray-900">Audit log</h1>
         <p className="text-sm text-gray-500">Every admin create, update, delete, verify, import and reveal, newest first.</p>
       </div>
+      <ViewTabs table="admin-audit-log" />
 
       <FilterForm key={searchParams.toString()} filters={filters} onApply={applyFilters} onClear={() => setSearchParams({})} />
 
