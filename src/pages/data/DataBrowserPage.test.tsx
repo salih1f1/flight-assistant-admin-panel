@@ -109,19 +109,17 @@ describe('DataBrowserPage', () => {
     expect(screen.queryByText('Data browser')).not.toBeInTheDocument()
   })
 
-  it('All columns shows the hidden columns in their place, keeping the choice in the URL', async () => {
+  it('showing hidden columns puts them in their place, keeping the choice in the URL', async () => {
     const user = userEvent.setup()
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
-    expect(screen.getByRole('button', { name: 'All columns' })).toHaveAttribute('aria-pressed', 'false')
 
-    await user.click(screen.getByRole('button', { name: 'All columns' }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 hidden columns' }))
 
     expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'])
-    expect(screen.getByRole('button', { name: 'All columns' })).toHaveAttribute('aria-pressed', 'true')
     expect(search(router).get('columns')).toBe('all')
 
-    await user.click(screen.getByRole('button', { name: 'All columns' }))
+    await user.click(screen.getByRole('button', { name: 'Hide 3 columns' }))
 
     expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBeNull()
