@@ -25,6 +25,8 @@ const cases: {
   page: string
   Component: ComponentType
   url: string
+  /** The raw table its Raw data tab links to. */
+  table: string
   row: (n: number) => Record<string, unknown> & { id: number | string }
   text: (n: number) => string
 }[] = [
@@ -32,6 +34,7 @@ const cases: {
     page: 'AirportsPage',
     Component: AirportsPage,
     url: '/admin/airports',
+    table: 'airports',
     row: n => ({ id: n, iata: 'XXX', icao: null, name: `Airport ${pad(n)}`, city: 'City', countryCode: 'XX', latitude: null, longitude: null, elevationFt: null }),
     text: n => `Airport ${pad(n)}`,
   },
@@ -39,6 +42,7 @@ const cases: {
     page: 'LoungesPage',
     Component: LoungesPage,
     url: '/admin/lounges',
+    table: 'lounges',
     row: n => ({ id: n, airportId: 1, name: `Lounge ${pad(n)}`, terminal: null, locationHint: null, hours: null, isAirside: true, isDomesticOnly: false, isInternationalOnly: false, amenities: null }),
     text: n => `Lounge ${pad(n)}`,
   },
@@ -46,6 +50,7 @@ const cases: {
     page: 'LoyaltyProgramsPage',
     Component: LoyaltyProgramsPage,
     url: '/admin/loyalty/programs',
+    table: 'loyalty-programs',
     row: n => ({ id: n, code: `P${pad(n)}`, name: `Program ${pad(n)}`, kind: 'Airline', airlineId: null, allianceCode: null, tiers: [] }),
     text: n => `Program ${pad(n)}`,
   },
@@ -53,6 +58,7 @@ const cases: {
     page: 'FlightsPage',
     Component: FlightsPage,
     url: '/admin/flights',
+    table: 'flights',
     row: n => ({
       id: n, airlineId: 1, flightNumber: `FA${pad(n)}`, departureAirportId: 1, arrivalAirportId: 2,
       serviceDate: '2026-09-13', scheduledDepartureUtc: '2026-09-13T10:00:00Z', scheduledArrivalUtc: '2026-09-13T12:00:00Z',
@@ -65,12 +71,13 @@ const cases: {
     page: 'TravelersPage',
     Component: TravelersPage,
     url: '/admin/travelers',
+    table: 'travelers',
     row: n => ({ id: `00000000-0000-0000-0000-000000000${pad(n)}`, email: `traveler${pad(n)}@example.com`, displayName: null, createdUtc: '2026-01-01T00:00:00Z' }),
     text: n => `traveler${pad(n)}@example.com`,
   },
 ]
 
-describe.each(cases)('$page', ({ Component, url, row, text }) => {
+describe.each(cases)('$page', ({ Component, url, table, row, text }) => {
   let rows: ReturnType<typeof row>[]
   let sent: SentRequest[]
 
@@ -94,6 +101,14 @@ describe.each(cases)('$page', ({ Component, url, row, text }) => {
     expect(screen.getByText(text(50))).toBeInTheDocument()
     expect(screen.queryByText(text(51))).not.toBeInTheDocument()
     expect(screen.queryByText(/no results/i)).not.toBeInTheDocument()
+  })
+
+  it('links to its raw table from the Manage | Raw data tabs', async () => {
+    renderWithProviders(<Component />)
+    await screen.findByText(text(1))
+
+    const views = screen.getByRole('navigation', { name: 'Views' })
+    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('href', `/data/${table}`)
   })
 
   it('shows the position and total from the API', async () => {

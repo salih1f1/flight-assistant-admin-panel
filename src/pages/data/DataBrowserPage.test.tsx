@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -68,10 +68,7 @@ let sent: SentRequest[]
 
 function renderAt(entry: string) {
   const router = createMemoryRouter(
-    [
-      { path: '/data', element: <DataBrowserPage /> },
-      { path: '/data/:table', element: <DataBrowserPage /> },
-    ],
+    [{ path: '/data/:table', element: <DataBrowserPage /> }],
     { initialEntries: [entry] },
   )
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -92,27 +89,39 @@ describe('DataBrowserPage', () => {
     ;({ sent } = installFakeApi(dataApi))
   })
 
-  it('lists the browsable tables with their row counts', async () => {
-    renderAt('/data')
+  it("shows a table's first page under its name, with the API's columns in the API's order", async () => {
+    renderAt('/data/travelers')
 
-    const travelers = await screen.findByRole('link', { name: /Travelers/ })
-    expect(travelers).toHaveTextContent('120 rows')
-    expect(screen.getByRole('link', { name: /Flight Statuses/ })).toHaveTextContent('1 row')
-    expect(screen.getByText('Pick a table to browse its rows.')).toBeInTheDocument()
-  })
-
-  it("picking a table shows its first page, with the API's columns in the API's order", async () => {
-    const user = userEvent.setup()
-    const router = renderAt('/data')
-
-    await user.click(await screen.findByRole('link', { name: /Travelers/ }))
-
+    expect(await screen.findByRole('heading', { level: 1, name: 'Travelers' })).toBeInTheDocument()
     expect(await screen.findByText('Traveler 001')).toBeInTheDocument()
     expect(screen.getByText('Traveler 050')).toBeInTheDocument()
     expect(screen.queryByText('Traveler 051')).not.toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/data/travelers')
     expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'])
     expect(screen.getByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
+  })
+
+  it('has no table list of its own: the side menu lists the tables', async () => {
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    expect(screen.queryByRole('link', { name: /Flight Statuses/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Data browser')).not.toBeInTheDocument()
+  })
+
+  it('links a table with a management page to it, current on Raw data', async () => {
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    const views = screen.getByRole('navigation', { name: 'Views' })
+    expect(within(views).getByRole('link', { name: 'Manage' })).toHaveAttribute('href', '/travelers')
+    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('shows no Manage | Raw data tabs for a table with no management page', async () => {
+    renderAt('/data/flight-statuses')
+    await screen.findByText('Scheduled')
+
+    expect(screen.queryByRole('navigation', { name: 'Views' })).not.toBeInTheDocument()
   })
 
   it('shows masked values as masked, never as the placeholder text', async () => {
@@ -217,12 +226,12 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Unknown table 'nope'.")
   })
 
-  it('switching tables starts the new table on page 1 with no sort or filter', async () => {
-    const user = userEvent.setup()
+  it('switching tables from the menu starts the new table on page 1 with no sort or filter', async () => {
     const router = renderAt('/data/travelers?page=2&sort=-DisplayName&filter=DisplayName:Traveler')
     await screen.findByText('Traveler 070')
 
-    await user.click(screen.getByRole('link', { name: /Flight Statuses/ }))
+    // The side menu links each table by its bare path.
+    await act(() => router.navigate('/data/flight-statuses'))
 
     expect(await screen.findByText('Scheduled')).toBeInTheDocument()
     expect(lastDataRequest()).toEqual(expect.objectContaining({ url: '/admin/data/flight-statuses', params: { Page: 1, PageSize: 50 } }))

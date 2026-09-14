@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAdmin } from '@/components/RequireAdmin'
 import { Dashboard } from '@/pages/Dashboard'
@@ -45,7 +45,8 @@ export const router = createBrowserRouter([
           { path: '/lounges', element: <LoungesPage /> },
           { path: '/lounges/new', element: <LoungeFormPage /> },
           { path: '/lounges/:id/edit', element: <LoungeFormPage /> },
-          { path: '/data', element: <DataBrowserPage /> },
+          // The tables are in the side menu now; the old table picker has no page of its own.
+          { path: '/data', element: <Navigate to="/" replace /> },
           { path: '/data/:table', element: <DataBrowserPage /> },
           { path: '/import', element: <ImportPage /> },
           { path: '/audit', element: <AuditLogPage /> },

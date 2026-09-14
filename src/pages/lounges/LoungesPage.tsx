@@ -5,6 +5,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/DataTable'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
+import { ViewTabs } from '@/components/ViewTabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAdminDeleteLounge, useAdminGetAllLounges } from '@/api/generated/admin'
@@ -65,6 +66,7 @@ export function LoungesPage() {
           <Plus className="h-4 w-4 mr-2" /> Add lounge
         </Button>
       </div>
+      <ViewTabs table="lounges" />
       {/* No search box: the API has no search parameter, so it could only filter
           the rows on the current page. */}
       <DataTable
