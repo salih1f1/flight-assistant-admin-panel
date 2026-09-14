@@ -102,6 +102,7 @@ describe('Dashboard recent activity', () => {
     const section = await activity()
 
     expect(await within(section).findByRole('alert')).toHaveTextContent('Could not load recent activity: An unexpected error occurred.')
-    expect(screen.getByText('Travelers')).toBeInTheDocument()
+    // The rest of the dashboard still renders: the stats section's period selector is there.
+    expect(screen.getByRole('group', { name: 'Period' })).toBeInTheDocument()
   })
 })
