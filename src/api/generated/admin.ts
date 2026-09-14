@@ -38,9 +38,11 @@ import type {
   AdminGetBrowsableTableDataParams,
   AdminGetCiRunsParams,
   AdminGetLoyaltyProgramsParams,
+  AdminGetStatsParams,
   AdminHealthDto,
   AdminLoungeDto,
   AdminLoungeDtoPagedResult,
+  AdminStatsDto,
   AdminTravelerDetailDto,
   AdminTravelerDto,
   AdminTravelerDtoPagedResult,
@@ -4674,6 +4676,101 @@ export function useAdminGetAllAlliances<TData = Awaited<ReturnType<typeof adminG
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAdminGetAllAlliancesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * For travelers, flights, airlines, airports, lounges and loyalty programs: the total, how many were added in the period with a per-bucket series, and verified/unverified counts (null for travelers and flights). 'period' is 24h, 7d, 30d or 90d (default 7d), resolved to whole hourly (24h) or UTC-day buckets ending with the current one, so NewInPeriod always equals the sum of Series. 'Added' is CreatedUtc, or FirstSeenAt for airlines and airports; rows with no known date and seeded airlines and airports never count as new.
+ * @summary Dashboard card counts: totals, new in a period, verified
+ */
+export const adminGetStats = (
+    params?: AdminGetStatsParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminStatsDto>(
+      {url: `/admin/stats`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetStatsQueryKey = (params?: AdminGetStatsParams,) => {
+    return [
+    `/admin/stats`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminGetStatsQueryOptions = <TData = Awaited<ReturnType<typeof adminGetStats>>, TError = ErrorType<HttpValidationProblemDetails>>(params?: AdminGetStatsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetStatsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetStats>>> = ({ signal }) => adminGetStats(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetStatsQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetStats>>>
+export type AdminGetStatsQueryError = ErrorType<HttpValidationProblemDetails>
+
+
+export function useAdminGetStats<TData = Awaited<ReturnType<typeof adminGetStats>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params: undefined |  AdminGetStatsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetStats>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetStats<TData = Awaited<ReturnType<typeof adminGetStats>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminGetStatsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetStats>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetStats<TData = Awaited<ReturnType<typeof adminGetStats>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminGetStatsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Dashboard card counts: totals, new in a period, verified
+ */
+
+export function useAdminGetStats<TData = Awaited<ReturnType<typeof adminGetStats>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminGetStatsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetStats>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetStatsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
