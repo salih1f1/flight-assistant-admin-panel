@@ -1,7 +1,11 @@
 import {
+  adminDeleteAirline, adminDeleteAirport, adminDeleteDeviceToken, adminDeleteFlight, adminDeleteLounge,
+  adminDeleteLoyaltyProgram, adminDeleteTraveler,
   adminVerifyAirline, adminVerifyAirport, adminVerifyAlliance, adminVerifyCountry, adminVerifyLounge,
   adminVerifyLoungeProvider, adminVerifyLoyaltyProgram, adminVerifyLoyaltyProgramKind,
 } from '@/api/generated/admin'
+
+type Row = Record<string, unknown>
 
 /**
  * `map[key]` for an own key only. Table slugs come from the URL, and a slug like 'constructor'
@@ -55,4 +59,52 @@ export function recordPath(table: string, row: Record<string, unknown>): string 
   if (value === null || value === undefined) return undefined
   const id = String(value)
   return lookup(OWN_DETAIL_PAGES, table)?.(id) ?? `/data/${table}/${encodeURIComponent(id)}`
+}
+
+/** Tables the API can create and update: the noun for one record, and the page that creates one. */
+export const EDITABLE: Record<string, { noun: string; newPath: string }> = {
+  airlines: { noun: 'airline', newPath: '/airlines/new' },
+  airports: { noun: 'airport', newPath: '/airports/new' },
+  lounges: { noun: 'lounge', newPath: '/lounges/new' },
+  'loyalty-programs': { noun: 'loyalty program', newPath: '/loyalty/new' },
+}
+
+/** Tables the API can delete from: what the confirmation says, and the typed DELETE for a raw row. */
+export const DELETERS: Record<string, { noun: string; warning: string; remove: (row: Row) => Promise<void> }> = {
+  travelers: {
+    noun: 'traveler',
+    warning: 'This will permanently delete the traveler and all their data.',
+    remove: row => adminDeleteTraveler(String(row.Id)),
+  },
+  'device-tokens': {
+    noun: 'device token',
+    warning: 'The device will stop receiving notifications for this traveler.',
+    // The route nests the token under its traveler.
+    remove: row => adminDeleteDeviceToken(String(row.TravelerId), String(row.Id)),
+  },
+  flights: {
+    noun: 'flight',
+    warning: 'This will remove the flight record and all tracking links.',
+    remove: row => adminDeleteFlight(Number(row.Id)),
+  },
+  airlines: {
+    noun: 'airline',
+    warning: 'Cannot delete if flights reference this airline.',
+    remove: row => adminDeleteAirline(Number(row.Id)),
+  },
+  airports: {
+    noun: 'airport',
+    warning: 'This will permanently delete this airport record.',
+    remove: row => adminDeleteAirport(Number(row.Id)),
+  },
+  lounges: {
+    noun: 'lounge',
+    warning: 'This will permanently delete this lounge.',
+    remove: row => adminDeleteLounge(Number(row.Id)),
+  },
+  'loyalty-programs': {
+    noun: 'loyalty program',
+    warning: 'This will remove the program and all its tiers.',
+    remove: row => adminDeleteLoyaltyProgram(Number(row.Id)),
+  },
 }

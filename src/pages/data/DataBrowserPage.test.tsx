@@ -96,7 +96,8 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByText('Traveler 001')).toBeInTheDocument()
     expect(screen.getByText('Traveler 050')).toBeInTheDocument()
     expect(screen.queryByText('Traveler 051')).not.toBeInTheDocument()
-    expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'])
+    // Email is masked on every row and CreatedBy/UpdatedBy are bookkeeping, so they start hidden.
+    expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(screen.getByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
   })
 
@@ -108,18 +109,47 @@ describe('DataBrowserPage', () => {
     expect(screen.queryByText('Data browser')).not.toBeInTheDocument()
   })
 
-  it('links a table with a management page to it, current on Raw data', async () => {
+  it('All columns shows the hidden columns in their place, keeping the choice in the URL', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+    expect(screen.getByRole('button', { name: 'All columns' })).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'All columns' }))
+
+    expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'])
+    expect(screen.getByRole('button', { name: 'All columns' })).toHaveAttribute('aria-pressed', 'true')
+    expect(search(router).get('columns')).toBe('all')
+
+    await user.click(screen.getByRole('button', { name: 'All columns' }))
+
+    expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
+    expect(search(router).get('columns')).toBeNull()
+  })
+
+  it('keeps All columns while paging, and opens with it from a shared link', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers?columns=all')
+    await screen.findByText('Traveler 001')
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(await screen.findByText('Traveler 051')).toBeInTheDocument()
+    expect(headers()).toContain('Email')
+    expect(search(router).get('columns')).toBe('all')
+  })
+
+  it('still offers hidden columns to filter on', async () => {
     renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    const views = screen.getByRole('navigation', { name: 'Views' })
-    expect(within(views).getByRole('link', { name: 'Manage' })).toHaveAttribute('href', '/travelers')
-    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('aria-current', 'page')
+    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    expect(options).toEqual(expect.arrayContaining(['CreatedBy', 'UpdatedBy']))
   })
 
-  it('shows no Manage | Raw data tabs for a table with no management page', async () => {
-    renderAt('/data/flight-statuses')
-    await screen.findByText('Scheduled')
+  it('has no Manage | Raw data tabs: the grid is the only list', async () => {
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
 
     expect(screen.queryByRole('navigation', { name: 'Views' })).not.toBeInTheDocument()
   })
@@ -139,7 +169,8 @@ describe('DataBrowserPage', () => {
   })
 
   it('shows masked values as masked, never as the placeholder text', async () => {
-    renderAt('/data/travelers')
+    // Email is masked on every row, so it's only in the grid with All columns.
+    renderAt('/data/travelers?columns=all')
 
     const row = (await screen.findByText('Traveler 001')).closest('tr')!
     expect(within(row).getByText('Masked')).toBeInTheDocument()

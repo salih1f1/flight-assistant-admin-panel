@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { httpError, installFakeApi, pagedResult, rawRows, type SentRequest } from '@/test/fakeApi'
 import { AirportFormPage } from './AirportFormPage'
-import { AirportsPage } from './AirportsPage'
+import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -22,6 +22,9 @@ let sent: SentRequest[]
 
 /** An in-memory /admin/airports: list, get, create and update change what later reads return. */
 function airportsApi(req: SentRequest) {
+  // The grid the form returns to: the same records, as GET /admin/data/airports rows.
+  if (req.method === 'GET' && req.url === '/admin/data/tables') return []
+  if (req.method === 'GET' && req.url === '/admin/data/airports') return pagedResult(rawRows(airports), req.params)
   if (req.method === 'GET' && req.url === '/admin/airports') return pagedResult(airports, req.params)
   if (req.method === 'POST' && req.url === '/admin/airports') {
     const id = 100 + airports.length
@@ -46,7 +49,7 @@ function airportsApi(req: SentRequest) {
 function renderRoutes(initialEntry: string) {
   const router = createMemoryRouter(
     [
-      { path: '/airports', element: <AirportsPage /> },
+      { path: '/data/:table', element: <DataBrowserPage /> },
       { path: '/airports/new', element: <AirportFormPage /> },
       { path: '/airports/:id/edit', element: <AirportFormPage /> },
     ],
@@ -118,7 +121,7 @@ describe('AirportFormPage', () => {
 
   it('after saving, the airport list shows the change without a reload', async () => {
     const user = userEvent.setup()
-    const { router } = renderRoutes('/airports')
+    const { router } = renderRoutes('/data/airports')
     await screen.findByText('Heathrow')
 
     await act(async () => {
@@ -129,7 +132,7 @@ describe('AirportFormPage', () => {
     await user.type(name, 'London Heathrow')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    // The form navigates back to /airports on success.
+    // The form navigates back to the /data/airports grid on success.
     expect(await screen.findByText('London Heathrow')).toBeInTheDocument()
     expect(screen.queryByText('Heathrow')).not.toBeInTheDocument()
   })

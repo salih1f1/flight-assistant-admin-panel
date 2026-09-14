@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { httpError, installFakeApi, pagedResult, rawRows, type SentRequest } from '@/test/fakeApi'
 import { LoyaltyProgramFormPage } from './LoyaltyProgramFormPage'
-import { LoyaltyProgramsPage } from './LoyaltyProgramsPage'
+import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -44,6 +44,9 @@ let sent: SentRequest[]
 const BRITISH_AIRWAYS = { id: 42, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'ONEWORLD' }
 
 function loyaltyApi(req: SentRequest) {
+  // The grid the form returns to: the same records, as GET /admin/data/loyalty-programs rows.
+  if (req.method === 'GET' && req.url === '/admin/data/tables') return []
+  if (req.method === 'GET' && req.url === '/admin/data/loyalty-programs') return pagedResult(rawRows(programs), req.params)
   if (req.method === 'GET' && req.url === '/admin/airlines/42') return BRITISH_AIRWAYS
   if (req.method === 'GET' && req.url === '/admin/loyalty/programs') return pagedResult(programs, req.params)
   if (req.method === 'GET' && req.url === '/admin/data/loyalty-program-kinds') return pagedResult(KINDS, req.params)
@@ -70,7 +73,7 @@ function loyaltyApi(req: SentRequest) {
 function renderRoutes(initialEntry: string) {
   const router = createMemoryRouter(
     [
-      { path: '/loyalty', element: <LoyaltyProgramsPage /> },
+      { path: '/data/:table', element: <DataBrowserPage /> },
       { path: '/loyalty/new', element: <LoyaltyProgramFormPage /> },
       { path: '/loyalty/:id/edit', element: <LoyaltyProgramFormPage /> },
     ],
@@ -213,7 +216,7 @@ describe('LoyaltyProgramFormPage', () => {
 
   it('after saving, the loyalty program list shows the change without a reload', async () => {
     const user = userEvent.setup()
-    const { router } = renderRoutes('/loyalty')
+    const { router } = renderRoutes('/data/loyalty-programs')
     await screen.findByText('Program 3')
 
     await act(async () => {
@@ -225,7 +228,7 @@ describe('LoyaltyProgramFormPage', () => {
     await user.type(name, 'Renamed Program')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    // The form navigates back to /loyalty on success.
+    // The form navigates back to the /data/loyalty-programs grid on success.
     expect(await screen.findByText('Renamed Program')).toBeInTheDocument()
     expect(screen.queryByText('Program 3')).not.toBeInTheDocument()
 

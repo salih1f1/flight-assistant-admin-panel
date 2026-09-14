@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { httpError, installFakeApi, pagedResult, rawRows, type SentRequest } from '@/test/fakeApi'
 import { AirlineFormPage } from './AirlineFormPage'
-import { AirlinesPage } from './AirlinesPage'
+import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -18,6 +18,9 @@ let sent: SentRequest[]
 
 /** An in-memory /admin/airlines: list, get, create and update change what later reads return. */
 function airlinesApi(req: SentRequest) {
+  // The grid the form returns to: the same records, as GET /admin/data/airlines rows.
+  if (req.method === 'GET' && req.url === '/admin/data/tables') return []
+  if (req.method === 'GET' && req.url === '/admin/data/airlines') return pagedResult(rawRows(airlines), req.params)
   if (req.method === 'GET' && req.url === '/admin/airlines') return pagedResult(airlines, req.params)
   if (req.method === 'POST' && req.url === '/admin/airlines') {
     const id = 100 + airlines.length
@@ -45,7 +48,7 @@ function airlinesApi(req: SentRequest) {
 function renderRoutes(initialEntry: string) {
   const router = createMemoryRouter(
     [
-      { path: '/airlines', element: <AirlinesPage /> },
+      { path: '/data/:table', element: <DataBrowserPage /> },
       { path: '/airlines/new', element: <AirlineFormPage /> },
       { path: '/airlines/:id/edit', element: <AirlineFormPage /> },
     ],
@@ -116,7 +119,7 @@ describe('AirlineFormPage', () => {
 
   it('after saving, the airline list shows the change without a reload', async () => {
     const user = userEvent.setup()
-    const router = renderRoutes('/airlines')
+    const router = renderRoutes('/data/airlines')
     await screen.findByText('British Airways')
 
     await act(async () => {
@@ -127,7 +130,7 @@ describe('AirlineFormPage', () => {
     await user.type(name, 'BA Euroflyer')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    // The form navigates back to /airlines on success.
+    // The form navigates back to the /data/airlines grid on success.
     expect(await screen.findByText('BA Euroflyer')).toBeInTheDocument()
     expect(screen.queryByText('British Airways')).not.toBeInTheDocument()
   })

@@ -29,7 +29,7 @@ export function AirlineFormPage() {
   return (
     <div className="max-w-lg space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit airline' : 'New airline'}</h1>
-      <AirlineForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/airlines')} />
+      <AirlineForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/data/airlines')} />
     </div>
   )
 }
