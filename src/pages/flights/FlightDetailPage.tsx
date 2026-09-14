@@ -62,7 +62,7 @@ function FlightDetail({ flight }: { flight: AdminFlightDetailDto }) {
             <AirportName id={flight.arrivalAirportId} />
           </Fact>
           <Fact label="Aircraft">{flight.equipmentAircraftIcao ?? '—'}</Fact>
-          <Fact label="External id"><span className="break-all font-mono text-xs">{flight.externalId ?? '—'}</span></Fact>
+          <div className="hidden lg:block" />
           <Fact label="Scheduled departure">{utc(flight.scheduledDepartureUtc)}</Fact>
           <Fact label="Estimated departure">{utc(flight.estimatedDepartureUtc)}</Fact>
           <Fact label="Actual departure">{utc(flight.actualDepartureUtc)}</Fact>

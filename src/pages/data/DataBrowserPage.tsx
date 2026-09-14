@@ -31,7 +31,7 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
  * payloads. The record page always shows them.
  */
 const HIDDEN_COLUMNS = new Set([
-  'CreatedBy', 'UpdatedBy', 'SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt',
+  'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
 

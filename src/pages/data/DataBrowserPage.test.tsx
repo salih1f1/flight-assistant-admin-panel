@@ -26,9 +26,7 @@ const TRAVELERS: Row[] = Array.from({ length: 120 }, (_, i) => ({
   Email: '<redacted>',
   DisplayName: `Traveler ${pad(i + 1)}`,
   CreatedUtc: '2026-01-01T00:00:00Z',
-  CreatedBy: null,
   UpdatedUtc: null,
-  UpdatedBy: null,
 }))
 const FLIGHT_STATUSES: Row[] = [{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null }]
 
@@ -96,7 +94,7 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByText('Traveler 001')).toBeInTheDocument()
     expect(screen.getByText('Traveler 050')).toBeInTheDocument()
     expect(screen.queryByText('Traveler 051')).not.toBeInTheDocument()
-    // Email is masked on every row and CreatedBy/UpdatedBy are bookkeeping, so they start hidden.
+    // Email is masked on every row, so it starts hidden.
     expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(screen.getByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
   })
@@ -114,12 +112,12 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.click(screen.getByRole('button', { name: 'Show 3 hidden columns' }))
+    await user.click(screen.getByRole('button', { name: 'Show 1 hidden column' }))
 
-    expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'])
+    expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBe('all')
 
-    await user.click(screen.getByRole('button', { name: 'Hide 3 columns' }))
+    await user.click(screen.getByRole('button', { name: 'Hide 1 column' }))
 
     expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBeNull()
@@ -142,7 +140,7 @@ describe('DataBrowserPage', () => {
     await screen.findByText('Traveler 001')
 
     const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
-    expect(options).toEqual(expect.arrayContaining(['CreatedBy', 'UpdatedBy']))
+    expect(options).toEqual(expect.arrayContaining(['Email']))
   })
 
   it('has no Manage | Raw data tabs: the grid is the only list', async () => {
