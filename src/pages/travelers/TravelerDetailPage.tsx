@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AirlineName, AirportName, LoyaltyProgramName, LoyaltyTierName } from '@/components/ReferenceNames'
@@ -8,16 +9,13 @@ import { useAdminGetTravelerDetail } from '@/api/generated/admin'
 import type { AdminTravelerDetailDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
+import { isTravelerId } from '@/lib/travelerId'
 
 // SensitiveProperties.RedactedPlaceholder: what the API sends in place of a sensitive value.
 const MASKED = '<redacted>'
 
 // GetAdminTravelerDetailQueryHandler.MaxTrackedFlights.
 const MAX_TRACKED_FLIGHTS = 50
-
-// The detail route is {id:guid}. Anything else matches no route, and an unmatched /admin route
-// fails the CORS preflight in the browser instead of returning 404, so it's checked here first.
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * One traveler from GET /admin/travelers/{id}/detail: profile, device tokens, tracked flights
@@ -26,13 +24,13 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  */
 export function TravelerDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
-  const isTravelerId = GUID.test(id)
-  const { data, isLoading, error } = useAdminGetTravelerDetail(id, { query: { enabled: isTravelerId } })
+  const validId = isTravelerId(id)
+  const { data, isLoading, error } = useAdminGetTravelerDetail(id, { query: { enabled: validId } })
 
   return (
     <div className="space-y-6">
       <Link to="/travelers" className="text-sm text-gray-500 hover:text-gray-900">Back to travelers</Link>
-      {!isTravelerId ? (
+      {!validId ? (
         <Alert>{`'${id}' isn't a traveler id.`}</Alert>
       ) : error ? (
         <LoadError id={id} error={error} />
@@ -53,7 +51,12 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-gray-900">{traveler.displayName || 'Traveler'}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-900">{traveler.displayName || 'Traveler'}</h1>
+        <Button asChild variant="outline">
+          <Link to={`/flights/track?${new URLSearchParams({ traveler: id })}`}>Track a flight</Link>
+        </Button>
+      </div>
 
       <Section id="traveler-profile" title="Profile">
         <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">

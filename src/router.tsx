@@ -4,6 +4,7 @@ import { RequireAdmin } from '@/components/RequireAdmin'
 import { Dashboard } from '@/pages/Dashboard'
 import { TravelerDetailPage } from '@/pages/travelers/TravelerDetailPage'
 import { FlightDetailPage } from '@/pages/flights/FlightDetailPage'
+import { TrackFlightPage } from '@/pages/flights/TrackFlightPage'
 import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
 import { AirportFormPage } from '@/pages/airports/AirportFormPage'
 import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
           { path: '/travelers', element: <Navigate to="/data/travelers" replace /> },
           { path: '/travelers/:id', element: <TravelerDetailPage /> },
           { path: '/flights', element: <Navigate to="/data/flights" replace /> },
+          { path: '/flights/track', element: <TrackFlightPage /> },
           { path: '/flights/:id', element: <FlightDetailPage /> },
           { path: '/airlines', element: <Navigate to="/data/airlines" replace /> },
           { path: '/airlines/new', element: <AirlineFormPage /> },

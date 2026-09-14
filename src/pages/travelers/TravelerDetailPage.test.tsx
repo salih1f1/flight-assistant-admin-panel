@@ -96,6 +96,12 @@ describe('TravelerDetailPage', () => {
     install()
   })
 
+  it('links to tracking a flight for this traveler', async () => {
+    renderAt(TRAVELER_ID)
+
+    expect(await screen.findByRole('link', { name: 'Track a flight' })).toHaveAttribute('href', `/flights/track?traveler=${TRAVELER_ID}`)
+  })
+
   it("loads the traveler's detail and shows the profile", async () => {
     renderAt(TRAVELER_ID)
 

@@ -22,7 +22,7 @@ const current = () => within(menu()).getAllByRole('link').filter(l => l.getAttri
 // Audit log page covers. There is no separate Data entry, and a list opens the raw grid.
 const GROUPS: [string, [string, string][]][] = [
   ['Travelers', [['Travelers', '/data/travelers'], ['Device Tokens', '/data/device-tokens'], ['Loyalty Memberships', '/data/traveler-loyalty-memberships']]],
-  ['Flights', [['Flights', '/data/flights'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Statuses', '/data/flight-statuses'], ['Flight Status Events', '/data/flight-status-events']]],
+  ['Flights', [['Flights', '/data/flights'], ['Track a flight', '/flights/track'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Statuses', '/data/flight-statuses'], ['Flight Status Events', '/data/flight-status-events']]],
   ['Lounges', [['Lounges', '/data/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
   ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
   ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries']]],
@@ -60,6 +60,13 @@ describe('Sidebar', () => {
 
     expect(groupButton('Reference data')).toHaveAttribute('aria-expanded', 'true')
     expect(current()).toEqual(['Airlines'])
+  })
+
+  it.each([['/flights/track', 'Track a flight'], ['/flights/42', 'Flights']])('highlights only the most specific entry on %s', (path, entry) => {
+    renderAt(path)
+
+    expect(groupButton('Flights')).toHaveAttribute('aria-expanded', 'true')
+    expect(current()).toEqual([entry])
   })
 
   it("doesn't highlight a managed item on another table of its domain", () => {

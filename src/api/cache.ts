@@ -4,10 +4,12 @@ import {
   getAdminGetAirportByIdQueryKey,
   getAdminGetAllAirlinesQueryKey,
   getAdminGetAllAirportsQueryKey,
+  getAdminGetAllFlightsQueryKey,
   getAdminGetAllLoungesQueryKey,
   getAdminGetBrowsableTableDataQueryKey,
   getAdminGetLoungeByIdQueryKey,
   getAdminGetLoyaltyProgramsQueryKey,
+  getAdminGetTravelerDetailQueryKey,
 } from './generated/admin'
 
 /*
@@ -36,6 +38,10 @@ export const invalidateLounges = (queryClient: QueryClient, id?: number) =>
 // is keyed under the list key, so the list invalidation refreshes it too.
 export const invalidateLoyaltyPrograms = (queryClient: QueryClient) =>
   invalidate(queryClient, getAdminGetLoyaltyProgramsQueryKey(), rawTable('loyalty-programs'))
+
+/** After tracking a flight for a traveler: their detail page, and the flights and tracking tables, since tracking can create the flight. */
+export const invalidateTrackedFlights = (queryClient: QueryClient, travelerId: string) =>
+  invalidate(queryClient, getAdminGetTravelerDetailQueryKey(travelerId), getAdminGetAllFlightsQueryKey(), rawTable('flights'), rawTable('traveler-flights'))
 
 /**
  * Every raw table, on every page. For a write whose effects reach other tables: deleting a
