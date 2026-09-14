@@ -36,6 +36,7 @@ import type {
   AdminGetAllTravelersParams,
   AdminGetAuditLogParams,
   AdminGetBrowsableTableDataParams,
+  AdminGetCiRunsParams,
   AdminGetLoyaltyProgramsParams,
   AdminHealthDto,
   AdminLoungeDto,
@@ -50,6 +51,8 @@ import type {
   AirportAdminDtoPagedResult,
   AllianceAdminDto,
   BrowsableTableDto,
+  CiRunDto,
+  CiTestReportDto,
   CountryAdminDto,
   CreateAirlineRequest,
   CreateAirportRequest,
@@ -1170,6 +1173,195 @@ export function useAdminGetAuditLog<TData = Awaited<ReturnType<typeof adminGetAu
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAdminGetAuditLogQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Proxies GitHub's run list for the CI workflow (GitHub:Workflow, default ci.yml), newest first. Optional 'branch' filters to one branch; 'limit' is 1–50, default 20. Cached for 60 seconds. Test counts are not part of a run: read them from GET /admin/ci/runs/{id}/tests. 503 when GitHub:Token is not set.
+ * @summary Recent CI runs
+ */
+export const adminGetCiRuns = (
+    params?: AdminGetCiRunsParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<CiRunDto[]>(
+      {url: `/admin/ci/runs`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetCiRunsQueryKey = (params?: AdminGetCiRunsParams,) => {
+    return [
+    `/admin/ci/runs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminGetCiRunsQueryOptions = <TData = Awaited<ReturnType<typeof adminGetCiRuns>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(params?: AdminGetCiRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetCiRunsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetCiRuns>>> = ({ signal }) => adminGetCiRuns(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetCiRunsQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetCiRuns>>>
+export type AdminGetCiRunsQueryError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+
+
+export function useAdminGetCiRuns<TData = Awaited<ReturnType<typeof adminGetCiRuns>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: undefined |  AdminGetCiRunsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetCiRuns>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetCiRuns>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetCiRuns<TData = Awaited<ReturnType<typeof adminGetCiRuns>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetCiRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetCiRuns>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetCiRuns>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetCiRuns<TData = Awaited<ReturnType<typeof adminGetCiRuns>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetCiRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Recent CI runs
+ */
+
+export function useAdminGetCiRuns<TData = Awaited<ReturnType<typeof adminGetCiRuns>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetCiRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRuns>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetCiRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Reads the test-results.json from the run's test-results artifact: totals, then each test project with every test's outcome, duration and failure message. 404 when the run doesn't exist, has no report (still running, or stopped before its tests reported), or its report has expired. Cached by artifact, since an artifact never changes. 503 when GitHub:Token is not set.
+ * @summary A CI run's test report
+ */
+export const adminGetCiRunTests = (
+    id: number,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<CiTestReportDto>(
+      {url: `/admin/ci/runs/${id}/tests`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetCiRunTestsQueryKey = (id: number,) => {
+    return [
+    `/admin/ci/runs/${id}/tests`
+    ] as const;
+    }
+
+
+export const getAdminGetCiRunTestsQueryOptions = <TData = Awaited<ReturnType<typeof adminGetCiRunTests>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetCiRunTestsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetCiRunTests>>> = ({ signal }) => adminGetCiRunTests(id, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetCiRunTestsQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetCiRunTests>>>
+export type AdminGetCiRunTestsQueryError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+
+
+export function useAdminGetCiRunTests<TData = Awaited<ReturnType<typeof adminGetCiRunTests>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ id: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetCiRunTests>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetCiRunTests>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetCiRunTests<TData = Awaited<ReturnType<typeof adminGetCiRunTests>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetCiRunTests>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetCiRunTests>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetCiRunTests<TData = Awaited<ReturnType<typeof adminGetCiRunTests>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary A CI run's test report
+ */
+
+export function useAdminGetCiRunTests<TData = Awaited<ReturnType<typeof adminGetCiRunTests>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetCiRunTests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetCiRunTestsQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
