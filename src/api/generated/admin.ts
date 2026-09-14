@@ -42,6 +42,7 @@ import type {
   AdminHealthDto,
   AdminLoungeDto,
   AdminLoungeDtoPagedResult,
+  AdminSearchFlightsParams,
   AdminStatsDto,
   AdminTravelerDetailDto,
   AdminTravelerDto,
@@ -60,6 +61,7 @@ import type {
   CreateAirportRequest,
   CreateLoungeRequest,
   CreateLoyaltyProgramRequest,
+  FlightSearchResultDto,
   HttpValidationProblemDetails,
   ImportAirlinesBody,
   ImportAirportsBody,
@@ -75,6 +77,7 @@ import type {
   RevealValueRequest,
   RevealedValueDto,
   StringObjectDictionaryPagedResult,
+  TrackFlightRequest,
   UpdateAirlineRequest,
   UpdateAirportRequest,
   UpdateLoungeRequest,
@@ -2444,6 +2447,101 @@ export function useExportLoyaltyProgramKinds<TData = Awaited<ReturnType<typeof e
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getExportLoyaltyProgramKindsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * The same search, inputs and responses as GET /flights/search, for the admin panel. Each row can be posted unmodified to POST /admin/travelers/{id}/flights. Every distinct search that misses the cache is a paid AeroAPI call, so it shares the flight-search rate limit.
+ * @summary Search flights by route or flight number on a date
+ */
+export const adminSearchFlights = (
+    params: AdminSearchFlightsParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<FlightSearchResultDto[]>(
+      {url: `/admin/flights/search`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminSearchFlightsQueryKey = (params?: AdminSearchFlightsParams,) => {
+    return [
+    `/admin/flights/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminSearchFlightsQueryOptions = <TData = Awaited<ReturnType<typeof adminSearchFlights>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(params: AdminSearchFlightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminSearchFlightsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminSearchFlights>>> = ({ signal }) => adminSearchFlights(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminSearchFlightsQueryResult = NonNullable<Awaited<ReturnType<typeof adminSearchFlights>>>
+export type AdminSearchFlightsQueryError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+
+
+export function useAdminSearchFlights<TData = Awaited<ReturnType<typeof adminSearchFlights>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: AdminSearchFlightsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminSearchFlights>>,
+          TError,
+          Awaited<ReturnType<typeof adminSearchFlights>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminSearchFlights<TData = Awaited<ReturnType<typeof adminSearchFlights>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: AdminSearchFlightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminSearchFlights>>,
+          TError,
+          Awaited<ReturnType<typeof adminSearchFlights>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminSearchFlights<TData = Awaited<ReturnType<typeof adminSearchFlights>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: AdminSearchFlightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search flights by route or flight number on a date
+ */
+
+export function useAdminSearchFlights<TData = Awaited<ReturnType<typeof adminSearchFlights>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: AdminSearchFlightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminSearchFlights>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminSearchFlightsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -5130,6 +5228,76 @@ export const useAdminDeleteTraveler = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAdminDeleteTravelerMutationOptions(options), queryClient);
+    }
+
+/**
+ * Adds a flight to this traveler's tracking list, exactly as POST /flights does for the signed-in traveler. A row from GET /admin/flights/search can be posted here unmodified. Tracking a flight the traveler already tracks changes nothing and still returns 201 with its flightId. An unknown traveler is a 404 and writes nothing.
+ * @summary Track a flight for a traveler
+ */
+export const adminTrackFlightForTraveler = (
+    id: string,
+    trackFlightRequest: BodyType<TrackFlightRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/travelers/${id}/flights`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: trackFlightRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminTrackFlightForTravelerMutationKey = () => ['adminTrackFlightForTraveler'] as const;
+
+export const getAdminTrackFlightForTravelerMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminTrackFlightForTraveler>>, TError,AdminTrackFlightForTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminTrackFlightForTraveler>>, TError,AdminTrackFlightForTravelerMutationVariables, TContext> => {
+
+const mutationKey = getAdminTrackFlightForTravelerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminTrackFlightForTraveler>>, AdminTrackFlightForTravelerMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminTrackFlightForTraveler(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminTrackFlightForTravelerMutationResult = NonNullable<Awaited<ReturnType<typeof adminTrackFlightForTraveler>>>
+    export type AdminTrackFlightForTravelerMutationBody = BodyType<TrackFlightRequest>
+    export type AdminTrackFlightForTravelerMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminTrackFlightForTravelerMutationVariables = {id: string;data: BodyType<TrackFlightRequest>}
+
+    /**
+ * @summary Track a flight for a traveler
+ */
+export const useAdminTrackFlightForTraveler = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminTrackFlightForTraveler>>, TError,AdminTrackFlightForTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminTrackFlightForTraveler>>,
+        TError,
+        AdminTrackFlightForTravelerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminTrackFlightForTravelerMutationOptions(options), queryClient);
     }
 
 /**

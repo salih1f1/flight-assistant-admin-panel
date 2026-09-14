@@ -31,6 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Plane,
     items: [
       table('Flights', 'flights', '/flights'),
+      { label: 'Track a flight', to: '/flights/track' },
       table('Traveler Flights', 'traveler-flights'),
       table('Flight Statuses', 'flight-statuses'),
       table('Flight Status Events', 'flight-status-events'),
@@ -76,8 +77,21 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-/** Whether `pathname` is this entry's page or below it (a record at /data/airlines/7), or under its `also` path. */
-export function isCurrent(item: NavItem, pathname: string) {
-  const within = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
-  return within(item.to) || (item.also !== undefined && within(item.also))
+/**
+ * The entry `pathname` belongs to: its page or below it (a record at /data/airlines/7), or under its
+ * `also` path. When several match, the longest matching path wins, so /flights/track is Track a
+ * flight rather than Flights, whose own pages sit under /flights.
+ */
+export function currentEntry(pathname: string): NavItem | undefined {
+  let current: NavItem | undefined
+  let longest = -1
+  for (const item of NAV_GROUPS.flatMap(group => group.items)) {
+    const length = Math.max(matchLength(item.to, pathname), item.also === undefined ? -1 : matchLength(item.also, pathname))
+    if (length > longest) [current, longest] = [item, length]
+  }
+  return current
 }
+
+/** How much of `pathname` `path` covers: its length when `pathname` is `path` or below it, else -1. */
+const matchLength = (path: string, pathname: string) =>
+  pathname === path || pathname.startsWith(`${path}/`) ? path.length : -1

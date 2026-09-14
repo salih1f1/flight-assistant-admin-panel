@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { ChevronRight, LayoutDashboard, LogOut, Plane } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAdminAuth } from '@/auth/useAdminAuth'
-import { isCurrent, NAV_GROUPS } from './navigation'
+import { currentEntry, NAV_GROUPS } from './navigation'
 
 const linkClass = (current: boolean) =>
   cn(
@@ -14,6 +14,7 @@ const linkClass = (current: boolean) =>
 export function Sidebar() {
   const { logout, account } = useAdminAuth()
   const { pathname } = useLocation()
+  const currentItem = currentEntry(pathname)
   // A group the admin opened or closed keeps that choice; any other is open only while it holds the current page.
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
 
@@ -33,7 +34,7 @@ export function Sidebar() {
         </Link>
 
         {NAV_GROUPS.map(({ label, icon: Icon, items }) => {
-          const holdsCurrent = items.some(item => isCurrent(item, pathname))
+          const holdsCurrent = currentItem !== undefined && items.includes(currentItem)
           const open = toggled[label] ?? holdsCurrent
           return (
             <div key={label}>
@@ -53,7 +54,7 @@ export function Sidebar() {
               {open && (
                 <ul aria-label={label} className="mt-0.5 space-y-0.5 pl-7">
                   {items.map(item => {
-                    const current = isCurrent(item, pathname)
+                    const current = item === currentItem
                     return (
                       <li key={item.to}>
                         <Link to={item.to} aria-current={current ? 'page' : undefined} className={cn(linkClass(current), 'py-1.5')}>
