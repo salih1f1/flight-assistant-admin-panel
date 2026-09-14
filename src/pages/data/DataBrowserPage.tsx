@@ -27,7 +27,7 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
 ]
 
 /**
- * Bookkeeping columns, hidden until All columns: who and where a record came from, and raw
+ * Bookkeeping columns, hidden until shown: who and where a record came from, and raw
  * payloads. The record page always shows them.
  */
 const HIDDEN_COLUMNS = new Set([
@@ -44,7 +44,7 @@ type Row = Record<string, unknown>
  * as dictionaries keyed by the entity's PascalCase column names, in the API's column order;
  * sensitive columns are already masked server-side.
  *
- * The table is in the path and page, sort, filter and All columns are in the query string, so a
+ * The table is in the path and page, sort, filter and shown columns are in the query string, so a
  * view survives a reload and can be shared. Sort and filter column names go to the API as they
  * appear in the rows (the API matches them case-sensitively).
  *
@@ -124,9 +124,8 @@ export function DataBrowserPage() {
   const items = (rows.data?.items ?? []) as Row[]
   const columnNames = items.length > 0 ? Object.keys(items[0]) : []
   // A column masked on every row says nothing in a grid; the record page reveals it.
-  const visibleNames = showAll
-    ? columnNames
-    : columnNames.filter(name => !HIDDEN_COLUMNS.has(name) && !items.every(row => row[name] === MASKED))
+  const hiddenNames = columnNames.filter(name => HIDDEN_COLUMNS.has(name) || items.every(row => row[name] === MASKED))
+  const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
 
   const toggleSort = useCallback(
@@ -204,7 +203,7 @@ export function DataBrowserPage() {
     },
   ]
 
-  const hiddenCount = columnNames.length - visibleNames.length
+  const hiddenWord = hiddenNames.length === 1 ? 'column' : 'columns'
 
   return (
     <div className="space-y-6">
@@ -238,15 +237,12 @@ export function DataBrowserPage() {
               ))}
             </div>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            aria-pressed={showAll}
-            title={showAll ? 'Hide bookkeeping and masked columns' : `Show ${hiddenCount} hidden column${hiddenCount === 1 ? '' : 's'}`}
-            onClick={toggleAllColumns}
-          >
-            All columns
-          </Button>
+          {/* Only where it changes something: some tables have no bookkeeping or masked columns. */}
+          {hiddenNames.length > 0 && (
+            <Button variant="outline" size="sm" onClick={toggleAllColumns}>
+              {showAll ? `Hide ${hiddenNames.length} ${hiddenWord}` : `Show ${hiddenNames.length} hidden ${hiddenWord}`}
+            </Button>
+          )}
         </div>
         {verifier && items.length > 0 && !verifiableRows && (
           <p className="text-sm text-gray-500">
