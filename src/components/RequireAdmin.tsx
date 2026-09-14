@@ -1,14 +1,14 @@
 import { Outlet } from 'react-router-dom'
 import { useAdminAuth } from '@/auth/useAdminAuth'
 import { Button } from '@/components/ui/button'
-import { Loader2, Plane, ShieldAlert } from 'lucide-react'
+import { Loader2, LogOut, Plane, ShieldAlert } from 'lucide-react'
 
 /**
  * A UX gate only. The real one is the API's `AdminOnly` policy — nothing here
  * protects data, it just avoids rendering a UI whose every call would 403.
  */
 export function RequireAdmin() {
-  const { isAuthenticated, isAdmin, isRoleResolved, login } = useAdminAuth()
+  const { isAuthenticated, isAdmin, isRoleResolved, account, login, logout } = useAdminAuth()
 
   if (!isAuthenticated) {
     return (
@@ -46,6 +46,11 @@ export function RequireAdmin() {
           <ShieldAlert className="mx-auto h-12 w-12 text-red-500" />
           <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
           <p className="text-gray-500">Your account does not have the admin role.</p>
+          {/* The sidebar's Sign out isn't rendered here, and without one there's no way to switch accounts. */}
+          {account?.username && <p className="text-sm font-medium text-gray-700">{account.username}</p>}
+          <Button variant="outline" onClick={() => logout()}>
+            <LogOut className="mr-2 h-4 w-4" /> Sign out
+          </Button>
         </div>
       </div>
     )
