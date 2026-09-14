@@ -45,7 +45,7 @@ export function AirlineName({ id }: { id: number | null | undefined }) {
   if (!valid) return <NotFound id={id} />
   if (statusOf(error) === 404) return <NotFound id={id} />
   if (!data) return <Pending id={id} />
-  return <NameLink to={`/airlines/${id}/edit`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
+  return <NameLink to={`/data/airlines/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
 }
 
 /** "London Heathrow (LHR)", linking to the airport. */
@@ -57,7 +57,7 @@ export function AirportName({ id }: { id: number | null | undefined }) {
   if (!valid) return <NotFound id={id} />
   if (statusOf(error) === 404) return <NotFound id={id} />
   if (!data) return <Pending id={id} />
-  return <NameLink to={`/airports/${id}/edit`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
+  return <NameLink to={`/data/airports/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
 }
 
 /** "Executive Club (EXEC_CLUB)", linking to the program. There is no by-id endpoint; the lookup walks the list. */
@@ -69,7 +69,7 @@ export function LoyaltyProgramName({ id }: { id: number | null | undefined }) {
   if (!valid) return <NotFound id={id} />
   if (isSuccess && !data) return <NotFound id={id} />
   if (!data) return <Pending id={id} />
-  return <NameLink to={`/loyalty/${id}/edit`}>{withCode(data.name, data.code)}</NameLink>
+  return <NameLink to={`/data/loyalty-programs/${id}`}>{withCode(data.name, data.code)}</NameLink>
 }
 
 /** A tier's name, read from its program's tiers (the only place the API names a tier). */

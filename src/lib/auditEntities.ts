@@ -4,10 +4,10 @@ import type { AdminAuditDto } from '@/api/generated/model'
 const ENTITY_PAGES: Record<string, (id: string) => string> = {
   Traveler: id => `/travelers/${id}`,
   Flight: id => `/flights/${id}`,
-  Airline: id => `/airlines/${id}/edit`,
-  Airport: id => `/airports/${id}/edit`,
-  Lounge: id => `/lounges/${id}/edit`,
-  LoyaltyProgram: id => `/loyalty/${id}/edit`,
+  Airline: id => `/data/airlines/${id}`,
+  Airport: id => `/data/airports/${id}`,
+  Lounge: id => `/data/lounges/${id}`,
+  LoyaltyProgram: id => `/data/loyalty-programs/${id}`,
 }
 
 type AuditEntity = Pick<AdminAuditDto, 'entityType' | 'entityId'>

@@ -153,7 +153,7 @@ describe('LoungeFormPage', () => {
     renderRoutes('/lounges/12/edit')
     await waitFor(async () => expect(await screen.findByLabelText('Airport ID')).toHaveValue(5))
 
-    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/airports/5/edit')
+    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/data/airports/5')
   })
 
   it('names the airport for an id typed into a new lounge, and says when there is no such airport', async () => {

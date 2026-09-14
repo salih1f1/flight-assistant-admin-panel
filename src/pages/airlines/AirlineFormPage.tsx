@@ -25,8 +25,23 @@ export function AirlineFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit airline' : 'New airline'}</h1>
+      <AirlineForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/airlines')} />
+    </div>
+  )
+}
+
+/**
+ * The airline form: edits airline `id`, or creates one when there's no id. `onDone` runs after a
+ * successful save and on Cancel, so the page around it decides where the admin goes next.
+ */
+export function AirlineForm({ id, onDone }: { id?: number; onDone: () => void }) {
+  const isEdit = id !== undefined
   const queryClient = useQueryClient()
-  const { data: existing } = useAdminGetAirlineById(Number(id), { query: { enabled: isEdit } })
+  const { data: existing } = useAdminGetAirlineById(id ?? 0, { query: { enabled: isEdit } })
   const createMutation = useAdminCreateAirline({ mutation: { onSuccess: () => invalidateAirlines(queryClient) } })
   const updateMutation = useAdminUpdateAirline({
     mutation: { onSuccess: (_, variables) => invalidateAirlines(queryClient, variables.id) },
@@ -49,55 +64,52 @@ export function AirlineFormPage() {
 
   const onSubmit = (data: FormData) => {
     const payload = { name: data.name, countryCode: data.countryCode, iata: data.iata || undefined, icao: data.icao || undefined, allianceCode: data.allianceCode || undefined }
-    if (isEdit) {
-      updateMutation.mutate({ id: Number(id), data: payload }, { onSuccess: () => navigate('/airlines') })
+    if (id !== undefined) {
+      updateMutation.mutate({ id, data: payload }, { onSuccess: () => onDone() })
     } else {
-      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/airlines') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => onDone() })
     }
   }
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit airline' : 'New airline'}</h1>
-      <Card>
-        <CardHeader><CardTitle className="text-base">Airline details</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="iata">IATA code</Label>
-                <Input id="iata" {...register('iata')} placeholder="e.g. BA" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="icao">ICAO code</Label>
-                <Input id="icao" {...register('icao')} placeholder="e.g. BAW" />
-              </div>
+    <Card>
+      <CardHeader><CardTitle className="text-base">Airline details</CardTitle></CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="iata">IATA code</Label>
+              <Input id="iata" {...register('iata')} placeholder="e.g. BA" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-              <Input id="name" {...register('name')} />
-              {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+              <Label htmlFor="icao">ICAO code</Label>
+              <Input id="icao" {...register('icao')} placeholder="e.g. BAW" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="countryCode">Country code <span className="text-red-500">*</span></Label>
-                <Input id="countryCode" {...register('countryCode')} placeholder="e.g. GB" maxLength={2} />
-                {errors.countryCode && <p className="text-xs text-red-500">{errors.countryCode.message}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="allianceCode">Alliance</Label>
-                <Input id="allianceCode" {...register('allianceCode')} placeholder="STAR / OW / ST" />
-              </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
+            <Input id="name" {...register('name')} />
+            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="countryCode">Country code <span className="text-red-500">*</span></Label>
+              <Input id="countryCode" {...register('countryCode')} placeholder="e.g. GB" maxLength={2} />
+              {errors.countryCode && <p className="text-xs text-red-500">{errors.countryCode.message}</p>}
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {isEdit ? 'Save changes' : 'Create airline'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/airlines')}>Cancel</Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="allianceCode">Alliance</Label>
+              <Input id="allianceCode" {...register('allianceCode')} placeholder="STAR / OW / ST" />
             </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+              {isEdit ? 'Save changes' : 'Create airline'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => onDone()}>Cancel</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

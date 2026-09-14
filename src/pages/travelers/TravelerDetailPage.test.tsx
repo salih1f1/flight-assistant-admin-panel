@@ -143,7 +143,7 @@ describe('TravelerDetailPage', () => {
     const row = within(memberships).getAllByRole('row')[1]
     // The program and tier by name, not their ids.
     await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['Executive Club (EXEC_CLUB)', 'Masked', 'Gold', '2027-03-31', '—']))
-    expect(within(row).getByRole('link', { name: 'Executive Club (EXEC_CLUB)' })).toHaveAttribute('href', '/loyalty/3/edit')
+    expect(within(row).getByRole('link', { name: 'Executive Club (EXEC_CLUB)' })).toHaveAttribute('href', '/data/loyalty-programs/3')
 
     await reveal(user, memberships, 'AccountNumber')
 

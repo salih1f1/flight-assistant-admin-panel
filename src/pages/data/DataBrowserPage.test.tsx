@@ -124,6 +124,20 @@ describe('DataBrowserPage', () => {
     expect(screen.queryByRole('navigation', { name: 'Views' })).not.toBeInTheDocument()
   })
 
+  it("each row's eye opens it: a traveler on its own detail page", async () => {
+    renderAt('/data/travelers')
+
+    const row = (await screen.findByText('Traveler 001')).closest('tr')!
+    expect(within(row).getByRole('link', { name: 'Open record' })).toHaveAttribute('href', `/travelers/${TRAVELERS[0].Id}`)
+  })
+
+  it("each row's eye opens it: other tables on the record page", async () => {
+    renderAt('/data/flight-statuses')
+
+    const row = (await screen.findByText('Scheduled')).closest('tr')!
+    expect(within(row).getByRole('link', { name: 'Open record' })).toHaveAttribute('href', '/data/flight-statuses/1')
+  })
+
   it('shows masked values as masked, never as the placeholder text', async () => {
     renderAt('/data/travelers')
 
@@ -136,7 +150,8 @@ describe('DataBrowserPage', () => {
     renderAt('/data/flight-statuses')
 
     const row = (await screen.findByText('Scheduled')).closest('tr')!
-    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['1', 'SCH', 'Scheduled', '—'])
+    // The last cell is the row's Open link, which has no text.
+    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['1', 'SCH', 'Scheduled', '—', ''])
   })
 
   it('Next requests page 2 and keeps the page in the URL', async () => {

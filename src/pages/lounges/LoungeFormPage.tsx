@@ -33,8 +33,23 @@ export function LoungeFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
   const navigate = useNavigate()
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit lounge' : 'New lounge'}</h1>
+      <LoungeForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/lounges')} />
+    </div>
+  )
+}
+
+/**
+ * The lounge form: edits lounge `id`, or creates one when there's no id. `onDone` runs after a
+ * successful save and on Cancel, so the page around it decides where the admin goes next.
+ */
+export function LoungeForm({ id, onDone }: { id?: number; onDone: () => void }) {
+  const isEdit = id !== undefined
   const queryClient = useQueryClient()
-  const { data: lounge, isLoading } = useAdminGetLoungeById(Number(id), { query: { enabled: isEdit } })
+  const { data: lounge, isLoading } = useAdminGetLoungeById(id ?? 0, { query: { enabled: isEdit } })
   const createMutation = useAdminCreateLounge({ mutation: { onSuccess: () => invalidateLounges(queryClient) } })
   const updateMutation = useAdminUpdateLounge({
     mutation: { onSuccess: (_, variables) => invalidateLounges(queryClient, variables.id) },
@@ -75,15 +90,15 @@ export function LoungeFormPage() {
       amenities: values.amenities || undefined,
     }
 
-    if (isEdit) {
+    if (id !== undefined) {
       // UpdateLoungeRequest has no airportId: a lounge's airport is fixed at creation.
       const { name, terminal, hours, locationHint, amenities, isAirside, isDomesticOnly, isInternationalOnly } = payload
       updateMutation.mutate(
-        { id: Number(id), data: { name, terminal, hours, locationHint, amenities, isAirside, isDomesticOnly, isInternationalOnly } },
-        { onSuccess: () => navigate('/lounges') },
+        { id, data: { name, terminal, hours, locationHint, amenities, isAirside, isDomesticOnly, isInternationalOnly } },
+        { onSuccess: () => onDone() },
       )
     } else {
-      createMutation.mutate({ data: payload }, { onSuccess: () => navigate('/lounges') })
+      createMutation.mutate({ data: payload }, { onSuccess: () => onDone() })
     }
   }
 
@@ -92,61 +107,58 @@ export function LoungeFormPage() {
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className="max-w-xl space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit lounge' : 'New lounge'}</h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-1">
-          <Label htmlFor="airportId">Airport ID</Label>
-          {/* readOnly, not disabled: a disabled field is left out of the submitted values. */}
-          <Input id="airportId" type="number" readOnly={isEdit} {...register('airportId')} />
-          {/* Which airport the number is, looked up as it's typed. */}
-          {Number(watch('airportId')) > 0 && (
-            <p className="text-xs text-gray-500"><AirportName id={Number(watch('airportId'))} /></p>
-          )}
-          {isEdit && <p className="text-xs text-gray-500">A lounge's airport can't be changed after it's created.</p>}
-          {errors.airportId && <p className="text-sm text-red-500">{errors.airportId.message}</p>}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="name">Name</Label>
-          <Input id="name" {...register('name')} />
-          {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="terminal">Terminal</Label>
-          <Input id="terminal" {...register('terminal')} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="hours">Hours</Label>
-          <Input id="hours" placeholder="e.g. 05:00–23:00" {...register('hours')} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="locationHint">Location hint</Label>
-          <Input id="locationHint" placeholder="e.g. After security, near gate A10" {...register('locationHint')} />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="amenities">Amenities</Label>
-          <Input id="amenities" {...register('amenities')} />
-        </div>
-        <div className="flex gap-6">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register('isAirside')} /> Airside
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register('isDomesticOnly')} /> Domestic only
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register('isInternationalOnly')} /> International only
-          </label>
-        </div>
-        <div className="flex gap-3 pt-2">
-          <Button type="submit" disabled={isPending}>
-            {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create lounge'}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate('/lounges')}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-1">
+        <Label htmlFor="airportId">Airport ID</Label>
+        {/* readOnly, not disabled: a disabled field is left out of the submitted values. */}
+        <Input id="airportId" type="number" readOnly={isEdit} {...register('airportId')} />
+        {/* Which airport the number is, looked up as it's typed. */}
+        {Number(watch('airportId')) > 0 && (
+          <p className="text-xs text-gray-500"><AirportName id={Number(watch('airportId'))} /></p>
+        )}
+        {isEdit && <p className="text-xs text-gray-500">A lounge's airport can't be changed after it's created.</p>}
+        {errors.airportId && <p className="text-sm text-red-500">{errors.airportId.message}</p>}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="name">Name</Label>
+        <Input id="name" {...register('name')} />
+        {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="terminal">Terminal</Label>
+        <Input id="terminal" {...register('terminal')} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="hours">Hours</Label>
+        <Input id="hours" placeholder="e.g. 05:00–23:00" {...register('hours')} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="locationHint">Location hint</Label>
+        <Input id="locationHint" placeholder="e.g. After security, near gate A10" {...register('locationHint')} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="amenities">Amenities</Label>
+        <Input id="amenities" {...register('amenities')} />
+      </div>
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register('isAirside')} /> Airside
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register('isDomesticOnly')} /> Domestic only
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" {...register('isInternationalOnly')} /> International only
+        </label>
+      </div>
+      <div className="flex gap-3 pt-2">
+        <Button type="submit" disabled={isPending}>
+          {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create lounge'}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => onDone()}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }

@@ -162,7 +162,7 @@ describe('AuditLogPage', () => {
   it("links an entity to its page when the panel has one, and leaves others as text", async () => {
     renderAt('/audit')
 
-    expect(within(await rowOf('Update Airline 7')).getByRole('link', { name: 'Airline 7' })).toHaveAttribute('href', '/airlines/7/edit')
+    expect(within(await rowOf('Update Airline 7')).getByRole('link', { name: 'Airline 7' })).toHaveAttribute('href', '/data/airlines/7')
     expect(within(await rowOf(`Update Traveler ${TRAVELER_ID}`)).getByRole('link', { name: `Traveler ${TRAVELER_ID}` })).toHaveAttribute('href', `/travelers/${TRAVELER_ID}`)
     expect(within(await rowOf('Delete SeedVersion 9')).queryByRole('link')).not.toBeInTheDocument()
     expect(within(await rowOf('Create Airport (pending id)')).queryByRole('link')).not.toBeInTheDocument()

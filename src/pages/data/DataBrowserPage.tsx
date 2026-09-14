@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/DataTable'
@@ -7,35 +7,16 @@ import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ViewTabs } from '@/components/ViewTabs'
+import { Eye } from 'lucide-react'
 import {
-  adminVerifyAirline, adminVerifyAirport, adminVerifyAlliance, adminVerifyCountry, adminVerifyLounge,
-  adminVerifyLoungeProvider, adminVerifyLoyaltyProgram, adminVerifyLoyaltyProgramKind,
   getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
+import { MASKED, recordPath, VERIFIERS } from './records'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
-
-// SensitiveProperties.RedactedPlaceholder: what the API sends in place of a sensitive value.
-const MASKED = '<redacted>'
-
-/**
- * The reference data tables that can be verified: PATCH /admin/{slug}/{id}/verify exists for
- * exactly these slugs, and their data browser rows carry IsVerified, VerifiedAt and VerifiedBy.
- * The typed admin DTOs have no verified state, which is why verifying lives here.
- */
-const VERIFIERS: Record<string, (id: number, body: { isVerified: boolean }) => Promise<void>> = {
-  airports: adminVerifyAirport,
-  airlines: adminVerifyAirline,
-  alliances: adminVerifyAlliance,
-  countries: adminVerifyCountry,
-  lounges: adminVerifyLounge,
-  'lounge-providers': adminVerifyLoungeProvider,
-  'loyalty-programs': adminVerifyLoyaltyProgram,
-  'loyalty-program-kinds': adminVerifyLoyaltyProgramKind,
-}
 
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
@@ -140,8 +121,22 @@ export function DataBrowserPage() {
   // The verify routes take a numeric id ({id:int}). Countries is verifiable but keyed by Code with
   // no Id column, so it can't be verified from here; Number(undefined) used to send /NaN/verify.
   const verifiableRows = verifier !== undefined && items.some(row => typeof row.Id === 'number')
+  // Last, after any Verify: opens the row on its own detail page or the record page.
+  const openColumn: ColumnDef<Row> = {
+    id: 'open',
+    header: () => null,
+    cell: ({ row }) => {
+      const to = table ? recordPath(table, row.original) : undefined
+      return to ? (
+        <Link to={to} aria-label="Open record" title="Open" className="inline-flex text-gray-500 hover:text-gray-900">
+          <Eye className="h-4 w-4" />
+        </Link>
+      ) : null
+    },
+  }
+
   // A new array, never a push: dataColumns is memoized and must not grow a verify column per render.
-  const columns: ColumnDef<Row>[] = verifiableRows && table ? [
+  const withVerify: ColumnDef<Row>[] = verifiableRows && table ? [
     ...dataColumns,
     {
       id: 'verify',
@@ -163,6 +158,7 @@ export function DataBrowserPage() {
       },
     },
   ] : dataColumns
+  const columns = [...withVerify, openColumn]
 
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
