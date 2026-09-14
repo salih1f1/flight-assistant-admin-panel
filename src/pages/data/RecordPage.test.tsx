@@ -15,6 +15,7 @@ const TABLES = [
   { slug: 'alliances', displayName: 'Alliances', rowCount: 1 },
   { slug: 'countries', displayName: 'Countries', rowCount: 2 },
   { slug: 'device-tokens', displayName: 'Device Tokens', rowCount: 1 },
+  { slug: 'flight-status-events', displayName: 'Flight Status Events', rowCount: 1 },
   { slug: 'lounges', displayName: 'Lounges', rowCount: 1 },
   { slug: 'seed-versions', displayName: 'Seed Versions', rowCount: 1 },
 ]
@@ -25,11 +26,11 @@ type Row = Record<string, unknown>
 const makeAirlines = (): Row[] => [
   {
     Id: 7, Iata: 'TK', Icao: 'THY', Name: 'Turkish Airlines', CountryCode: 'TR', AllianceCode: 'STAR',
-    ExternalIds: { openflights: '1701' }, Notes: null, IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid',
+    IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid',
   },
   {
     Id: 8, Iata: 'BA', Icao: 'BAW', Name: 'British Airways', CountryCode: 'GB', AllianceCode: 'OW',
-    ExternalIds: null, Notes: null, IsVerified: false, VerifiedAt: null, VerifiedBy: null,
+    IsVerified: false, VerifiedAt: null, VerifiedBy: null,
   },
 ]
 
@@ -42,6 +43,7 @@ const ROWS: Record<string, () => Row[]> = {
   // "de" is inside both codes: the API's string filter is a contains match.
   countries: () => [{ Code: 'DEX', Name: 'Not a country', IsEU: false }, { Code: 'DE', Name: 'Germany', IsEU: true }],
   'device-tokens': () => [{ Id: 4, TravelerId: '00000000-0000-0000-0000-000000000001', Platform: 'ios', Token: '<redacted>', LastSeenUtc: null }],
+  'flight-status-events': () => [{ Id: 5, FlightId: 42, Source: 'AeroAPI', Remarks: null, RawPayloadJson: { status: 'Delayed' } }],
   lounges: () => [{ Id: 12, AirportId: 11, Name: 'Plaza Premium', IsAirside: true }],
 }
 
@@ -121,8 +123,6 @@ describe('RecordPage', () => {
     expect(await heading('Turkish Airlines')).toBeInTheDocument()
     expect(dataRequests('airlines').map(r => r.params?.filter)).toEqual(['Id:7'])
     expect(field('Iata')).toHaveTextContent('TK')
-    expect(field('ExternalIds')).toHaveTextContent('{"openflights":"1701"}')
-    expect(field('Notes')).toHaveTextContent('—')
     expect(field('IsVerified')).toHaveTextContent('Yes')
     expect(field('VerifiedBy')).toHaveTextContent('admin-oid')
     expect(screen.getByRole('link', { name: /Airlines/ })).toHaveAttribute('href', '/data/airlines')
@@ -149,6 +149,14 @@ describe('RecordPage', () => {
     await heading('Device Tokens #4')
     expect(field('Token')).toContainElement(screen.getByRole('button', { name: 'Reveal Token' }))
     expect(screen.queryByText('<redacted>')).not.toBeInTheDocument()
+  })
+
+  it('shows a JSON value as JSON, and an empty one as a dash', async () => {
+    renderAt('/data/flight-status-events/5')
+
+    await heading('Flight Status Events #5')
+    expect(field('RawPayloadJson')).toHaveTextContent('{"status":"Delayed"}')
+    expect(field('Remarks')).toHaveTextContent('—')
   })
 
   it('names a referenced airport, linking to its record', async () => {

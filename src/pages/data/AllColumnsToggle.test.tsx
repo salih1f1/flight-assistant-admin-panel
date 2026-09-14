@@ -16,9 +16,9 @@ vi.mock('@/api/client', () => ({
  * by hand, not derived from DataBrowserPage's list, so a change there has to agree with this.
  */
 const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
-  { slug: 'travelers', columns: ['Id', 'Email', 'DisplayName', 'CreatedUtc', 'CreatedBy', 'UpdatedUtc', 'UpdatedBy'], hidden: ['Email', 'CreatedBy', 'UpdatedBy'] },
+  { slug: 'travelers', columns: ['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'], hidden: ['Email'] },
   { slug: 'device-tokens', columns: ['Id', 'TravelerId', 'Platform', 'Token', 'LastSeenUtc'], hidden: ['Token'] },
-  { slug: 'flights', columns: ['Id', 'AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'ScheduledDepartureUtc', 'ScheduledArrivalUtc', 'EstimatedDepartureUtc', 'EstimatedArrivalUtc', 'ActualDepartureUtc', 'ActualArrivalUtc', 'EquipmentAircraftIcao', 'ExternalId', 'CreatedUtc', 'UpdatedUtc'], hidden: [] },
+  { slug: 'flights', columns: ['Id', 'AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'ScheduledDepartureUtc', 'ScheduledArrivalUtc', 'EstimatedDepartureUtc', 'EstimatedArrivalUtc', 'ActualDepartureUtc', 'ActualArrivalUtc', 'EquipmentAircraftIcao', 'CreatedUtc', 'UpdatedUtc'], hidden: [] },
   { slug: 'traveler-flights', columns: ['Id', 'TravelerId', 'FlightId', 'Notify', 'CreatedUtc'], hidden: [] },
   { slug: 'flight-statuses', columns: ['Id', 'Code', 'Name', 'Description'], hidden: [] },
   { slug: 'flight-status-events', columns: ['Id', 'FlightId', 'StatusId', 'EffectiveAtUtc', 'RecordedAtUtc', 'Source', 'ExternalId', 'Gate', 'Terminal', 'BaggageClaim', 'Remarks', 'RawPayloadJson', 'DedupHash'], hidden: ['RawPayloadJson', 'DedupHash'] },
@@ -29,10 +29,10 @@ const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
   { slug: 'loyalty-program-kinds', columns: ['Id', 'Code', 'Name', 'Description', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['VerifiedAt', 'VerifiedBy'] },
   { slug: 'loyalty-tiers', columns: ['Id', 'ProgramId', 'Code', 'Name', 'Rank', 'AllianceCode', 'AllianceTierCode'], hidden: [] },
   { slug: 'traveler-loyalty-memberships', columns: ['Id', 'TravelerId', 'ProgramId', 'TierId', 'AccountNumber', 'TierExpiryDate', 'PointsExpiryDate', 'CreatedUtc', 'UpdatedUtc'], hidden: ['AccountNumber'] },
-  { slug: 'airlines', columns: ['Id', 'Iata', 'Icao', 'Name', 'CountryCode', 'AllianceCode', 'SourceType', 'SourceSystem', 'ExternalIds', 'Status', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'VerifiedAt', 'VerifiedBy'] },
-  { slug: 'airports', columns: ['Id', 'Iata', 'Icao', 'Name', 'City', 'CountryCode', 'Latitude', 'Longitude', 'ElevationFt', 'SourceType', 'SourceSystem', 'ExternalIds', 'Status', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'VerifiedAt', 'VerifiedBy'] },
-  { slug: 'alliances', columns: ['Id', 'Code', 'Name', 'SourceType', 'SourceSystem', 'ExternalIds', 'Status', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'VerifiedAt', 'VerifiedBy'] },
-  { slug: 'countries', columns: ['Code', 'Name', 'Alpha3', 'NumericCode', 'Region', 'Subregion', 'IsEU', 'IsSchengen', 'IsEEA', 'SourceType', 'SourceSystem', 'ExternalIds', 'Status', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt', 'Notes', 'VerifiedAt', 'VerifiedBy'] },
+  { slug: 'airlines', columns: ['Id', 'Iata', 'Icao', 'Name', 'CountryCode', 'AllianceCode', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'FirstSeenAt', 'VerifiedAt', 'VerifiedBy'] },
+  { slug: 'airports', columns: ['Id', 'Iata', 'Icao', 'Name', 'City', 'CountryCode', 'Latitude', 'Longitude', 'ElevationFt', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'FirstSeenAt', 'VerifiedAt', 'VerifiedBy'] },
+  { slug: 'alliances', columns: ['Id', 'Code', 'Name', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'FirstSeenAt', 'VerifiedAt', 'VerifiedBy'] },
+  { slug: 'countries', columns: ['Code', 'Name', 'Alpha3', 'NumericCode', 'Region', 'Subregion', 'IsEU', 'IsSchengen', 'IsEEA', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy'], hidden: ['SourceType', 'FirstSeenAt', 'VerifiedAt', 'VerifiedBy'] },
   { slug: 'seed-versions', columns: ['Dataset', 'Version', 'AppliedAt'], hidden: [] },
   { slug: 'admin-audit-log', columns: ['Id', 'ActorId', 'ActorName', 'ActionUtc', 'Action', 'EntityType', 'EntityId', 'Summary', 'Before', 'After', 'TraceId'], hidden: [] },
 ]

@@ -30,7 +30,6 @@ const makeDetail = () => ({
   actualDepartureUtc: null as string | null,
   actualArrivalUtc: null as string | null,
   equipmentAircraftIcao: 'B77W' as string | null,
-  externalId: 'BAW117-1726822800-schedule-0001' as string | null,
   currentStatus: DELAYED as typeof DELAYED | null,
   statusHistory: [DELAYED, SCHEDULED],
   statusHistoryTruncated: false,
@@ -111,7 +110,6 @@ describe('FlightDetailPage', () => {
 
     const flight = region('Flight')
     expect(fact(flight, 'Aircraft')).toHaveTextContent('B77W')
-    expect(fact(flight, 'External id')).toHaveTextContent('BAW117-1726822800-schedule-0001')
     expect(fact(flight, 'Scheduled departure')).toHaveTextContent('2026-09-20 10:00 UTC')
     expect(fact(flight, 'Estimated departure')).toHaveTextContent('2026-09-20 10:25 UTC')
     expect(fact(flight, 'Actual departure')).toHaveTextContent('—')

@@ -25,6 +25,4 @@ export interface AdminFlightDto {
   actualArrivalUtc?: string | null;
   /** @nullable */
   equipmentAircraftIcao?: string | null;
-  /** @nullable */
-  externalId?: string | null;
 }
