@@ -37,7 +37,7 @@ export function LoyaltyProgramFormPage() {
   return (
     <div className="max-w-lg space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit loyalty program' : 'New loyalty program'}</h1>
-      <LoyaltyProgramForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/loyalty')} />
+      <LoyaltyProgramForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/data/loyalty-programs')} />
     </div>
   )
 }

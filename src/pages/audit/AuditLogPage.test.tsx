@@ -97,14 +97,6 @@ describe('AuditLogPage', () => {
     expect(lastRequest()).toEqual(expect.objectContaining({ method: 'GET', url: '/admin/audit', params: { Page: 1, PageSize: 50 } }))
   })
 
-  it('links to the audit log raw table from the Manage | Raw data tabs', async () => {
-    renderAt('/audit')
-    await rowOf('Update Airline 7')
-
-    const views = screen.getByRole('navigation', { name: 'Views' })
-    expect(within(views).getByRole('link', { name: 'Raw data' })).toHaveAttribute('href', '/data/admin-audit-log')
-  })
-
   it('pages through the log with the API, keeping the page in the URL', async () => {
     const user = userEvent.setup()
     const router = renderAt('/audit')

@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { httpError, installFakeApi, pagedResult, rawRows, type SentRequest } from '@/test/fakeApi'
 import { LoungeFormPage } from './LoungeFormPage'
-import { LoungesPage } from './LoungesPage'
+import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -25,6 +25,9 @@ let sent: SentRequest[]
 
 /** An in-memory /admin/lounges: list, get, create and update change what later reads return. */
 function loungesApi(req: SentRequest) {
+  // The grid the form returns to: the same records, as GET /admin/data/lounges rows.
+  if (req.method === 'GET' && req.url === '/admin/data/tables') return []
+  if (req.method === 'GET' && req.url === '/admin/data/lounges') return pagedResult(rawRows(lounges), req.params)
   if (req.method === 'GET' && req.url === '/admin/airports/5') return HEATHROW
   if (req.method === 'GET' && req.url === '/admin/lounges') return pagedResult(lounges, req.params)
   if (req.method === 'POST' && req.url === '/admin/lounges') {
@@ -50,7 +53,7 @@ function loungesApi(req: SentRequest) {
 function renderRoutes(initialEntry: string) {
   const router = createMemoryRouter(
     [
-      { path: '/lounges', element: <LoungesPage /> },
+      { path: '/data/:table', element: <DataBrowserPage /> },
       { path: '/lounges/new', element: <LoungeFormPage /> },
       { path: '/lounges/:id/edit', element: <LoungeFormPage /> },
     ],
@@ -132,7 +135,7 @@ describe('LoungeFormPage', () => {
 
   it('after saving, the lounge list shows the change without a reload', async () => {
     const user = userEvent.setup()
-    const router = renderRoutes('/lounges')
+    const router = renderRoutes('/data/lounges')
     await screen.findByText('Galleries First')
 
     await act(async () => {
@@ -144,7 +147,7 @@ describe('LoungeFormPage', () => {
     await user.type(name, 'Concorde Room')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
 
-    // The form navigates back to /lounges on success.
+    // The form navigates back to the /data/lounges grid on success.
     expect(await screen.findByText('Concorde Room')).toBeInTheDocument()
     expect(screen.queryByText('Galleries First')).not.toBeInTheDocument()
   })

@@ -98,7 +98,7 @@ describe('DataBrowserPage verify', () => {
   })
 
   it("offers Verify on unverified rows and Unverify on verified ones", async () => {
-    renderAt('/data/airlines')
+    renderAt('/data/airlines?columns=all')
 
     expect(within(await rowOf('Alpha Air')).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
@@ -107,7 +107,7 @@ describe('DataBrowserPage verify', () => {
 
   it('Verify sends isVerified true and shows the row as verified without a reload', async () => {
     const user = userEvent.setup()
-    renderAt('/data/airlines')
+    renderAt('/data/airlines?columns=all')
 
     await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
 
@@ -118,7 +118,7 @@ describe('DataBrowserPage verify', () => {
 
   it('Unverify sends isVerified false and clears the verified details', async () => {
     const user = userEvent.setup()
-    renderAt('/data/airlines')
+    renderAt('/data/airlines?columns=all')
 
     await user.click(within(await rowOf('Alpha Air')).getByRole('button', { name: 'Unverify' }))
 
@@ -129,7 +129,7 @@ describe('DataBrowserPage verify', () => {
 
   it('filters to unverified, verified or all rows, keeping the choice in the URL', async () => {
     const user = userEvent.setup()
-    const router = renderAt('/data/airlines')
+    const router = renderAt('/data/airlines?columns=all')
     await rowOf('Alpha Air')
 
     await user.click(screen.getByRole('button', { name: 'Unverified' }))
@@ -152,7 +152,7 @@ describe('DataBrowserPage verify', () => {
 
   it('verifying a row while showing unverified rows takes it off the list', async () => {
     const user = userEvent.setup()
-    renderAt('/data/airlines?filter=IsVerified:false')
+    renderAt('/data/airlines?columns=all&filter=IsVerified:false')
 
     await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
 
@@ -165,7 +165,7 @@ describe('DataBrowserPage verify', () => {
       throw httpError(404)
     }
     const user = userEvent.setup()
-    renderAt('/data/airlines')
+    renderAt('/data/airlines?columns=all')
 
     await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
 

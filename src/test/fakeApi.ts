@@ -45,3 +45,8 @@ export function pagedResult(rows: readonly unknown[], params?: Record<string, un
   const start = (page - 1) * pageSize
   return { items: rows.slice(start, start + pageSize), total: rows.length, page, pageSize }
 }
+
+/** Rows as GET /admin/data/{table} sends them: each DTO field under its PascalCase entity name. */
+export function rawRows(rows: readonly object[]) {
+  return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key[0].toUpperCase() + key.slice(1), value])))
+}

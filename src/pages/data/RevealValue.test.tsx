@@ -76,7 +76,7 @@ describe('DataBrowserPage reveal', () => {
 
   it('asks before revealing, says the reveal is audited, and sends nothing on cancel', async () => {
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
 
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
 
@@ -92,7 +92,7 @@ describe('DataBrowserPage reveal', () => {
 
   it('confirming sends the reveal and shows the value in that cell only', async () => {
     const user = userEvent.setup()
-    const router = renderAt('/data/travelers')
+    const router = renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 002')).getByRole('button', { name: 'Reveal Email' }))
 
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
@@ -101,13 +101,13 @@ describe('DataBrowserPage reveal', () => {
     expect(reveals()).toEqual([{ method: 'POST', url: `/admin/data/travelers/${idOf(2)}/reveal`, params: undefined, data: { column: 'Email' } }])
     expect(within(await rowOf('Traveler 001')).getByText('Masked')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    // Never in the URL, where it would outlive the page in history and shared links.
-    expect(router.state.location.search).toBe('')
+    // Never in the URL, where it would outlive the page in history and shared links: only the view the test opened.
+    expect(router.state.location.search).toBe('?columns=all')
   })
 
   it('Hide masks the value again without asking the API', async () => {
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
     await screen.findByText('traveler001@example.com')
@@ -121,7 +121,7 @@ describe('DataBrowserPage reveal', () => {
 
   it('drops revealed values when the view changes, so paging back shows them masked', async () => {
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
     await screen.findByText('traveler001@example.com')
@@ -137,7 +137,7 @@ describe('DataBrowserPage reveal', () => {
 
   it('keeps a revealed value when the rows refresh without the view changing', async () => {
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
     await screen.findByText('traveler001@example.com')
@@ -154,7 +154,7 @@ describe('DataBrowserPage reveal', () => {
 
   it('never shows a revealed value on another row when the rows refresh in a different order', async () => {
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reveal' }))
     await screen.findByText('traveler001@example.com')
@@ -177,7 +177,7 @@ describe('DataBrowserPage reveal', () => {
       throw httpError(404, { title: `No 'Travelers' row with id '${id}'.`, status: 404 })
     }
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
 
     const dialog = await screen.findByRole('dialog')
@@ -193,7 +193,7 @@ describe('DataBrowserPage reveal', () => {
       throw httpError(429, 'Too many requests. Please try again later.')
     }
     const user = userEvent.setup()
-    renderAt('/data/travelers')
+    renderAt('/data/travelers?columns=all')
     await user.click(within(await rowOf('Traveler 001')).getByRole('button', { name: 'Reveal Email' }))
 
     const dialog = await screen.findByRole('dialog')

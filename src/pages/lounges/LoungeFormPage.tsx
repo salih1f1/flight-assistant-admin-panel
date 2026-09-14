@@ -37,7 +37,7 @@ export function LoungeFormPage() {
   return (
     <div className="max-w-xl space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit lounge' : 'New lounge'}</h1>
-      <LoungeForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/lounges')} />
+      <LoungeForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/data/lounges')} />
     </div>
   )
 }

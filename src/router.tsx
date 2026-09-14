@@ -2,18 +2,11 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAdmin } from '@/components/RequireAdmin'
 import { Dashboard } from '@/pages/Dashboard'
-import { TravelersPage } from '@/pages/travelers/TravelersPage'
 import { TravelerDetailPage } from '@/pages/travelers/TravelerDetailPage'
-import { FlightsPage } from '@/pages/flights/FlightsPage'
 import { FlightDetailPage } from '@/pages/flights/FlightDetailPage'
-import { AirlinesPage } from '@/pages/airlines/AirlinesPage'
 import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
-import { AirportsPage } from '@/pages/airports/AirportsPage'
 import { AirportFormPage } from '@/pages/airports/AirportFormPage'
-import { CountriesPage } from '@/pages/countries/CountriesPage'
-import { LoyaltyProgramsPage } from '@/pages/loyalty/LoyaltyProgramsPage'
 import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
-import { LoungesPage } from '@/pages/lounges/LoungesPage'
 import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
 import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 import { RecordPage, RedirectToRecord } from '@/pages/data/RecordPage'
@@ -29,21 +22,22 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: '/', element: <Dashboard /> },
-          { path: '/travelers', element: <TravelersPage /> },
+          // The old list pages: every list is the raw grid now.
+          { path: '/travelers', element: <Navigate to="/data/travelers" replace /> },
           { path: '/travelers/:id', element: <TravelerDetailPage /> },
-          { path: '/flights', element: <FlightsPage /> },
+          { path: '/flights', element: <Navigate to="/data/flights" replace /> },
           { path: '/flights/:id', element: <FlightDetailPage /> },
-          { path: '/airlines', element: <AirlinesPage /> },
+          { path: '/airlines', element: <Navigate to="/data/airlines" replace /> },
           { path: '/airlines/new', element: <AirlineFormPage /> },
           { path: '/airlines/:id/edit', element: <RedirectToRecord table="airlines" /> },
-          { path: '/airports', element: <AirportsPage /> },
+          { path: '/airports', element: <Navigate to="/data/airports" replace /> },
           { path: '/airports/new', element: <AirportFormPage /> },
           { path: '/airports/:id/edit', element: <RedirectToRecord table="airports" /> },
-          { path: '/countries', element: <CountriesPage /> },
-          { path: '/loyalty', element: <LoyaltyProgramsPage /> },
+          { path: '/countries', element: <Navigate to="/data/countries" replace /> },
+          { path: '/loyalty', element: <Navigate to="/data/loyalty-programs" replace /> },
           { path: '/loyalty/new', element: <LoyaltyProgramFormPage /> },
           { path: '/loyalty/:id/edit', element: <RedirectToRecord table="loyalty-programs" /> },
-          { path: '/lounges', element: <LoungesPage /> },
+          { path: '/lounges', element: <Navigate to="/data/lounges" replace /> },
           { path: '/lounges/new', element: <LoungeFormPage /> },
           { path: '/lounges/:id/edit', element: <RedirectToRecord table="lounges" /> },
           // The tables are in the side menu now; the old table picker has no page of its own.

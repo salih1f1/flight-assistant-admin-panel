@@ -1,67 +1,67 @@
 import { Award, Globe, Plane, Settings, Sofa, Users, type LucideIcon } from 'lucide-react'
 
 /**
- * A side menu entry. `table` is the slug of its raw table (GET /admin/data/{table}) when the
- * entry is a management page that also has one: the entry then stays current on /data/{table},
- * and both views get Manage | Raw data tabs (ViewTabs).
+ * A side menu entry. Lists open their raw grid at /data/{table}; `also` is where the entity's own
+ * detail and create pages live (e.g. /travelers/{id}, /airlines/new), so the entry stays current there.
  */
-export type NavItem = { label: string; to: string; table?: string }
+export type NavItem = { label: string; to: string; also?: string }
 
 export type NavGroup = { label: string; icon: LucideIcon; items: NavItem[] }
 
-/** A raw table with no management page of its own. */
-const rawTable = (label: string, slug: string): NavItem => ({ label, to: `/data/${slug}` })
+/** A raw table's grid, and optionally the path of the entity's own pages. */
+const table = (label: string, slug: string, also?: string): NavItem => ({ label, to: `/data/${slug}`, also })
 
 /**
- * Every page and every raw table in BrowsableTables (backend), grouped by domain. A table the
- * API adds later is still reachable at /data/{slug}, but only appears here once it's added.
+ * Every page and every raw table in BrowsableTables (backend), grouped by domain, except the raw
+ * admin audit log, which the Audit log page covers with its own filters. A table the API adds
+ * later is still reachable at /data/{slug}, but only appears here once it's added.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Travelers',
     icon: Users,
     items: [
-      { label: 'Travelers', to: '/travelers', table: 'travelers' },
-      rawTable('Device Tokens', 'device-tokens'),
-      rawTable('Loyalty Memberships', 'traveler-loyalty-memberships'),
+      table('Travelers', 'travelers', '/travelers'),
+      table('Device Tokens', 'device-tokens'),
+      table('Loyalty Memberships', 'traveler-loyalty-memberships'),
     ],
   },
   {
     label: 'Flights',
     icon: Plane,
     items: [
-      { label: 'Flights', to: '/flights', table: 'flights' },
-      rawTable('Traveler Flights', 'traveler-flights'),
-      rawTable('Flight Statuses', 'flight-statuses'),
-      rawTable('Flight Status Events', 'flight-status-events'),
+      table('Flights', 'flights', '/flights'),
+      table('Traveler Flights', 'traveler-flights'),
+      table('Flight Statuses', 'flight-statuses'),
+      table('Flight Status Events', 'flight-status-events'),
     ],
   },
   {
     label: 'Lounges',
     icon: Sofa,
     items: [
-      { label: 'Lounges', to: '/lounges', table: 'lounges' },
-      rawTable('Lounge Providers', 'lounge-providers'),
-      rawTable('Provider Links', 'lounge-provider-links'),
+      table('Lounges', 'lounges', '/lounges'),
+      table('Lounge Providers', 'lounge-providers'),
+      table('Provider Links', 'lounge-provider-links'),
     ],
   },
   {
     label: 'Loyalty',
     icon: Award,
     items: [
-      { label: 'Loyalty Programs', to: '/loyalty', table: 'loyalty-programs' },
-      rawTable('Program Kinds', 'loyalty-program-kinds'),
-      rawTable('Tiers', 'loyalty-tiers'),
+      table('Loyalty Programs', 'loyalty-programs', '/loyalty'),
+      table('Program Kinds', 'loyalty-program-kinds'),
+      table('Tiers', 'loyalty-tiers'),
     ],
   },
   {
     label: 'Reference data',
     icon: Globe,
     items: [
-      { label: 'Airlines', to: '/airlines', table: 'airlines' },
-      { label: 'Airports', to: '/airports', table: 'airports' },
-      rawTable('Alliances', 'alliances'),
-      { label: 'Countries', to: '/countries', table: 'countries' },
+      table('Airlines', 'airlines', '/airlines'),
+      table('Airports', 'airports', '/airports'),
+      table('Alliances', 'alliances'),
+      table('Countries', 'countries'),
     ],
   },
   {
@@ -69,20 +69,15 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { label: 'Import', to: '/import' },
-      { label: 'Audit log', to: '/audit', table: 'admin-audit-log' },
+      { label: 'Audit log', to: '/audit' },
       { label: 'Tests', to: '/tests' },
-      rawTable('Seed Versions', 'seed-versions'),
+      table('Seed Versions', 'seed-versions'),
     ],
   },
 ]
 
-/** Whether `pathname` is this entry's page, one of its sub-pages (e.g. /airlines/7/edit), or its raw table. */
+/** Whether `pathname` is this entry's page or below it (a record at /data/airlines/7), or under its `also` path. */
 export function isCurrent(item: NavItem, pathname: string) {
   const within = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
-  return within(item.to) || (item.table !== undefined && within(`/data/${item.table}`))
-}
-
-/** The management page entry whose raw table is `table`, if there is one. */
-export function managedItemFor(table: string) {
-  return NAV_GROUPS.flatMap(group => group.items).find(item => item.table === table)
+  return within(item.to) || (item.also !== undefined && within(item.also))
 }

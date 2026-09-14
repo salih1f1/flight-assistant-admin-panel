@@ -18,13 +18,14 @@ const menu = () => screen.getByRole('navigation', { name: 'Main' })
 const groupButton = (name: string) => within(menu()).getByRole('button', { name })
 const current = () => within(menu()).getAllByRole('link').filter(l => l.getAttribute('aria-current') === 'page').map(l => l.textContent)
 
-// Every page and every raw table the API browses, by domain. There is no separate Data entry.
+// Every page and every raw table the API browses, by domain, except the raw audit log, which the
+// Audit log page covers. There is no separate Data entry, and a list opens the raw grid.
 const GROUPS: [string, [string, string][]][] = [
-  ['Travelers', [['Travelers', '/travelers'], ['Device Tokens', '/data/device-tokens'], ['Loyalty Memberships', '/data/traveler-loyalty-memberships']]],
-  ['Flights', [['Flights', '/flights'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Statuses', '/data/flight-statuses'], ['Flight Status Events', '/data/flight-status-events']]],
-  ['Lounges', [['Lounges', '/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
-  ['Loyalty', [['Loyalty Programs', '/loyalty'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
-  ['Reference data', [['Airlines', '/airlines'], ['Airports', '/airports'], ['Alliances', '/data/alliances'], ['Countries', '/countries']]],
+  ['Travelers', [['Travelers', '/data/travelers'], ['Device Tokens', '/data/device-tokens'], ['Loyalty Memberships', '/data/traveler-loyalty-memberships']]],
+  ['Flights', [['Flights', '/data/flights'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Statuses', '/data/flight-statuses'], ['Flight Status Events', '/data/flight-status-events']]],
+  ['Lounges', [['Lounges', '/data/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
+  ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
+  ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries']]],
   ['System', [['Import', '/import'], ['Audit log', '/audit'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
 ]
 
@@ -54,7 +55,7 @@ describe('Sidebar', () => {
     expect(current()).toEqual(['Flight Statuses'])
   })
 
-  it.each(['/airlines', '/airlines/7/edit', '/data/airlines'])('highlights Airlines on %s: its page, sub-pages and raw table', path => {
+  it.each(['/data/airlines', '/data/airlines/7', '/airlines/new'])('highlights Airlines on %s: its grid, records and create page', path => {
     renderAt(path)
 
     expect(groupButton('Reference data')).toHaveAttribute('aria-expanded', 'true')
@@ -67,8 +68,8 @@ describe('Sidebar', () => {
     expect(current()).toEqual(['Flight Status Events'])
   })
 
-  it('highlights the audit log on its raw table', () => {
-    renderAt('/data/admin-audit-log')
+  it('highlights the audit log on its page', () => {
+    renderAt('/audit')
 
     expect(groupButton('System')).toHaveAttribute('aria-expanded', 'true')
     expect(current()).toEqual(['Audit log'])
@@ -96,7 +97,7 @@ describe('Sidebar', () => {
 
   it('opens the group of a page reached from another group', async () => {
     const user = userEvent.setup()
-    const router = renderAt('/travelers')
+    const router = renderAt('/data/travelers')
 
     await user.click(groupButton('Reference data'))
     await user.click(within(menu()).getByRole('link', { name: 'Alliances' }))

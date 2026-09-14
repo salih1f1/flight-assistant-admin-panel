@@ -36,7 +36,7 @@ export function AirportFormPage() {
   return (
     <div className="max-w-lg space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit airport' : 'New airport'}</h1>
-      <AirportForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/airports')} />
+      <AirportForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/data/airports')} />
     </div>
   )
 }

@@ -2,18 +2,20 @@ import { useCallback, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ViewTabs } from '@/components/ViewTabs'
-import { Eye } from 'lucide-react'
 import {
-  getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
+  adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
+import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
-import { MASKED, recordPath, VERIFIERS } from './records'
+import { DELETERS, EDITABLE, lookup, MASKED, recordPath, VERIFIERS } from './records'
+import { RowActions } from './RowActions'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -24,19 +26,29 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'Unverified', filter: 'IsVerified:false' },
 ]
 
+/**
+ * Bookkeeping columns, hidden until All columns: who and where a record came from, and raw
+ * payloads. The record page always shows them.
+ */
+const HIDDEN_COLUMNS = new Set([
+  'CreatedBy', 'UpdatedBy', 'SourceType', 'SourceSystem', 'ExternalIds', 'FirstSeenAt', 'LastSeenAt',
+  'VerifiedAt', 'VerifiedBy', 'Notes', 'RawPayloadJson', 'DedupHash',
+])
+
 type VerifyTarget = { table: string; id: number; isVerified: boolean }
 
 type Row = Record<string, unknown>
 
 /**
- * The read-only data browser over GET /admin/data/{table}. Rows arrive as
- * dictionaries keyed by the entity's PascalCase column names, in the API's column
- * order; sensitive columns are already masked server-side.
+ * A table's grid over GET /admin/data/{table}, and the one list page for every entity. Rows arrive
+ * as dictionaries keyed by the entity's PascalCase column names, in the API's column order;
+ * sensitive columns are already masked server-side.
  *
- * The table is in the path and page, sort and filter are in the query string, so a
- * view survives a reload and can be shared. Sort and filter column names go to the
- * API as they appear in the rows (the API matches them case-sensitively).
+ * The table is in the path and page, sort, filter and All columns are in the query string, so a
+ * view survives a reload and can be shared. Sort and filter column names go to the API as they
+ * appear in the rows (the API matches them case-sensitively).
  *
+ * Each row opens its record, and the table's typed API adds Edit, Delete and (for flights) Sync.
  * A masked value can be revealed, audited (RevealableValue). Each is keyed by table, row id
  * and column, so a different page, sort or filter mounts fresh, masked values.
  */
@@ -46,6 +58,7 @@ export function DataBrowserPage() {
   const page = Math.max(1, Number(searchParams.get('page')) || 1)
   const sort = searchParams.get('sort') ?? undefined
   const filter = searchParams.get('filter') ?? undefined
+  const showAll = searchParams.get('columns') === 'all'
 
   const tables = useAdminListBrowsableTables()
   const rows = useAdminGetBrowsableTableData(
@@ -62,11 +75,26 @@ export function DataBrowserPage() {
   )
 
   const queryClient = useQueryClient()
-  const verifier = table ? VERIFIERS[table] : undefined
+  const verifier = table ? lookup(VERIFIERS, table) : undefined
   const verify = useMutation({
     mutationFn: ({ table: slug, id, isVerified }: VerifyTarget) => VERIFIERS[slug](id, { isVerified }),
     // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
     onSuccess: (_, { table: slug }) => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) }),
+  })
+
+  const editable = table ? lookup(EDITABLE, table) : undefined
+  const deleter = table ? lookup(DELETERS, table) : undefined
+  const [deleting, setDeleting] = useState<Row | null>(null)
+  const remove = useMutation({
+    mutationFn: ({ table: slug, row }: { table: string; row: Row }) => DELETERS[slug].remove(row),
+    // Every raw table: a delete can cascade, e.g. a traveler's device tokens go with them.
+    onSuccess: () => invalidateRawTables(queryClient),
+    onSettled: () => setDeleting(null),
+  })
+  const sync = useMutation({
+    mutationFn: (flight: Row) => adminSyncFlightStatus(Number(flight.Id)),
+    // The flight's times change, and the sync records status events.
+    onSuccess: () => invalidateRawTables(queryClient),
   })
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
@@ -86,8 +114,19 @@ export function DataBrowserPage() {
     setSearchParams(next)
   }, [searchParams, setSearchParams])
 
+  const toggleAllColumns = () => {
+    const next = new URLSearchParams(searchParams)
+    if (showAll) next.delete('columns')
+    else next.set('columns', 'all')
+    setSearchParams(next)
+  }
+
   const items = (rows.data?.items ?? []) as Row[]
   const columnNames = items.length > 0 ? Object.keys(items[0]) : []
+  // A column masked on every row says nothing in a grid; the record page reveals it.
+  const visibleNames = showAll
+    ? columnNames
+    : columnNames.filter(name => !HIDDEN_COLUMNS.has(name) && !items.every(row => row[name] === MASKED))
   const selected = tables.data?.find(t => t.slug === table)
 
   const toggleSort = useCallback(
@@ -98,7 +137,7 @@ export function DataBrowserPage() {
   // Memoized so cell renderers keep their identity until the view changes. The table mounts each
   // renderer as a component, so a new function per render would remount every cell and drop a
   // revealed value on any re-render, e.g. a refetch that brings changed rows into the same view.
-  const columnKey = columnNames.join('|')
+  const columnKey = visibleNames.join('|')
   const dataColumns = useMemo<ColumnDef<Row>[]>(() => (columnKey ? columnKey.split('|') : []).map(name => ({
     id: name,
     accessorFn: row => row[name],
@@ -118,27 +157,17 @@ export function DataBrowserPage() {
     },
   })), [columnKey, table, sort, toggleSort])
 
+  // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
+  if (!table) return null
+
   // The verify routes take a numeric id ({id:int}). Countries is verifiable but keyed by Code with
   // no Id column, so it can't be verified from here; Number(undefined) used to send /NaN/verify.
   const verifiableRows = verifier !== undefined && items.some(row => typeof row.Id === 'number')
-  // Last, after any Verify: opens the row on its own detail page or the record page.
-  const openColumn: ColumnDef<Row> = {
-    id: 'open',
-    header: () => null,
-    cell: ({ row }) => {
-      const to = table ? recordPath(table, row.original) : undefined
-      return to ? (
-        <Link to={to} aria-label="Open record" title="Open" className="inline-flex text-gray-500 hover:text-gray-900">
-          <Eye className="h-4 w-4" />
-        </Link>
-      ) : null
-    },
-  }
 
-  // A new array, never a push: dataColumns is memoized and must not grow a verify column per render.
-  const withVerify: ColumnDef<Row>[] = verifiableRows && table ? [
+  // A new array, never a push: dataColumns is memoized and must not grow a column per render.
+  const columns: ColumnDef<Row>[] = [
     ...dataColumns,
-    {
+    ...(verifiableRows ? [{
       id: 'verify',
       header: () => <span className="sr-only">Verify</span>,
       cell: ({ row }) => {
@@ -156,40 +185,69 @@ export function DataBrowserPage() {
           </Button>
         )
       },
+    } satisfies ColumnDef<Row>] : []),
+    {
+      id: 'actions',
+      header: () => null,
+      cell: ({ row }) => {
+        const openTo = recordPath(table, row.original)
+        return (
+          <RowActions
+            openTo={openTo}
+            editTo={editable && openTo ? `${openTo}?mode=edit` : undefined}
+            onSync={table === 'flights' ? () => sync.mutate(row.original) : undefined}
+            syncing={sync.isPending}
+            onDelete={deleter ? () => setDeleting(row.original) : undefined}
+          />
+        )
+      },
     },
-  ] : dataColumns
-  const columns = [...withVerify, openColumn]
+  ]
 
-  // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
-  if (!table) return null
+  const hiddenCount = columnNames.length - visibleNames.length
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{selected?.displayName ?? table}</h1>
-          <p className="text-sm text-gray-500">Read-only. Sensitive columns are masked by the API; revealing one is audited.</p>
+          <p className="text-sm text-gray-500">Sensitive columns are masked by the API; revealing one is audited.</p>
         </div>
-        <ViewTabs table={table} />
+        {editable && (
+          <Link to={editable.newPath} className={buttonVariants()}>
+            <Plus className="mr-2 h-4 w-4" /> {`Add ${editable.noun}`}
+          </Link>
+        )}
       </div>
 
       <div className="min-w-0 space-y-4">
-        {verifier && (
-          // The API takes one filter, so choosing one of these replaces any column filter.
-          <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
-            {VERIFIED_FILTERS.map(option => (
-              <button
-                key={option.label}
-                type="button"
-                aria-pressed={filter === option.filter}
-                onClick={() => updateView({ filter: option.filter })}
-                className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {verifier && (
+            // The API takes one filter, so choosing one of these replaces any column filter.
+            <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
+              {VERIFIED_FILTERS.map(option => (
+                <button
+                  key={option.label}
+                  type="button"
+                  aria-pressed={filter === option.filter}
+                  onClick={() => updateView({ filter: option.filter })}
+                  className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            aria-pressed={showAll}
+            title={showAll ? 'Hide bookkeeping and masked columns' : `Show ${hiddenCount} hidden column${hiddenCount === 1 ? '' : 's'}`}
+            onClick={toggleAllColumns}
+          >
+            All columns
+          </Button>
+        </div>
         {verifier && items.length > 0 && !verifiableRows && (
           <p className="text-sm text-gray-500">
             {`Verifying isn't available for ${selected?.displayName ?? table}: the API's verify route takes a numeric id, and these rows have none.`}
@@ -199,6 +257,7 @@ export function DataBrowserPage() {
         <FilterForm
           // Remount when the applied filter or table changes, so the inputs show what's applied.
           key={`${table}|${filter ?? ''}`}
+          // Every column, hidden or not: filtering on one doesn't need it on screen.
           columns={columnNames}
           filter={filter}
           onApply={value => updateView({ filter: value })}
@@ -206,6 +265,15 @@ export function DataBrowserPage() {
         />
         {verify.error && verify.variables?.table === table && (
           <VerifyError error={verify.error} target={verify.variables} />
+        )}
+        {remove.error && remove.variables?.table === table && (
+          <ActionError
+            text={`Couldn't delete ${DELETERS[table]?.noun ?? 'row'} ${String(remove.variables.row.Id)}`}
+            error={remove.error}
+          />
+        )}
+        {sync.error && table === 'flights' && sync.variables && (
+          <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
         )}
         {rows.error ? (
           // In place of the table: an empty grid would read as "no rows match".
@@ -222,6 +290,17 @@ export function DataBrowserPage() {
           </div>
         )}
       </div>
+
+      {deleter && (
+        <ConfirmDeleteDialog
+          open={deleting !== null}
+          onOpenChange={open => !open && setDeleting(null)}
+          title={`Delete ${deleter.noun}`}
+          description={deleter.warning}
+          loading={remove.isPending}
+          onConfirm={() => deleting && remove.mutate({ table, row: deleting })}
+        />
+      )}
     </div>
   )
 }
@@ -242,6 +321,16 @@ function VerifyError({ error, target }: { error: unknown; target: VerifyTarget }
   return (
     <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       <p>{`Couldn't ${target.isVerified ? 'verify' : 'unverify'} row ${target.id}: ${title}`}</p>
+      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
+    </div>
+  )
+}
+
+function ActionError({ text, error }: { text: string; error: unknown }) {
+  const { title, detail } = apiErrorMessage(error)
+  return (
+    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <p>{`${text}: ${title}`}</p>
       {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
     </div>
   )
