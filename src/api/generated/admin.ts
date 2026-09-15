@@ -24,6 +24,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AcceptVerificationSourceRequest,
   AdminAuditDtoPagedResult,
   AdminFlightDetailDto,
   AdminFlightDto,
@@ -40,6 +41,7 @@ import type {
   AdminGetLoyaltyProgramsParams,
   AdminGetStatsParams,
   AdminHealthDto,
+  AdminListVerificationSourcesParams,
   AdminLoungeDto,
   AdminLoungeDtoPagedResult,
   AdminSearchFlightsParams,
@@ -74,6 +76,7 @@ import type {
   ImportResult,
   LoyaltyProgramDtoPagedResult,
   ProblemDetails,
+  QueueVerificationRequestsRequest,
   RevealValueRequest,
   RevealedValueDto,
   StringObjectDictionaryPagedResult,
@@ -82,6 +85,8 @@ import type {
   UpdateAirportRequest,
   UpdateLoungeRequest,
   UpdateLoyaltyProgramRequest,
+  VerificationEnqueueDto,
+  VerificationSourceDto,
   VerifyRequest
 } from './model';
 
@@ -2460,7 +2465,7 @@ export function useExportLoyaltyProgramKinds<TData = Awaited<ReturnType<typeof e
 
 
 /**
- * The same search, inputs and responses as GET /flights/search, for the admin panel. Each row can be posted unmodified to POST /admin/travelers/{id}/flights. Every distinct search that misses the cache is a paid AeroAPI call, so it shares the flight-search rate limit.
+ * The same search, inputs and responses as GET /flights/search, for the admin panel. Each row can be posted unmodified to POST /admin/travelers/{id}/flights. Every distinct search that misses the cache is a paid AeroAPI call, so it shares the flight-search rate limit, counted per admin. Once this month's flight data budget is nearly used up, a search that isn't cached returns 503.
  * @summary Search flights by route or flight number on a date
  */
 export const adminSearchFlights = (
@@ -2902,6 +2907,7 @@ export const useAdminDeleteFlight = <TError = ErrorType<unknown>,
     }
 
 /**
+ * Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise returns { updated: true } if a new status was recorded. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503.
  * @summary Sync flight status
  */
 export const adminSyncFlightStatus = (
@@ -2921,7 +2927,7 @@ export const adminSyncFlightStatus = (
 
 export const getAdminSyncFlightStatusMutationKey = () => ['adminSyncFlightStatus'] as const;
 
-export const getAdminSyncFlightStatusMutationOptions = <TError = ErrorType<unknown>,
+export const getAdminSyncFlightStatusMutationOptions = <TError = ErrorType<ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext> => {
 
@@ -2950,13 +2956,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminSyncFlightStatusMutationResult = NonNullable<Awaited<ReturnType<typeof adminSyncFlightStatus>>>
 
-    export type AdminSyncFlightStatusMutationError = ErrorType<unknown>
+    export type AdminSyncFlightStatusMutationError = ErrorType<ProblemDetails>
     export type AdminSyncFlightStatusMutationVariables = {id: number}
 
     /**
  * @summary Sync flight status
  */
-export const useAdminSyncFlightStatus = <TError = ErrorType<unknown>,
+export const useAdminSyncFlightStatus = <TError = ErrorType<ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminSyncFlightStatus>>,
@@ -2968,7 +2974,7 @@ export const useAdminSyncFlightStatus = <TError = ErrorType<unknown>,
     }
 
 /**
- * Runs every registered health check with no predicate — including 'aeroapi' and 'apns', tagged 'external' and excluded from the load-balancer probe at /health/ready — and always responds 200, even when the overall status is Unhealthy. Also reports process/build info (version, build SHA, uptime), pending EF Core migrations, and the flight-status sync's last-run heartbeat. Exception detail on individual checks and the sync's last error render outside Production only.
+ * Runs every registered health check with no predicate — including 'aeroapi' and 'apns', tagged 'external' and excluded from the load-balancer probe at /health/ready — and always responds 200, even when the overall status is Unhealthy. Also reports process/build info (version, build SHA, uptime), pending EF Core migrations, the flight-status sync's last-run heartbeat, and the reference verification job's last-cycle heartbeat with its pending request count. Exception detail on individual checks and both jobs' last errors render outside Production only.
  * @summary Operator health detail
  */
 export const adminGetHealth = (
@@ -5239,7 +5245,7 @@ export const useAdminDeleteTraveler = <TError = ErrorType<unknown>,
     }
 
 /**
- * Adds a flight to this traveler's tracking list, exactly as POST /flights does for the signed-in traveler. A row from GET /admin/flights/search can be posted here unmodified. Tracking a flight the traveler already tracks changes nothing and still returns 201 with its flightId. An unknown traveler is a 404 and writes nothing.
+ * Adds a flight to this traveler's tracking list, exactly as POST /flights does for the signed-in traveler. A row from GET /admin/flights/search can be posted here unmodified. Tracking a flight the traveler already tracks changes nothing and still returns 201 with its flightId. An unknown traveler is a 404 and writes nothing. The same cap as POST /flights applies: at the traveler's limit of flights tracked at a time, tracking another returns 409 and writes nothing.
  * @summary Track a flight for a traveler
  */
 export const adminTrackFlightForTraveler = (
@@ -5470,4 +5476,305 @@ export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminG
 
 
 
+
+/**
+ * The registered sources whose supported entity types include 'entityType', ordered by name, with each one's cost per row lookup. 'entityType' is required and must be exactly Airport, Airline or Country; anything else is a 400. An empty list is a valid answer: no source checks Airline yet.
+ * @summary List the verification sources that can check an entity type
+ */
+export const adminListVerificationSources = (
+    params?: AdminListVerificationSourcesParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<VerificationSourceDto[]>(
+      {url: `/admin/verification-sources`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminListVerificationSourcesQueryKey = (params?: AdminListVerificationSourcesParams,) => {
+    return [
+    `/admin/verification-sources`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminListVerificationSourcesQueryOptions = <TData = Awaited<ReturnType<typeof adminListVerificationSources>>, TError = ErrorType<HttpValidationProblemDetails>>(params?: AdminListVerificationSourcesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminListVerificationSourcesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListVerificationSources>>> = ({ signal }) => adminListVerificationSources(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminListVerificationSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof adminListVerificationSources>>>
+export type AdminListVerificationSourcesQueryError = ErrorType<HttpValidationProblemDetails>
+
+
+export function useAdminListVerificationSources<TData = Awaited<ReturnType<typeof adminListVerificationSources>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params: undefined |  AdminListVerificationSourcesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminListVerificationSources>>,
+          TError,
+          Awaited<ReturnType<typeof adminListVerificationSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminListVerificationSources<TData = Awaited<ReturnType<typeof adminListVerificationSources>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationSourcesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminListVerificationSources>>,
+          TError,
+          Awaited<ReturnType<typeof adminListVerificationSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminListVerificationSources<TData = Awaited<ReturnType<typeof adminListVerificationSources>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationSourcesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the verification sources that can check an entity type
+ */
+
+export function useAdminListVerificationSources<TData = Awaited<ReturnType<typeof adminListVerificationSources>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationSourcesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminListVerificationSourcesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.
+ * @summary Queue verification checks for reference-data rows
+ */
+export const adminQueueVerificationRequests = (
+    queueVerificationRequestsRequest: BodyType<QueueVerificationRequestsRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<VerificationEnqueueDto>(
+      {url: `/admin/verification-requests`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: queueVerificationRequestsRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminQueueVerificationRequestsMutationKey = () => ['adminQueueVerificationRequests'] as const;
+
+export const getAdminQueueVerificationRequestsMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminQueueVerificationRequests>>, TError,AdminQueueVerificationRequestsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminQueueVerificationRequests>>, TError,AdminQueueVerificationRequestsMutationVariables, TContext> => {
+
+const mutationKey = getAdminQueueVerificationRequestsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminQueueVerificationRequests>>, AdminQueueVerificationRequestsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  adminQueueVerificationRequests(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminQueueVerificationRequestsMutationResult = NonNullable<Awaited<ReturnType<typeof adminQueueVerificationRequests>>>
+    export type AdminQueueVerificationRequestsMutationBody = BodyType<QueueVerificationRequestsRequest>
+    export type AdminQueueVerificationRequestsMutationError = ErrorType<HttpValidationProblemDetails>
+    export type AdminQueueVerificationRequestsMutationVariables = {data: BodyType<QueueVerificationRequestsRequest>}
+
+    /**
+ * @summary Queue verification checks for reference-data rows
+ */
+export const useAdminQueueVerificationRequests = <TError = ErrorType<HttpValidationProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminQueueVerificationRequests>>, TError,AdminQueueVerificationRequestsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminQueueVerificationRequests>>,
+        TError,
+        AdminQueueVerificationRequestsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminQueueVerificationRequestsMutationOptions(options), queryClient);
+    }
+
+/**
+ * Writes the chosen source's values to the entity for only the columns that source reported as different, verifies the entity with that source as the caller, and saves once. The entity write is audited as an Update; the request itself stays Mismatch. 400 when 'source' is blank, is not one of the request's sources, or has no stored values. 404 when the request or the entity no longer exists. 409 when the request is not Mismatch; the entity has an open verification request (accept once it has finished); a differing column has changed since the check; a value cannot be parsed or would empty a required column; the row would break the admin edit's rules; a new unique code already belongs to another row; or a new country code is not one of our countries. The edit-rules check validates the whole row, as the admin edit does, so an existing invalid value in a column the source did not touch also returns 409, naming that column.
+ * @summary Accept one source's values for a mismatched check
+ */
+export const adminAcceptVerificationSource = (
+    id: number,
+    acceptVerificationSourceRequest: BodyType<AcceptVerificationSourceRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/verification-requests/${id}/accept-source`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: acceptVerificationSourceRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminAcceptVerificationSourceMutationKey = () => ['adminAcceptVerificationSource'] as const;
+
+export const getAdminAcceptVerificationSourceMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminAcceptVerificationSource>>, TError,AdminAcceptVerificationSourceMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminAcceptVerificationSource>>, TError,AdminAcceptVerificationSourceMutationVariables, TContext> => {
+
+const mutationKey = getAdminAcceptVerificationSourceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminAcceptVerificationSource>>, AdminAcceptVerificationSourceMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminAcceptVerificationSource(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminAcceptVerificationSourceMutationResult = NonNullable<Awaited<ReturnType<typeof adminAcceptVerificationSource>>>
+    export type AdminAcceptVerificationSourceMutationBody = BodyType<AcceptVerificationSourceRequest>
+    export type AdminAcceptVerificationSourceMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminAcceptVerificationSourceMutationVariables = {id: number;data: BodyType<AcceptVerificationSourceRequest>}
+
+    /**
+ * @summary Accept one source's values for a mismatched check
+ */
+export const useAdminAcceptVerificationSource = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminAcceptVerificationSource>>, TError,AdminAcceptVerificationSourceMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminAcceptVerificationSource>>,
+        TError,
+        AdminAcceptVerificationSourceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminAcceptVerificationSourceMutationOptions(options), queryClient);
+    }
+
+/**
+ * Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request.
+ * @summary Check an entity again with an earlier request's sources
+ */
+export const adminRetryVerificationRequest = (
+    id: number,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<VerificationEnqueueDto>(
+      {url: `/admin/verification-requests/${id}/retry`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminRetryVerificationRequestMutationKey = () => ['adminRetryVerificationRequest'] as const;
+
+export const getAdminRetryVerificationRequestMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminRetryVerificationRequest>>, TError,AdminRetryVerificationRequestMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminRetryVerificationRequest>>, TError,AdminRetryVerificationRequestMutationVariables, TContext> => {
+
+const mutationKey = getAdminRetryVerificationRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminRetryVerificationRequest>>, AdminRetryVerificationRequestMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  adminRetryVerificationRequest(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminRetryVerificationRequestMutationResult = NonNullable<Awaited<ReturnType<typeof adminRetryVerificationRequest>>>
+
+    export type AdminRetryVerificationRequestMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminRetryVerificationRequestMutationVariables = {id: number}
+
+    /**
+ * @summary Check an entity again with an earlier request's sources
+ */
+export const useAdminRetryVerificationRequest = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminRetryVerificationRequest>>, TError,AdminRetryVerificationRequestMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminRetryVerificationRequest>>,
+        TError,
+        AdminRetryVerificationRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminRetryVerificationRequestMutationOptions(options), queryClient);
+    }
 

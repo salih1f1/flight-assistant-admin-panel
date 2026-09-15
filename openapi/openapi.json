@@ -1126,7 +1126,7 @@
           "Admin - Flights"
         ],
         "summary": "Search flights by route or flight number on a date",
-        "description": "The same search, inputs and responses as GET /flights/search, for the admin panel. Each row can be posted unmodified to POST /admin/travelers/{id}/flights. Every distinct search that misses the cache is a paid AeroAPI call, so it shares the flight-search rate limit.",
+        "description": "The same search, inputs and responses as GET /flights/search, for the admin panel. Each row can be posted unmodified to POST /admin/travelers/{id}/flights. Every distinct search that misses the cache is a paid AeroAPI call, so it shares the flight-search rate limit, counted per admin. Once this month's flight data budget is nearly used up, a search that isn't cached returns 503.",
         "operationId": "AdminSearchFlights",
         "parameters": [
           {
@@ -1388,6 +1388,7 @@
           "Admin - Flights"
         ],
         "summary": "Sync flight status",
+        "description": "Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise returns { updated: true } if a new status was recorded. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503.",
         "operationId": "AdminSyncFlightStatus",
         "parameters": [
           {
@@ -1403,6 +1404,16 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1413,7 +1424,7 @@
           "Admin - Health"
         ],
         "summary": "Operator health detail",
-        "description": "Runs every registered health check with no predicate — including 'aeroapi' and 'apns', tagged 'external' and excluded from the load-balancer probe at /health/ready — and always responds 200, even when the overall status is Unhealthy. Also reports process/build info (version, build SHA, uptime), pending EF Core migrations, and the flight-status sync's last-run heartbeat. Exception detail on individual checks and the sync's last error render outside Production only.",
+        "description": "Runs every registered health check with no predicate — including 'aeroapi' and 'apns', tagged 'external' and excluded from the load-balancer probe at /health/ready — and always responds 200, even when the overall status is Unhealthy. Also reports process/build info (version, build SHA, uptime), pending EF Core migrations, the flight-status sync's last-run heartbeat, and the reference verification job's last-cycle heartbeat with its pending request count. Exception detail on individual checks and both jobs' last errors render outside Production only.",
         "operationId": "AdminGetHealth",
         "responses": {
           "200": {
@@ -2731,7 +2742,7 @@
           "Admin - Travelers"
         ],
         "summary": "Track a flight for a traveler",
-        "description": "Adds a flight to this traveler's tracking list, exactly as POST /flights does for the signed-in traveler. A row from GET /admin/flights/search can be posted here unmodified. Tracking a flight the traveler already tracks changes nothing and still returns 201 with its flightId. An unknown traveler is a 404 and writes nothing.",
+        "description": "Adds a flight to this traveler's tracking list, exactly as POST /flights does for the signed-in traveler. A row from GET /admin/flights/search can be posted here unmodified. Tracking a flight the traveler already tracks changes nothing and still returns 201 with its flightId. An unknown traveler is a 404 and writes nothing. The same cap as POST /flights applies: at the traveler's limit of flights tracked at a time, tracking another returns 409 and writes nothing.",
         "operationId": "AdminTrackFlightForTraveler",
         "parameters": [
           {
@@ -2770,6 +2781,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2906,13 +2927,228 @@
         }
       }
     },
+    "/admin/verification-sources": {
+      "get": {
+        "tags": [
+          "Admin - Verification"
+        ],
+        "summary": "List the verification sources that can check an entity type",
+        "description": "The registered sources whose supported entity types include 'entityType', ordered by name, with each one's cost per row lookup. 'entityType' is required and must be exactly Airport, Airline or Country; anything else is a 400. An empty list is a valid answer: no source checks Airline yet.",
+        "operationId": "AdminListVerificationSources",
+        "parameters": [
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VerificationSourceDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/verification-requests": {
+      "post": {
+        "tags": [
+          "Admin - Verification"
+        ],
+        "summary": "Queue verification checks for reference-data rows",
+        "description": "Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.",
+        "operationId": "AdminQueueVerificationRequests",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueVerificationRequestsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationEnqueueDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/verification-requests/{id}/accept-source": {
+      "post": {
+        "tags": [
+          "Admin - Verification"
+        ],
+        "summary": "Accept one source's values for a mismatched check",
+        "description": "Writes the chosen source's values to the entity for only the columns that source reported as different, verifies the entity with that source as the caller, and saves once. The entity write is audited as an Update; the request itself stays Mismatch. 400 when 'source' is blank, is not one of the request's sources, or has no stored values. 404 when the request or the entity no longer exists. 409 when the request is not Mismatch; the entity has an open verification request (accept once it has finished); a differing column has changed since the check; a value cannot be parsed or would empty a required column; the row would break the admin edit's rules; a new unique code already belongs to another row; or a new country code is not one of our countries. The edit-rules check validates the whole row, as the admin edit does, so an existing invalid value in a column the source did not touch also returns 409, naming that column.",
+        "operationId": "AdminAcceptVerificationSource",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptVerificationSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/verification-requests/{id}/retry": {
+      "post": {
+        "tags": [
+          "Admin - Verification"
+        ],
+        "summary": "Check an entity again with an earlier request's sources",
+        "description": "Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request.",
+        "operationId": "AdminRetryVerificationRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationEnqueueDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flights/search": {
       "get": {
         "tags": [
           "Flights"
         ],
         "summary": "Search flights by route or flight number on a date",
-        "description": "Searches scheduled flights to populate the 'add flight' picker. Each returned row has exactly the same shape as TrackFlightRequest (flightNumber, serviceDate, departureAirportIata, arrivalAirportIata, scheduledDepartureUtc, scheduledArrivalUtc), so a result can be posted straight to POST /flights, unmodified, to track it.\n\nSearch criteria (query params):\n- date (required): the departure date in YYYY-MM-DD format. Must fall within the provider's rolling past/future horizon.\n- from / to (optional): departure and arrival airport as 3-letter IATA codes (e.g. LHR, JFK). Case-insensitive. Must be supplied together.\n- flightNumber (optional): an IATA flight code — a 2-character airline prefix containing at least one letter, followed by 1–4 digits and an optional trailing letter (e.g. BA123, 6E4120, BA123A). Case-insensitive. The same rule POST /flights applies, so any flightNumber this endpoint accepts is trackable.\n- includeCodeshares (optional, default false): when true, includes codeshare-marketed rows for the same physical departure alongside the operating flight's own row; when false, only the operating flight's own row is returned.\n\nYou must provide either a full route (both from and to) OR a flightNumber, in addition to date; otherwise the request is rejected with 400.\n\nEach result is one flight designator — the same aircraft sold under several marketing numbers (e.g. TK1028 is also 6E4120, MS9668, RJ3710 and SQ6228) appears as one row per number, not grouped. There is no separate 'operating carrier' field: the airline is always the first two characters of the result's own flightNumber.\n\nResponses:\n- 200: list of matching flights (empty list when the provider responds successfully but nothing matches).\n- 400: invalid/insufficient parameters.\n- 500: server-side configuration issue with the flight data provider.\n- 502: the flight data provider was unreachable or returned an unexpected error.\n- 503: the flight data provider is throttling requests; retry after the period in the Retry-After header.",
+        "description": "Searches scheduled flights to populate the 'add flight' picker. Each returned row has exactly the same shape as TrackFlightRequest (flightNumber, serviceDate, departureAirportIata, arrivalAirportIata, scheduledDepartureUtc, scheduledArrivalUtc), so a result can be posted straight to POST /flights, unmodified, to track it.\n\nSearch criteria (query params):\n- date (required): the departure date in YYYY-MM-DD format. Must fall within the provider's rolling past/future horizon.\n- from / to (optional): departure and arrival airport as 3-letter IATA codes (e.g. LHR, JFK). Case-insensitive. Must be supplied together.\n- flightNumber (optional): an IATA flight code — a 2-character airline prefix containing at least one letter, followed by 1–4 digits and an optional trailing letter (e.g. BA123, 6E4120, BA123A). Case-insensitive. The same rule POST /flights applies, so any flightNumber this endpoint accepts is trackable.\n- includeCodeshares (optional, default false): when true, includes codeshare-marketed rows for the same physical departure alongside the operating flight's own row; when false, only the operating flight's own row is returned.\n\nYou must provide either a full route (both from and to) OR a flightNumber, in addition to date; otherwise the request is rejected with 400.\n\nEach result is one flight designator — the same aircraft sold under several marketing numbers (e.g. TK1028 is also 6E4120, MS9668, RJ3710 and SQ6228) appears as one row per number, not grouped. There is no separate 'operating carrier' field: the airline is always the first two characters of the result's own flightNumber.\n\nResponses:\n- 200: list of matching flights (empty list when the provider responds successfully but nothing matches).\n- 400: invalid/insufficient parameters.\n- 500: server-side configuration issue with the flight data provider.\n- 502: the flight data provider was unreachable or returned an unexpected error.\n- 503: the flight data provider is throttling requests, or this month's flight data budget is nearly used up, so only searches already cached are answered; retry after the period in the Retry-After header.\n- 429: too many searches from this caller (per signed-in traveler, or per client IP when anonymous); retry after the period in the Retry-After header.\n",
         "operationId": "SearchFlights",
         "parameters": [
           {
@@ -3065,7 +3301,7 @@
           "Flights"
         ],
         "summary": "Track a flight",
-        "description": "Adds a flight to the authenticated traveler's tracking list. A row returned by GET /flights/search can be posted here unmodified — this body is exactly that shape. If the flight already exists in the system (same airline, number, and service date) it is reused; otherwise a new flight record is created. The airline is derived from the first two characters of FlightNumber (e.g. 'BA123' -> 'BA', '6E4120' -> '6E'); there is no separate airline field. Body fields: FlightNumber (e.g. 'BA123' or '6E4120'), ServiceDate (YYYY-MM-DD), DepartureAirportIata, ArrivalAirportIata, ScheduledDepartureUtc, ScheduledArrivalUtc.",
+        "description": "Adds a flight to the authenticated traveler's tracking list. A row returned by GET /flights/search can be posted here unmodified — this body is exactly that shape. If the flight already exists in the system (same airline, number, and service date) it is reused; otherwise a new flight record is created. The airline is derived from the first two characters of FlightNumber (e.g. 'BA123' -> 'BA', '6E4120' -> '6E'); there is no separate airline field. Body fields: FlightNumber (e.g. 'BA123' or '6E4120'), ServiceDate (YYYY-MM-DD), DepartureAirportIata, ArrivalAirportIata, ScheduledDepartureUtc, ScheduledArrivalUtc. A traveler can track up to 20 flights at a time by default. A flight counts until its status sync stops: by default 30 minutes after it lands or is cancelled, or a day after its arrival time if no landing is reported. Tracking another returns 409 and adds nothing; tracking a flight the traveler already tracks still returns 201.",
         "operationId": "TrackFlight",
         "requestBody": {
           "content": {
@@ -3087,6 +3323,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3228,7 +3474,7 @@
           "Flights"
         ],
         "summary": "Manually sync flight status",
-        "description": "Triggers an on-demand status refresh for the specified flight by querying the external flight data provider. Returns { updated: true } if new status data was fetched and persisted, or { updated: false } if the data was already up to date. Route parameter: flightId — the numeric flight ID.",
+        "description": "Triggers an on-demand status refresh for the specified flight. Whether the external flight data provider is queried depends on the flight's sync mode: a flight not yet inside the provider's live-status window makes no provider call. A flight synced within the manual-sync cooldown (5 minutes by default) makes no call either. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) is refreshed; any other returns 503. Returns { updated: true } if a new status was recorded, or { updated: false } if nothing new was found or no call was made. Rate-limited per traveler: too many sync requests return 429 with a Retry-After header. Route parameter: flightId — the numeric flight ID.",
         "operationId": "SyncFlightStatus",
         "parameters": [
           {
@@ -3247,6 +3493,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3791,6 +4047,16 @@
   },
   "components": {
     "schemas": {
+      "AcceptVerificationSourceRequest": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AddDeviceTokenRequest": {
         "type": "object",
         "properties": {
@@ -4236,6 +4502,9 @@
           },
           "flightSync": {
             "$ref": "#/components/schemas/AdminHealthFlightSyncDto"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/AdminHealthVerificationDto"
           }
         },
         "additionalProperties": false
@@ -4340,6 +4609,51 @@
           },
           "appInsightsConfigured": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdminHealthVerificationDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "lastRunStartedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastRunCompletedUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastOutcome": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestsProcessed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestsFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextRunDueUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -5659,6 +5973,30 @@
         },
         "additionalProperties": { }
       },
+      "QueueVerificationRequestsRequest": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RegisterTravelerRequest": {
         "type": "object",
         "properties": {
@@ -5947,6 +6285,34 @@
             "type": "string",
             "format": "date",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerificationEnqueueDto": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VerificationSourceDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "costPerRowUsd": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

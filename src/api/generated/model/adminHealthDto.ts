@@ -8,6 +8,7 @@ import type { AdminHealthCheckDto } from './adminHealthCheckDto';
 import type { AdminHealthFlightSyncDto } from './adminHealthFlightSyncDto';
 import type { AdminHealthMigrationsDto } from './adminHealthMigrationsDto';
 import type { AdminHealthSystemDto } from './adminHealthSystemDto';
+import type { AdminHealthVerificationDto } from './adminHealthVerificationDto';
 
 export interface AdminHealthDto {
   /** @nullable */
@@ -18,4 +19,5 @@ export interface AdminHealthDto {
   system?: AdminHealthSystemDto;
   migrations?: AdminHealthMigrationsDto;
   flightSync?: AdminHealthFlightSyncDto;
+  verification?: AdminHealthVerificationDto;
 }
