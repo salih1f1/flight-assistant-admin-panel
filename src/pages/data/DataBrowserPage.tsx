@@ -17,6 +17,8 @@ import { ExportCsvButton } from './ExportCsvButton'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { VerificationStatusBadge } from './VerificationStatus'
+import { CHECKED_COLUMNS } from './verificationChecks'
+import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -78,6 +80,19 @@ export function DataBrowserPage() {
   const queryClient = useQueryClient()
   const verifier = table ? lookup(VERIFIERS, table) : undefined
   const keyColumn = table ? recordKey(table) : undefined
+
+  // R1: a selection belongs to one view (table + page + sort + filter). Comparing the view against
+  // the previous render's, and resetting when it differs, adjusts state while rendering instead of
+  // in an effect — so returning to an earlier view starts with nothing selected, not the old set.
+  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filter ?? ''}`
+  const [selectionView, setSelectionView] = useState(viewKey)
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  if (viewKey !== selectionView) {
+    setSelectionView(viewKey)
+    setSelectedKeys(new Set())
+  }
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
+
   const verify = useMutation({
     mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
     // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
@@ -128,7 +143,32 @@ export function DataBrowserPage() {
   // A column masked on every row says nothing in a grid; the record page reveals it.
   const hiddenNames = columnNames.filter(name => HIDDEN_COLUMNS.has(name) || items.every(row => row[name] === MASKED))
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
+  // Independent of the "show all" toggle: R6's "default-visible" is the grid's normal view, not
+  // whatever the admin currently has expanded.
+  const defaultVisibleNames = columnNames.filter(name => !hiddenNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
+
+  // R1/R2: rows on the current page selectable via the checkbox column, and the current selection
+  // intersected with them — a key that isn't among this page's rows (e.g. a refetch dropped it from
+  // an Unverified view) simply stops counting, without touching the stored selectedKeys.
+  const selectableItems = keyColumn ? items.filter(row => row[keyColumn] !== null && row[keyColumn] !== undefined) : []
+  const selectedRows = keyColumn ? items.filter(row => selectedKeys.has(String(row[keyColumn]))) : []
+  const allSelected = selectableItems.length > 0 && selectableItems.every(row => selectedKeys.has(String(row[keyColumn!])))
+  const someSelected = !allSelected && selectableItems.some(row => selectedKeys.has(String(row[keyColumn!])))
+
+  const toggleRow = (key: string) => setSelectedKeys(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+  const toggleAllRows = () => setSelectedKeys(prev => {
+    const next = new Set(prev)
+    const keys = selectableItems.map(row => String(row[keyColumn!]))
+    if (allSelected) keys.forEach(key => next.delete(key))
+    else keys.forEach(key => next.add(key))
+    return next
+  })
 
   const toggleSort = useCallback(
     (column: string) => updateView({ sort: sort === column ? `-${column}` : sort === `-${column}` ? undefined : column }),
@@ -163,8 +203,38 @@ export function DataBrowserPage() {
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
 
+  // R6: the dialog prepends the key column and appends Status itself, so this is only the middle
+  // segment — the §3 checked columns where they exist, else the grid's own default-visible columns.
+  const checkedColumns = lookup(CHECKED_COLUMNS, table)
+  const manualColumns = checkedColumns ? [...checkedColumns] : defaultVisibleNames.filter(name => name !== 'IsVerified')
+
   // A new array, never a push: dataColumns is memoized and must not grow a column per render.
   const columns: ColumnDef<Row>[] = [
+    ...(verifier && keyColumn ? [{
+      id: 'select',
+      header: () => (
+        <input
+          type="checkbox"
+          aria-label="Select all rows on this page"
+          checked={allSelected}
+          ref={el => { if (el) el.indeterminate = someSelected }}
+          onChange={toggleAllRows}
+        />
+      ),
+      cell: ({ row }) => {
+        const keyValue = row.original[keyColumn]
+        if (keyValue === null || keyValue === undefined) return null
+        const key = String(keyValue)
+        return (
+          <input
+            type="checkbox"
+            aria-label={`Select row ${key}`}
+            checked={selectedKeys.has(key)}
+            onChange={() => toggleRow(key)}
+          />
+        )
+      },
+    } satisfies ColumnDef<Row>] : []),
     ...dataColumns,
     ...(verifier ? [{
       id: 'verify',
@@ -238,6 +308,12 @@ export function DataBrowserPage() {
               ))}
             </div>
           )}
+          {/* R3: opens the Verify dialog on the rows selected via the checkbox column. */}
+          {verifier && (
+            <Button variant="outline" size="sm" disabled={selectedRows.length === 0} onClick={() => setVerifyDialogOpen(true)}>
+              {`Verify selected (${selectedRows.length})`}
+            </Button>
+          )}
           {/* Only where it changes something: some tables have no bookkeeping or masked columns. */}
           {hiddenNames.length > 0 && (
             <Button variant="outline" size="sm" onClick={toggleAllColumns}>
@@ -291,6 +367,17 @@ export function DataBrowserPage() {
           description={deleter.warning}
           loading={remove.isPending}
           onConfirm={() => deleting && remove.mutate({ table, row: deleting })}
+        />
+      )}
+
+      {verifier && keyColumn && (
+        <VerifyDialog
+          open={verifyDialogOpen}
+          onOpenChange={setVerifyDialogOpen}
+          table={table}
+          keyColumn={keyColumn}
+          rows={selectedRows}
+          manualColumns={manualColumns}
         />
       )}
     </div>
