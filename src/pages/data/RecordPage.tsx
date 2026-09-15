@@ -15,6 +15,7 @@ import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, VERIFIERS } from './records'
+import { VerificationStatusBadge } from './VerificationStatus'
 
 /** The tables the API can update, each with the form that edits one record. */
 const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void }>> = {
@@ -66,8 +67,8 @@ function Record({ table, id }: { table: string; id: string }) {
   const verifier = lookup(VERIFIERS, table)
   const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
   const verify = useMutation({
-    // Only offered when there's a verifier (below).
-    mutationFn: (isVerified: boolean) => verifier!(Number(id), { isVerified }),
+    // Only offered when there's a verifier (below). id is the route key: Countries' Code, Id elsewhere.
+    mutationFn: (isVerified: boolean) => verifier!(id, { isVerified }),
     onSuccess: refresh,
   })
 
@@ -109,12 +110,14 @@ function Record({ table, id }: { table: string; id: string }) {
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
+                {verifier && 'IsVerified' in row && <VerificationStatusBadge row={row} />}
+              </div>
               <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
             </div>
             <div className="flex items-center gap-2">
-              {/* The verify routes take a numeric id, so a record keyed otherwise (Countries) can't be verified. */}
-              {verifier && typeof row.Id === 'number' && 'IsVerified' in row && (
+              {verifier && 'IsVerified' in row && (
                 <Button variant="outline" disabled={verify.isPending} onClick={() => verify.mutate(row.IsVerified !== true)}>
                   {row.IsVerified === true ? 'Unverify' : 'Verify'}
                 </Button>

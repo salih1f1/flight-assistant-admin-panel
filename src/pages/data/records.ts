@@ -19,18 +19,23 @@ export const MASKED = '<redacted>'
 
 /**
  * The reference data tables that can be verified: PATCH /admin/{slug}/{id}/verify exists for
- * exactly these slugs, and their data browser rows carry IsVerified, VerifiedAt and VerifiedBy.
- * The typed admin DTOs have no verified state, which is why verifying lives with the raw data.
+ * exactly these slugs, and their data browser rows carry IsVerified, VerifiedAt, VerifiedBy,
+ * VerificationSource and VerificationIssue. The typed admin DTOs have no verified state, which is
+ * why verifying lives with the raw data.
+ *
+ * Keyed by the record's key as a string (recordKey(table)'s column, e.g. Id or countries' Code):
+ * the 7 numeric-id tables convert it with Number(...) themselves, since the route takes {id:int};
+ * countries' route takes {code} directly.
  */
-export const VERIFIERS: Record<string, (id: number, body: { isVerified: boolean }) => Promise<void>> = {
-  airports: adminVerifyAirport,
-  airlines: adminVerifyAirline,
-  alliances: adminVerifyAlliance,
+export const VERIFIERS: Record<string, (key: string, body: { isVerified: boolean }) => Promise<void>> = {
+  airports: (key, body) => adminVerifyAirport(Number(key), body),
+  airlines: (key, body) => adminVerifyAirline(Number(key), body),
+  alliances: (key, body) => adminVerifyAlliance(Number(key), body),
   countries: adminVerifyCountry,
-  lounges: adminVerifyLounge,
-  'lounge-providers': adminVerifyLoungeProvider,
-  'loyalty-programs': adminVerifyLoyaltyProgram,
-  'loyalty-program-kinds': adminVerifyLoyaltyProgramKind,
+  lounges: (key, body) => adminVerifyLounge(Number(key), body),
+  'lounge-providers': (key, body) => adminVerifyLoungeProvider(Number(key), body),
+  'loyalty-programs': (key, body) => adminVerifyLoyaltyProgram(Number(key), body),
+  'loyalty-program-kinds': (key, body) => adminVerifyLoyaltyProgramKind(Number(key), body),
 }
 
 // Tables keyed by something other than a single Id column (their EF configurations' HasKey).

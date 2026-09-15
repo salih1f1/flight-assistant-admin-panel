@@ -14,8 +14,9 @@ import {
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
-import { DELETERS, EDITABLE, lookup, MASKED, recordPath, VERIFIERS } from './records'
+import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
+import { VerificationStatusBadge } from './VerificationStatus'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -32,10 +33,10 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
  */
 const HIDDEN_COLUMNS = new Set([
   'SourceType', 'FirstSeenAt',
-  'VerifiedAt', 'VerifiedBy', 'Notes', 'RawPayloadJson', 'DedupHash',
+  'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
 
-type VerifyTarget = { table: string; id: number; isVerified: boolean }
+type VerifyTarget = { table: string; key: string; isVerified: boolean }
 
 type Row = Record<string, unknown>
 
@@ -76,8 +77,9 @@ export function DataBrowserPage() {
 
   const queryClient = useQueryClient()
   const verifier = table ? lookup(VERIFIERS, table) : undefined
+  const keyColumn = table ? recordKey(table) : undefined
   const verify = useMutation({
-    mutationFn: ({ table: slug, id, isVerified }: VerifyTarget) => VERIFIERS[slug](id, { isVerified }),
+    mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
     // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
     onSuccess: (_, { table: slug }) => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) }),
   })
@@ -148,37 +150,36 @@ export function DataBrowserPage() {
     ),
     cell: ({ row }) => {
       const value = row.original[name]
+      // The one column a verifiable table's badge replaces; non-verifiable tables keep the raw value.
+      if (name === 'IsVerified' && verifier) return <VerificationStatusBadge row={row.original} />
       // Every table with a sensitive column is keyed by a single Id, which is what the reveal endpoint takes.
       const id = row.original.Id
       if (value !== MASKED || id === null || id === undefined || !table) return <Cell value={value} />
       // Keyed so another row, page, sort or filter never inherits a revealed value.
       return <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
     },
-  })), [columnKey, table, sort, toggleSort])
+  })), [columnKey, table, sort, toggleSort, verifier])
 
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
 
-  // The verify routes take a numeric id ({id:int}). Countries is verifiable but keyed by Code with
-  // no Id column, so it can't be verified from here; Number(undefined) used to send /NaN/verify.
-  const verifiableRows = verifier !== undefined && items.some(row => typeof row.Id === 'number')
-
   // A new array, never a push: dataColumns is memoized and must not grow a column per render.
   const columns: ColumnDef<Row>[] = [
     ...dataColumns,
-    ...(verifiableRows ? [{
+    ...(verifier ? [{
       id: 'verify',
       header: () => <span className="sr-only">Verify</span>,
       cell: ({ row }) => {
-        const id = row.original.Id
-        if (typeof id !== 'number') return null
+        const keyValue = keyColumn ? row.original[keyColumn] : undefined
+        if (keyValue === null || keyValue === undefined) return null
+        const key = String(keyValue)
         const verified = row.original.IsVerified === true
         return (
           <Button
             size="sm"
             variant="outline"
             disabled={verify.isPending}
-            onClick={() => verify.mutate({ table, id, isVerified: !verified })}
+            onClick={() => verify.mutate({ table, key, isVerified: !verified })}
           >
             {verified ? 'Unverify' : 'Verify'}
           </Button>
@@ -244,11 +245,6 @@ export function DataBrowserPage() {
             </Button>
           )}
         </div>
-        {verifier && items.length > 0 && !verifiableRows && (
-          <p className="text-sm text-gray-500">
-            {`Verifying isn't available for ${selected?.displayName ?? table}: the API's verify route takes a numeric id, and these rows have none.`}
-          </p>
-        )}
         <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
         <FilterForm
           // Remount when the applied filter or table changes, so the inputs show what's applied.
@@ -316,7 +312,7 @@ function VerifyError({ error, target }: { error: unknown; target: VerifyTarget }
     : apiErrorMessage(error)
   return (
     <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <p>{`Couldn't ${target.isVerified ? 'verify' : 'unverify'} row ${target.id}: ${title}`}</p>
+      <p>{`Couldn't ${target.isVerified ? 'verify' : 'unverify'} row ${target.key}: ${title}`}</p>
       {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
     </div>
   )

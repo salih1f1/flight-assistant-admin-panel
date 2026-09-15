@@ -35,13 +35,22 @@ const makeAirlines = (): Row[] => [
 ]
 
 let airlines: Row[]
+let countries: Row[]
+
+// "de" is inside both codes: the API's string filter is a contains match. DE carries a
+// verification issue and no source, so the record page's Verify, badge and field-value tests
+// all read from one fixture row.
+const makeCountries = (): Row[] => [
+  { Code: 'DEX', Name: 'Not a country', IsEU: false },
+  { Code: 'DE', Name: 'Germany', IsEU: true, IsVerified: false, VerificationSource: null, VerificationIssue: 'Needs manual review' },
+]
+
 let sent: SentRequest[]
 
 const ROWS: Record<string, () => Row[]> = {
   airlines: () => airlines,
   alliances: () => [{ Id: 1, Code: 'STAR', Name: 'Star Alliance', IsVerified: true }],
-  // "de" is inside both codes: the API's string filter is a contains match.
-  countries: () => [{ Code: 'DEX', Name: 'Not a country', IsEU: false }, { Code: 'DE', Name: 'Germany', IsEU: true }],
+  countries: () => countries,
   'device-tokens': () => [{ Id: 4, TravelerId: '00000000-0000-0000-0000-000000000001', Platform: 'ios', Token: '<redacted>', LastSeenUtc: null }],
   'flight-status-events': () => [{ Id: 5, FlightId: 42, Source: 'AeroAPI', Remarks: null, RawPayloadJson: { status: 'Delayed' } }],
   lounges: () => [{ Id: 12, AirportId: 11, Name: 'Plaza Premium', IsAirside: true }],
@@ -82,6 +91,14 @@ function api(req: SentRequest) {
   if (req.method === 'GET' && req.url === '/admin/airports/11') {
     return { id: 11, iata: 'LHR', icao: 'EGLL', name: 'London Heathrow', city: 'London', countryCode: 'GB' }
   }
+  const countryCode = req.url.match(/^\/admin\/countries\/([A-Za-z]+)\/verify$/)?.[1]
+  const country = countries.find(c => c.Code === countryCode)
+  if (req.method === 'PATCH' && countryCode) {
+    if (!country) throw httpError(404)
+    const { isVerified } = req.data as { isVerified: boolean }
+    countries = countries.map(c => (c === country ? { ...c, IsVerified: isVerified } : c))
+    return undefined
+  }
   throw httpError(404)
 }
 
@@ -114,6 +131,7 @@ const heading = (name: string) => screen.findByRole('heading', { level: 1, name 
 describe('RecordPage', () => {
   beforeEach(() => {
     airlines = makeAirlines()
+    countries = makeCountries()
     ;({ sent } = installFakeApi(api))
   })
 
@@ -177,6 +195,34 @@ describe('RecordPage', () => {
     expect(await screen.findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(field('IsVerified')).toHaveTextContent('Yes')
     expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/airlines/8/verify', data: { isVerified: true } }))
+  })
+
+  it('verifies a country record by its code, not a numeric id', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/countries/DE')
+    await heading('Germany')
+    expect(field('IsVerified')).toHaveTextContent('No')
+
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+
+    expect(await screen.findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    expect(field('IsVerified')).toHaveTextContent('Yes')
+    expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/countries/DE/verify', data: { isVerified: true } }))
+  })
+
+  it('shows the verification status badge in the header', async () => {
+    renderAt('/data/countries/DE')
+
+    expect(await heading('Germany')).toBeInTheDocument()
+    expect(screen.getByText('Needs attention')).toBeInTheDocument()
+  })
+
+  it('shows VerificationSource and VerificationIssue as record fields, hidden or not in the grid', async () => {
+    renderAt('/data/countries/DE')
+    await heading('Germany')
+
+    expect(field('VerificationIssue')).toHaveTextContent('Needs manual review')
+    expect(field('VerificationSource')).toHaveTextContent('—')
   })
 
   it('Edit switches to the form in place; saving returns to Read with the saved values', async () => {
