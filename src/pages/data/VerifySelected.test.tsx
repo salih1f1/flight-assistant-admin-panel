@@ -61,8 +61,6 @@ let countries: Country[]
 let alliances: Alliance[]
 let sent: SentRequest[]
 let airportVerifyAnswer: (req: SentRequest) => unknown
-let countryVerifyAnswer: (req: SentRequest) => unknown
-let allianceVerifyAnswer: (req: SentRequest) => unknown
 
 /** GET /admin/data/{table}: applies the one `column:value` filter the way the real API does. */
 function readTable<T extends Record<string, unknown>>(rows: T[], req: SentRequest) {
@@ -72,30 +70,14 @@ function readTable<T extends Record<string, unknown>>(rows: T[], req: SentReques
 }
 
 // Matches the real verify handler: manual verify stamps VerificationSource 'manual' and clears
-// VerificationIssue; a missing row answers an empty 404 (Results.NotFound()).
+// VerificationIssue; a missing row answers an empty 404 (Results.NotFound()). Only airports is ever
+// actually verified in these tests — countries and alliances only need GET, for the Manually
+// columns tests — so this is the one PATCH handler, not a copy per table.
 const defaultAirportVerify = (req: SentRequest) => {
   const id = Number(req.url.split('/')[3])
   const { isVerified } = req.data as { isVerified: boolean }
   if (!airports.some(a => a.Id === id)) throw httpError(404)
   airports = airports.map(a => (a.Id === id
-    ? { ...a, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-16T00:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null, VerificationSource: isVerified ? 'manual' : null, VerificationIssue: null }
-    : a))
-  return undefined
-}
-const defaultCountryVerify = (req: SentRequest) => {
-  const code = req.url.split('/')[3]
-  const { isVerified } = req.data as { isVerified: boolean }
-  if (!countries.some(c => c.Code === code)) throw httpError(404)
-  countries = countries.map(c => (c.Code === code
-    ? { ...c, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-16T00:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null, VerificationSource: isVerified ? 'manual' : null, VerificationIssue: null }
-    : c))
-  return undefined
-}
-const defaultAllianceVerify = (req: SentRequest) => {
-  const id = Number(req.url.split('/')[3])
-  const { isVerified } = req.data as { isVerified: boolean }
-  if (!alliances.some(a => a.Id === id)) throw httpError(404)
-  alliances = alliances.map(a => (a.Id === id
     ? { ...a, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-16T00:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null, VerificationSource: isVerified ? 'manual' : null, VerificationIssue: null }
     : a))
   return undefined
@@ -111,8 +93,6 @@ function install() {
       return pagedResult([{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null }], req.params)
     }
     if (req.method === 'PATCH' && /^\/admin\/airports\/\d+\/verify$/.test(req.url)) return airportVerifyAnswer(req)
-    if (req.method === 'PATCH' && /^\/admin\/countries\/[A-Za-z]+\/verify$/.test(req.url)) return countryVerifyAnswer(req)
-    if (req.method === 'PATCH' && /^\/admin\/alliances\/\d+\/verify$/.test(req.url)) return allianceVerifyAnswer(req)
     throw httpError(404)
   }))
 }
@@ -140,8 +120,6 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     countries = makeCountries()
     alliances = makeAlliances()
     airportVerifyAnswer = defaultAirportVerify
-    countryVerifyAnswer = defaultCountryVerify
-    allianceVerifyAnswer = defaultAllianceVerify
     install()
   })
 
@@ -320,8 +298,17 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
 
-    await waitFor(() => expect(patches()).toHaveLength(2))
+    // Wait for the run to actually finish (the last row's badge) before counting requests, so a
+    // slow-but-eventually-correct implementation can't pass on a premature read.
+    const charlieRow = (await within(dialog).findByText('Charlie Airport')).closest('tr')!
+    await within(charlieRow).findByText('Verified · manual')
+
+    expect(patches()).toHaveLength(2)
     expect(patches().map(r => r.url)).toEqual(['/admin/airports/1/verify', '/admin/airports/3/verify'])
+
+    const bravoRow = (await within(dialog).findByText('Bravo Airport')).closest('tr')!
+    expect(within(bravoRow).getByText('Verified · ourairports')).toBeInTheDocument()
+    expect(within(bravoRow).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
   })
 
   it("8. Verify all shown continues past a failed row, and shows the API's title", async () => {
@@ -410,5 +397,161 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     // The grid behind the dialog refetches under the Unverified filter and drops the now-verified row.
     await waitFor(() => expect(screen.getAllByText('Alpha Airport')).toHaveLength(1))
     expect(within(dialog).getByText('Alpha Airport')).toBeInTheDocument()
+  })
+
+  it('checkbox focus: clicking, or pressing Space on, a row checkbox or the header checkbox keeps focus on that same checkbox', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    // Cached across every interaction below on purpose: a checkbox that gets swapped for a new DOM
+    // node on any render (the bug this proves fixed) would make a later click land on nothing.
+    const rowCheckbox = screen.getByRole('checkbox', { name: 'Select row 1' })
+    await user.click(rowCheckbox)
+    expect(rowCheckbox).toHaveFocus()
+    expect(rowCheckbox).toBeChecked()
+
+    await user.keyboard(' ')
+    expect(rowCheckbox).toHaveFocus()
+    expect(rowCheckbox).not.toBeChecked()
+
+    const headerCheckbox = screen.getByRole('checkbox', { name: 'Select all rows on this page' })
+    await user.click(headerCheckbox)
+    expect(headerCheckbox).toHaveFocus()
+    expect(headerCheckbox).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Verify selected (3)' })).toBeInTheDocument()
+
+    await user.keyboard(' ')
+    expect(headerCheckbox).toHaveFocus()
+    expect(headerCheckbox).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Verify selected (0)' })).toBeInTheDocument()
+  })
+
+  it('R2: a row with no value in the key column has no checkbox', async () => {
+    airports = [...airports, { ...airports[0], Id: null as unknown as number, Iata: 'ZZZ', Name: 'No-Id Airport' }]
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    const row = (await screen.findByText('No-Id Airport')).closest('tr')!
+    expect(within(row).queryByRole('checkbox')).not.toBeInTheDocument()
+    // The other three rows still get theirs.
+    expect(screen.getAllByRole('checkbox', { name: /^Select row / })).toHaveLength(3)
+  })
+
+  it('R10: closing the dialog keeps the selection', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    expect(screen.getByRole('button', { name: 'Verify selected (1)' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Select row 1' })).toBeChecked()
+  })
+
+  it('Verify all shown and the per-row Verify buttons are disabled while a run is in flight', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    airportVerifyAnswer = async req => {
+      if (Number(req.url.split('/')[3]) === 1) await gate
+      return defaultAirportVerify(req)
+    }
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+    await waitFor(() => expect(patches()).toHaveLength(1))
+
+    expect(within(dialog).getByRole('button', { name: 'Verify all shown' })).toBeDisabled()
+    const bravoRow = (await within(dialog).findByText('Bravo Airport')).closest('tr')!
+    expect(within(bravoRow).getByRole('button', { name: 'Verify' })).toBeDisabled()
+
+    release()
+    await waitFor(() => expect(patches()).toHaveLength(3))
+  })
+
+  it("M1: Verify all shown does not send a second PATCH for a row whose own per-row Verify is still in flight", async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    airportVerifyAnswer = async req => {
+      if (Number(req.url.split('/')[3]) === 1) await gate
+      return defaultAirportVerify(req)
+    }
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    const alphaRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
+    // Alpha's own per-row Verify, held in flight on the gate.
+    await user.click(within(alphaRow).getByRole('button', { name: 'Verify' }))
+    await waitFor(() => expect(patches()).toHaveLength(1))
+
+    // Bravo and Charlie should still be sent; Alpha must not get a second PATCH while its first is pending.
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+    await waitFor(() => expect(patches()).toHaveLength(3))
+    expect(patches().map(r => r.url)).toEqual(['/admin/airports/1/verify', '/admin/airports/2/verify', '/admin/airports/3/verify'])
+
+    release()
+    await within(alphaRow).findByText('Verified · manual')
+    // Releasing Alpha's request didn't trigger a further send either.
+    expect(patches()).toHaveLength(3)
+  })
+
+  it("M2: closing the dialog mid-run stops further requests, and a stopped run's outcome does not leak into a reopened dialog", async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    airportVerifyAnswer = async req => {
+      if (Number(req.url.split('/')[3]) === 1) {
+        await gate
+        throw httpError(500, { title: 'boom', status: 500 })
+      }
+      return defaultAirportVerify(req)
+    }
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+    await waitFor(() => expect(patches()).toHaveLength(1))
+
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    release()
+    // Give the released (and failing) request's microtasks a chance to run before checking that it
+    // didn't trigger a further one.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(patches()).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+    const reopened = await screen.findByRole('dialog')
+    expect(within(reopened).getByRole('button', { name: 'Verify all shown' })).toBeEnabled()
+    const alphaRow = (await within(reopened).findByText('Alpha Airport')).closest('tr')!
+    expect(within(alphaRow).queryByText(/Couldn't verify/)).not.toBeInTheDocument()
+    expect(within(alphaRow).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
   })
 })
