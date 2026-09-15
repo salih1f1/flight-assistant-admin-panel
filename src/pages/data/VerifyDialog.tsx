@@ -5,13 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getAdminGetBrowsableTableDataQueryKey } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
+import { cn } from '@/lib/utils'
 import { lookup, VERIFIERS } from './records'
 import { VerificationStatusBadge } from './VerificationStatus'
+import { SourceVerifyPanel } from './SourceVerifyPanel'
+import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
 
 type Row = Record<string, unknown>
 
 /** One dialog row's manual-verify result: in flight, verified, or a message to show inline. */
 type Outcome = { status: 'pending' } | { status: 'verified' } | { status: 'error'; message: string }
+
+/** The two ways this dialog can verify a row: by hand, or by queueing an outside source's check. */
+type Mode = 'manual' | 'sources'
 
 /**
  * Verifies a batch of already-selected rows by hand, one at a time or all at once.
@@ -40,6 +46,9 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   const [snapshot, setSnapshot] = useState<Row[]>(rows)
   const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
   const [runningAll, setRunningAll] = useState(false)
+  // Reset alongside snapshot/outcomes/runningAll on open, never on a plain mode switch: the toggle
+  // below changes this directly, and that must not touch any of the manual-verify session state.
+  const [mode, setMode] = useState<Mode>('manual')
   const generationRef = useRef(0)
 
   if (open !== wasOpen) {
@@ -48,8 +57,11 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       setSnapshot(rows)
       setOutcomes({})
       setRunningAll(false)
+      setMode('manual')
     }
   }
+
+  const entityType = lookup(VERIFICATION_ENTITY_TYPES, table)
 
   // Bumped whenever `open` changes, in either direction, in an effect rather than during the render
   // above: mutating a ref while rendering is unsafe (a render can be discarded or run twice), and
@@ -135,63 +147,93 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
           <DialogDescription>Verify rows by hand, one at a time or all at once.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-end">
-          <Button type="button" variant="outline" size="sm" disabled={runningAll || remaining === 0} onClick={() => void verifyAllShown()}>
-            Verify all shown
-          </Button>
-        </div>
+        {/* Only the three tables an outside source can check get a choice at all; the other five
+            keep the plain Manually list they've always had. Follows the Verified filter group's own
+            pressed-button pattern immediately below in the DOM. */}
+        {entityType && (
+          <div role="group" aria-label="Verify how" className="inline-flex w-fit overflow-hidden rounded-md border border-gray-200">
+            {(['manual', 'sources'] as const).map(option => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={mode === option}
+                onClick={() => setMode(option)}
+                className={cn('px-3 py-1.5 text-sm', mode === option ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+              >
+                {option === 'manual' ? 'Manually' : 'Against sources'}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Caps the dialog at 90% of the viewport and lets only this middle section scroll, so a
-            selection long enough to overflow the screen still keeps the title/Verify-all-shown
-            above and Close below on screen. jsdom can't lay this out, so it has no test — check in
-            a browser. */}
-        <div className="min-h-0 flex-1 overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map(name => <TableHead key={name}>{name}</TableHead>)}
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {snapshot.map(row => {
-                const key = String(row[keyColumn])
-                const outcome = outcomes[key]
-                const verified = isVerified(row)
-                // Only a row this dialog actually verified gets the manual stamp; a row that arrived
-                // already verified keeps its own VerificationSource so the badge doesn't misattribute it.
-                const displayRow = outcome?.status === 'verified' ? { ...row, IsVerified: true, VerificationSource: 'manual', VerificationIssue: null } : row
-                return (
-                  <TableRow key={key}>
-                    {columns.map(name => (
-                      <TableCell key={name}>
-                        {name === 'Status' ? <VerificationStatusBadge row={displayRow} /> : <CellValue value={row[name]} />}
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      {!verified && (
-                        <div className="space-y-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={runningAll || outcome?.status === 'pending'}
-                            onClick={() => void verifyOne(row)}
-                          >
-                            Verify
-                          </Button>
-                          {outcome?.status === 'error' && (
-                            <p className="text-xs text-red-600">{`Couldn't verify: ${outcome.message}`}</p>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
+        {mode === 'sources' && entityType ? (
+          // Same scroll cap as the Manually table below, so the header (title + mode toggle) and
+          // the footer's Close button stay on screen regardless of how many sources or how long the
+          // cost/queue text gets. jsdom can't lay this out, so it has no test — check in a browser.
+          <div className="min-h-0 flex-1 overflow-auto">
+            <SourceVerifyPanel entityType={entityType} keys={snapshot.map(row => String(row[keyColumn]))} />
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" size="sm" disabled={runningAll || remaining === 0} onClick={() => void verifyAllShown()}>
+                Verify all shown
+              </Button>
+            </div>
+
+            {/* Caps the dialog at 90% of the viewport and lets only this middle section scroll, so a
+                selection long enough to overflow the screen still keeps the title/Verify-all-shown
+                above and Close below on screen. jsdom can't lay this out, so it has no test — check in
+                a browser. */}
+            <div className="min-h-0 flex-1 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {columns.map(name => <TableHead key={name}>{name}</TableHead>)}
+                    <TableHead />
                   </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {snapshot.map(row => {
+                    const key = String(row[keyColumn])
+                    const outcome = outcomes[key]
+                    const verified = isVerified(row)
+                    // Only a row this dialog actually verified gets the manual stamp; a row that arrived
+                    // already verified keeps its own VerificationSource so the badge doesn't misattribute it.
+                    const displayRow = outcome?.status === 'verified' ? { ...row, IsVerified: true, VerificationSource: 'manual', VerificationIssue: null } : row
+                    return (
+                      <TableRow key={key}>
+                        {columns.map(name => (
+                          <TableCell key={name}>
+                            {name === 'Status' ? <VerificationStatusBadge row={displayRow} /> : <CellValue value={row[name]} />}
+                          </TableCell>
+                        ))}
+                        <TableCell>
+                          {!verified && (
+                            <div className="space-y-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={runningAll || outcome?.status === 'pending'}
+                                onClick={() => void verifyOne(row)}
+                              >
+                                Verify
+                              </Button>
+                              {outcome?.status === 'error' && (
+                                <p className="text-xs text-red-600">{`Couldn't verify: ${outcome.message}`}</p>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
