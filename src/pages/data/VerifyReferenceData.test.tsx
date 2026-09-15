@@ -20,10 +20,13 @@ const TABLES = [
 
 // Countries is verifiable but keyed by Code (CountryConfiguration: HasKey(x => x.Code)), so its
 // verify route is PATCH /admin/countries/{code}/verify — a string key, unlike the other 7 tables.
-type Country = { Code: string; Name: string; IsVerified: boolean; VerifiedAt: string | null; VerifiedBy: string | null }
+type Country = {
+  Code: string; Name: string; IsVerified: boolean; VerifiedAt: string | null; VerifiedBy: string | null
+  VerificationSource: string | null; VerificationIssue: string | null
+}
 const makeCountries = (): Country[] => [
-  { Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid' },
-  { Code: 'BG', Name: 'Bulgaria', IsVerified: false, VerifiedAt: null, VerifiedBy: null },
+  { Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid', VerificationSource: 'manual', VerificationIssue: null },
+  { Code: 'BG', Name: 'Bulgaria', IsVerified: false, VerifiedAt: null, VerifiedBy: null, VerificationSource: null, VerificationIssue: null },
 ]
 
 // Shaped like GET /admin/data/airlines rows (trimmed to a few columns): IsVerified, VerifiedAt,
@@ -70,6 +73,8 @@ function install() {
   }))
 }
 
+// Matches the real verify handler (spec §2.2/§4.4): manual verify stamps VerificationSource
+// 'manual' and clears VerificationIssue; unverify clears the source too.
 const defaultVerify = (req: SentRequest) => {
   const id = Number(req.url.split('/')[3])
   const { isVerified } = req.data as { isVerified: boolean }
@@ -77,7 +82,14 @@ const defaultVerify = (req: SentRequest) => {
   // Results.NotFound(): an empty body, not ProblemDetails.
   if (!row) throw httpError(404)
   airlines = airlines.map(a => (a.Id === id
-    ? { ...a, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null }
+    ? {
+      ...a,
+      IsVerified: isVerified,
+      VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null,
+      VerifiedBy: isVerified ? 'admin-oid' : null,
+      VerificationSource: isVerified ? 'manual' : null,
+      VerificationIssue: null,
+    }
     : a))
   return undefined
 }
@@ -88,7 +100,14 @@ const defaultVerifyCountry = (req: SentRequest) => {
   const row = countries.find(c => c.Code === code)
   if (!row) throw httpError(404)
   countries = countries.map(c => (c.Code === code
-    ? { ...c, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null }
+    ? {
+      ...c,
+      IsVerified: isVerified,
+      VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null,
+      VerifiedBy: isVerified ? 'admin-oid' : null,
+      VerificationSource: isVerified ? 'manual' : null,
+      VerificationIssue: null,
+    }
     : c))
   return undefined
 }
@@ -112,6 +131,14 @@ function renderAt(entry: string) {
 
 const rowOf = async (name: string) => (await screen.findByText(name)).closest('tr')!
 const verifies = () => sent.filter(r => r.method === 'PATCH')
+
+/** The IsVerified column's position among the grid's headers, so a cell can be picked out by index. */
+const isVerifiedColumnIndex = () => within(screen.getByRole('table'))
+  .getAllByRole('columnheader')
+  .findIndex(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim() === 'IsVerified')
+
+/** The IsVerified cell of one row, not the whole row: scopes a badge assertion to the column it renders in. */
+const isVerifiedCell = async (rowName: string) => within(await rowOf(rowName)).getAllByRole('cell')[isVerifiedColumnIndex()]
 
 describe('DataBrowserPage verify', () => {
   beforeEach(() => {
@@ -260,10 +287,11 @@ describe('DataBrowserPage verify', () => {
 
   it('shows a status badge for each verification state in the IsVerified cell', async () => {
     renderAt('/data/airlines')
+    await rowOf('Alpha Air')
 
-    expect(await rowOf('Alpha Air')).toHaveTextContent('Verified · manual')
-    expect(await rowOf('Beta Air')).toHaveTextContent('Unverified')
-    expect(await rowOf('Gamma Air')).toHaveTextContent('Needs attention')
+    expect(await isVerifiedCell('Alpha Air')).toHaveTextContent('Verified · manual')
+    expect(await isVerifiedCell('Beta Air')).toHaveTextContent('Unverified')
+    expect(await isVerifiedCell('Gamma Air')).toHaveTextContent('Needs attention')
   })
 
   it("renders a non-verifiable table's IsVerified-shaped column as plain text, never a badge", async () => {

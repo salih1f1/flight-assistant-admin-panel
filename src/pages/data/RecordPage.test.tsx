@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -85,7 +85,11 @@ function api(req: SentRequest) {
   }
   if (req.method === 'PATCH' && req.url === `/admin/airlines/${airlineId}/verify` && airline) {
     const { isVerified } = req.data as { isVerified: boolean }
-    airlines = airlines.map(a => (a === airline ? { ...a, IsVerified: isVerified } : a))
+    // Matches the real verify handler (spec §2.2/§4.4): manual verify stamps VerificationSource
+    // 'manual' and clears VerificationIssue; unverify clears the source too.
+    airlines = airlines.map(a => (a === airline
+      ? { ...a, IsVerified: isVerified, VerificationSource: isVerified ? 'manual' : null, VerificationIssue: null }
+      : a))
     return undefined
   }
   if (req.method === 'GET' && req.url === '/admin/airports/11') {
@@ -96,7 +100,11 @@ function api(req: SentRequest) {
   if (req.method === 'PATCH' && countryCode) {
     if (!country) throw httpError(404)
     const { isVerified } = req.data as { isVerified: boolean }
-    countries = countries.map(c => (c === country ? { ...c, IsVerified: isVerified } : c))
+    // Matches the real verify handler (spec §2.2/§4.4): manual verify stamps VerificationSource
+    // 'manual' and clears VerificationIssue; unverify clears the source too.
+    countries = countries.map(c => (c === country
+      ? { ...c, IsVerified: isVerified, VerificationSource: isVerified ? 'manual' : null, VerificationIssue: null }
+      : c))
     return undefined
   }
   throw httpError(404)
@@ -127,6 +135,8 @@ const dataRequests = (table: string) => sent.filter(r => r.method === 'GET' && r
 /** The value shown for a field: the <dd> after its <dt>. */
 const field = (name: string) => screen.getByText(name, { selector: 'dt' }).nextElementSibling as HTMLElement
 const heading = (name: string) => screen.findByRole('heading', { level: 1, name })
+/** The h1's wrapping div, which also holds the status badge: scopes badge assertions to the header, not the whole screen. */
+const headerArea = async (name: string) => (await heading(name)).parentElement as HTMLElement
 
 describe('RecordPage', () => {
   beforeEach(() => {
@@ -197,24 +207,28 @@ describe('RecordPage', () => {
     expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/airlines/8/verify', data: { isVerified: true } }))
   })
 
-  it('verifies a country record by its code, not a numeric id', async () => {
+  it('verifies a country record by its code, not a numeric id, updating the header badge from refreshed data', async () => {
     const user = userEvent.setup()
     renderAt('/data/countries/DE')
     await heading('Germany')
     expect(field('IsVerified')).toHaveTextContent('No')
+    expect(within(await headerArea('Germany')).getByText('Needs attention')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Verify' }))
 
     expect(await screen.findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(field('IsVerified')).toHaveTextContent('Yes')
+    // The badge reads the refetched row, not the one it first rendered with.
+    expect(within(await headerArea('Germany')).getByText('Verified · manual')).toBeInTheDocument()
+    expect(within(await headerArea('Germany')).queryByText('Needs attention')).not.toBeInTheDocument()
     expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/countries/DE/verify', data: { isVerified: true } }))
   })
 
   it('shows the verification status badge in the header', async () => {
     renderAt('/data/countries/DE')
+    await heading('Germany')
 
-    expect(await heading('Germany')).toBeInTheDocument()
-    expect(screen.getByText('Needs attention')).toBeInTheDocument()
+    expect(within(await headerArea('Germany')).getByText('Needs attention')).toBeInTheDocument()
   })
 
   it('shows VerificationSource and VerificationIssue as record fields, hidden or not in the grid', async () => {

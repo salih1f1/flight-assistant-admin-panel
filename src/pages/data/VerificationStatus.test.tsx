@@ -14,12 +14,17 @@ describe('VerificationStatusBadge', () => {
   it('carries no title or hidden text for Verified, which has no issue', () => {
     render(<VerificationStatusBadge row={{ IsVerified: true, VerificationSource: 'manual' }} />)
 
-    expect(screen.getByText('Verified · manual')).not.toHaveAttribute('title')
+    const badge = screen.getByText('Verified · manual')
+    expect(badge).not.toHaveAttribute('title')
+    // Exact, not substring: proves there's no hidden ": {issue}" suffix riding along.
+    expect(badge).toHaveTextContent(/^Verified · manual$/)
   })
 
   it('carries no title or hidden text for Unverified, which has no issue', () => {
     render(<VerificationStatusBadge row={{ IsVerified: false }} />)
 
-    expect(screen.getByText('Unverified')).not.toHaveAttribute('title')
+    const badge = screen.getByText('Unverified')
+    expect(badge).not.toHaveAttribute('title')
+    expect(badge).toHaveTextContent(/^Unverified$/)
   })
 })

@@ -18,10 +18,10 @@ export const lookup = <T>(map: Record<string, T>, key: string): T | undefined =>
 export const MASKED = '<redacted>'
 
 /**
- * The reference data tables that can be verified: PATCH /admin/{slug}/{id}/verify exists for
- * exactly these slugs, and their data browser rows carry IsVerified, VerifiedAt, VerifiedBy,
- * VerificationSource and VerificationIssue. The typed admin DTOs have no verified state, which is
- * why verifying lives with the raw data.
+ * The reference data tables that can be verified: PATCH /admin/{slug}/{key}/verify exists for
+ * exactly these slugs (key is Id for 7 of them, Code for countries), and their data browser rows
+ * carry IsVerified, VerifiedAt, VerifiedBy, VerificationSource and VerificationIssue. The typed
+ * admin DTOs have no verified state, which is why verifying lives with the raw data.
  *
  * Keyed by the record's key as a string (recordKey(table)'s column, e.g. Id or countries' Code):
  * the 7 numeric-id tables convert it with Number(...) themselves, since the route takes {id:int};

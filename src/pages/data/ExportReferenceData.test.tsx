@@ -26,7 +26,12 @@ let revoked: string[]
 function install() {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/data/tables') return TABLES
-    if (req.method === 'GET' && req.url === '/admin/data/countries') return pagedResult([{ Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: null, VerifiedBy: null }], req.params)
+    if (req.method === 'GET' && req.url === '/admin/data/countries') {
+      return pagedResult(
+        [{ Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: null, VerifiedBy: null, VerificationSource: 'manual', VerificationIssue: null }],
+        req.params,
+      )
+    }
     if (req.method === 'GET' && req.url === '/admin/data/flight-statuses') return pagedResult([{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null }], req.params)
     // Results.File(..., "text/csv", "countries-export.csv"); axios hands a blob request a Blob.
     if (req.method === 'GET' && req.url === '/admin/export/countries') return exportAnswer()

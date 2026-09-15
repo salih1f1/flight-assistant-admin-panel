@@ -1,10 +1,13 @@
-import type { BadgeProps } from '@/components/ui/badge'
-
 type Row = Record<string, unknown>
 
 export type VerificationState = {
   label: string
-  variant: NonNullable<BadgeProps['variant']>
+  /**
+   * Tailwind classes for the tinted status pill, following the panel's existing status-pill
+   * convention (TestsPage.tsx's RESULT_TONES: bg-{color}-100 text-{color}-800, no hover change
+   * since the pill isn't interactive) rather than Badge's solid default/destructive variants.
+   */
+  tone: string
   /** Set only for 'Needs attention': the issue text, shown on hover and to assistive tech. */
   issue?: string
 }
@@ -26,9 +29,10 @@ const text = (value: unknown): string | undefined => {
 export function verificationState(row: Row): VerificationState {
   if (row.IsVerified === true) {
     const source = text(row.VerificationSource)
-    return { label: source ? `Verified · ${source}` : 'Verified', variant: 'default' }
+    return { label: source ? `Verified · ${source}` : 'Verified', tone: 'border-transparent bg-green-100 text-green-800' }
   }
   const issue = text(row.VerificationIssue)
-  if (issue) return { label: 'Needs attention', variant: 'destructive', issue }
-  return { label: 'Unverified', variant: 'secondary' }
+  // Amber, not red: an unverified row with a known issue is a warning to review, not a failure.
+  if (issue) return { label: 'Needs attention', tone: 'border-transparent bg-amber-100 text-amber-800', issue }
+  return { label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' }
 }

@@ -15,9 +15,9 @@ vi.mock('@/api/client', () => ({
 // PascalCase property names. Kind 1 is deliberately not the kind under test, so
 // a form that falls back to kindId 1 cannot pass by accident.
 const KINDS = [
-  { Id: 1, Code: 'AIRLINE', Name: 'Airline', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null },
-  { Id: 2, Code: 'ALLIANCE', Name: 'Alliance', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null },
-  { Id: 3, Code: 'HOTEL', Name: 'Hotel', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null },
+  { Id: 1, Code: 'AIRLINE', Name: 'Airline', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null, VerificationSource: 'manual', VerificationIssue: null },
+  { Id: 2, Code: 'ALLIANCE', Name: 'Alliance', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null, VerificationSource: 'manual', VerificationIssue: null },
+  { Id: 3, Code: 'HOTEL', Name: 'Hotel', Description: null, IsVerified: true, VerifiedAt: null, VerifiedBy: null, VerificationSource: 'manual', VerificationIssue: null },
 ]
 
 const KIND_OVERRIDES: Record<number, string> = { 3: 'ALLIANCE', 7: 'RETIRED', 250: 'HOTEL' }
