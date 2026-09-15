@@ -20,7 +20,8 @@ type Outcome = { status: 'pending' } | { status: 'verified' } | { status: 'error
 type Mode = 'manual' | 'sources'
 
 /**
- * Verifies a batch of already-selected rows by hand, one at a time or all at once.
+ * Verifies a batch of already-selected rows, either by hand (one row at a time or all shown at
+ * once) or by queueing an outside source's automated check against them.
  *
  * `rows` is copied into `snapshot` the moment the dialog opens, via the "adjust state while
  * rendering" pattern (comparing `open` against the previous render's value) rather than an effect,
@@ -31,6 +32,12 @@ type Mode = 'manual' | 'sources'
  * so that closing mid-run — including a close forced by the caller, e.g. on navigation — and a
  * possible later reopen with a different selection can neither send a further request nor let a
  * stale write land in what's now showing.
+ *
+ * The sources side keeps its checked sources (`sourceSelection`) and its successful queue receipt
+ * (`sourceQueueResult`) here too, for the same reason: `SourceVerifyPanel` unmounts on every mode
+ * switch away from "Against sources" (sources and usage must only be fetched while that panel is
+ * actually shown), so anything that has to survive a round trip back to it — what was checked, and
+ * whether Start already succeeded — can't live in the panel's own state.
  */
 export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manualColumns }: {
   open: boolean
@@ -49,6 +56,10 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // Reset alongside snapshot/outcomes/runningAll on open, never on a plain mode switch: the toggle
   // below changes this directly, and that must not touch any of the manual-verify session state.
   const [mode, setMode] = useState<Mode>('manual')
+  // The sources side's own session state — see the class-level comment on why it lives here rather
+  // than in SourceVerifyPanel.
+  const [sourceSelection, setSourceSelection] = useState<Set<string>>(new Set())
+  const [sourceQueueResult, setSourceQueueResult] = useState<{ queued: number; skipped: number } | null>(null)
   const generationRef = useRef(0)
 
   if (open !== wasOpen) {
@@ -58,8 +69,17 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       setOutcomes({})
       setRunningAll(false)
       setMode('manual')
+      setSourceSelection(new Set())
+      setSourceQueueResult(null)
     }
   }
+
+  const toggleSource = (name: string) => setSourceSelection(prev => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    return next
+  })
 
   const entityType = lookup(VERIFICATION_ENTITY_TYPES, table)
 
@@ -99,7 +119,11 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // from its own button or from a bulk run, and Verify all shown must not send it a second one.
   const remaining = snapshot.filter(row => !isVerified(row) && !isPending(row)).length
 
-  async function verifyOne(row: Row) {
+  // `invalidate` defaults to true for the per-row button's own direct call. verifyAllShown passes
+  // false and invalidates once itself after the whole run, so a bulk run over N rows triggers one
+  // grid refetch instead of up to N interleaved ones (each discarding the last, since the grid query
+  // behind the dialog is an active observer and refetches on every invalidation).
+  async function verifyOne(row: Row, { invalidate = true }: { invalidate?: boolean } = {}) {
     const generation = generationRef.current
     const key = String(row[keyColumn])
     // Only applies the outcome while it's still this same open dialog session — see the
@@ -115,7 +139,7 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       applyOutcome({ status: 'verified' })
       // The row really did change server-side, so the grid should refresh regardless of whether
       // this dialog is still open, or has since been closed (or closed and reopened).
-      void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
+      if (invalidate) void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
     } catch (error) {
       // Matches the grid's own verify: the API answers a missing row with an empty 404.
       const status = (error as { response?: { status?: number } } | null)?.response?.status
@@ -128,14 +152,18 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // and continues past a failure (verifyOne catches its own error rather than throwing). Re-checks
   // the generation before every row so closing the dialog lets the in-flight request finish — its
   // own outcome write is what the generation check inside verifyOne guards — but starts no more.
+  // Each row skips its own invalidation and the whole run invalidates once at the end instead, run
+  // or not the loop completed in full: whatever rows did succeed before a break really did change
+  // server-side, the same as the per-row path, just refreshed as one refetch instead of several.
   async function verifyAllShown() {
     const generation = generationRef.current
     setRunningAll(true)
     for (const row of snapshot) {
       if (generationRef.current !== generation) break
       if (isVerified(row) || isPending(row)) continue
-      await verifyOne(row)
+      await verifyOne(row, { invalidate: false })
     }
+    void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
     if (generationRef.current === generation) setRunningAll(false)
   }
 
@@ -144,7 +172,9 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col">
         <DialogHeader>
           <DialogTitle>{`Verify ${snapshot.length} selected ${snapshot.length === 1 ? 'row' : 'rows'}`}</DialogTitle>
-          <DialogDescription>Verify rows by hand, one at a time or all at once.</DialogDescription>
+          <DialogDescription>
+            {mode === 'sources' ? 'Queue an outside source to check these rows.' : 'Verify rows by hand, one at a time or all at once.'}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Only the three tables an outside source can check get a choice at all; the other five
@@ -171,7 +201,14 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
           // the footer's Close button stay on screen regardless of how many sources or how long the
           // cost/queue text gets. jsdom can't lay this out, so it has no test — check in a browser.
           <div className="min-h-0 flex-1 overflow-auto">
-            <SourceVerifyPanel entityType={entityType} keys={snapshot.map(row => String(row[keyColumn]))} />
+            <SourceVerifyPanel
+              entityType={entityType}
+              keys={snapshot.map(row => String(row[keyColumn]))}
+              checked={sourceSelection}
+              onToggleSource={toggleSource}
+              queueResult={sourceQueueResult}
+              onQueued={setSourceQueueResult}
+            />
           </div>
         ) : (
           <>

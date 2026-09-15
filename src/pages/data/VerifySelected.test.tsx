@@ -308,6 +308,32 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(within(bravoRow).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
   })
 
+  it('a Verify all shown run over 3 rows refetches the grid once, not once per verified row', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+
+    // Wait for the run to actually finish (the last row's badge) before counting requests, so a
+    // slow-but-eventually-correct implementation can't pass on a premature read.
+    const charlieRow = (await within(dialog).findByText('Charlie Airport')).closest('tr')!
+    await within(charlieRow).findByText('Verified · manual')
+    expect(patches()).toHaveLength(3)
+
+    // Give any invalidation-triggered refetch a moment to actually land before counting it, so a
+    // per-row invalidation that just hasn't resolved yet can't pass as "one".
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const firstPatchIndex = sent.findIndex(r => r.method === 'PATCH')
+    const gridGetsDuringRun = sent.slice(firstPatchIndex).filter(r => r.method === 'GET' && r.url === '/admin/data/airports')
+    expect(gridGetsDuringRun).toHaveLength(1)
+  })
+
   it("8. Verify all shown continues past a failed row, and shows the API's title", async () => {
     airportVerifyAnswer = req => {
       const id = Number(req.url.split('/')[3])

@@ -39,8 +39,15 @@ const makeCountries = (): Country[] => [
 type Alliance = { Id: number; Code: string; Name: string; IsVerified: boolean; VerificationSource: string | null; VerificationIssue: string | null }
 const makeAlliances = (): Alliance[] => [{ Id: 1, Code: 'SA', Name: 'Star Alliance', IsVerified: false, VerificationSource: null, VerificationIssue: null }]
 
-// The brief's fixture: aeroapi costs $0.015/row, ourairports is free.
-const FAKE_SOURCES = [{ name: 'aeroapi', costPerRowUsd: 0.015 }, { name: 'ourairports', costPerRowUsd: 0 }]
+// The brief's fixture (aeroapi costs $0.015/row, ourairports is free), plus a third source with its
+// own distinct non-zero cost: with only two sources and one of them free, "sum of checked", "max of
+// checked" and "last checked" all happen to produce the same total, so they can't be told apart. The
+// third cost breaks that coincidence.
+const FAKE_SOURCES = [
+  { name: 'aeroapi', costPerRowUsd: 0.015 },
+  { name: 'oag', costPerRowUsd: 0.02 },
+  { name: 'ourairports', costPerRowUsd: 0 },
+]
 const FAKE_USAGE = { totalCostUsd: 2.1, monthlyBudgetUsd: 5 }
 
 let airports: Airport[]
@@ -153,6 +160,22 @@ describe('VerifyDialog: against sources', () => {
     expect(within(dialog).getByRole('button', { name: 'Start' })).toBeDisabled()
   })
 
+  it('a failed sources fetch shows an alert, not the empty-sources message', async () => {
+    sourcesAnswer = () => {
+      throw httpError(500, { title: 'Something went wrong' })
+    }
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Airport 1')
+
+    const dialog = await selectAllAndOpenDialog(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Against sources' }))
+
+    expect(await within(dialog).findByText('Could not load sources: Something went wrong')).toBeInTheDocument()
+    expect(within(dialog).queryByText('No outside source can check these rows yet.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
   it('3. the cost line reflects the checked sources', async () => {
     const user = userEvent.setup()
     renderAt('/data/airports')
@@ -164,13 +187,16 @@ describe('VerifyDialog: against sources', () => {
 
     // Checked in this order (the free source first) so that a "use the first checked source's
     // cost" bug — reading whichever source was checked first rather than summing every checked
-    // source — would show $0.00 here instead of the correct $0.18.
+    // source — would show $0.00 here instead of the correct total. All three checked: sum =
+    // 0.015 + 0 + 0.02 = 0.035; a "max of checked" or "last checked" bug would show $0.02 instead.
     await user.click(within(dialog).getByRole('checkbox', { name: 'ourairports' }))
     await user.click(within(dialog).getByRole('checkbox', { name: 'aeroapi' }))
-    expect(await within(dialog).findByText('12 × $0.015 = $0.18 · this month $2.10 of $5.00')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('checkbox', { name: 'oag' }))
+    expect(await within(dialog).findByText('12 × $0.035 = $0.42 · this month $2.10 of $5.00')).toBeInTheDocument()
 
+    // Unchecking aeroapi leaves ourairports (0) and oag (0.02) checked: sum = 0.02.
     await user.click(within(dialog).getByRole('checkbox', { name: 'aeroapi' }))
-    expect(await within(dialog).findByText('12 × $0.00 = $0.00 · this month $2.10 of $5.00')).toBeInTheDocument()
+    expect(await within(dialog).findByText('12 × $0.02 = $0.24 · this month $2.10 of $5.00')).toBeInTheDocument()
   })
 
   it('4. a failed usage fetch drops the month part with no alert', async () => {
@@ -269,7 +295,7 @@ describe('VerifyDialog: against sources', () => {
     expect(posts()[0].data).toMatchObject({ entityType: 'Country', keys: ['DE', 'BG'] })
   })
 
-  it('switching mode does not disturb a Manually outcome', async () => {
+  it('switching mode does not disturb a Manually outcome, or a checked source', async () => {
     const user = userEvent.setup()
     renderAt('/data/airports')
     await screen.findByText('Airport 1')
@@ -287,10 +313,30 @@ describe('VerifyDialog: against sources', () => {
     expect(within(row1Again).getByText('Verified · manual')).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Against sources' }))
-    // The sources panel remounts on returning (it holds no state of its own worth preserving across
-    // a switch), so re-select before asserting the cost line rather than expecting the old check to
-    // have survived.
-    await user.click(await within(dialog).findByRole('checkbox', { name: 'aeroapi' }))
+    // The sources panel itself remounts on every mode switch (sources/usage are only fetched while
+    // it's shown), but the checked set lives in VerifyDialog's own session state, so it survives the
+    // round trip without needing to re-check anything.
+    expect(await within(dialog).findByRole('checkbox', { name: 'aeroapi' })).toBeChecked()
     expect(await within(dialog).findByText('12 × $0.015 = $0.18 · this month $2.10 of $5.00')).toBeInTheDocument()
+  })
+
+  it('a mode round trip after a successful queue keeps the receipt and the disabled, checked sources', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Airport 1')
+
+    const dialog = await selectAllAndOpenDialog(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Against sources' }))
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'aeroapi' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Start' }))
+    await within(dialog).findByText('Queued 11 · skipped 1')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Manually' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Against sources' }))
+
+    expect(await within(dialog).findByText('Queued 11 · skipped 1')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Start' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('checkbox', { name: 'aeroapi' })).toBeChecked()
+    expect(within(dialog).getByRole('checkbox', { name: 'aeroapi' })).toBeDisabled()
   })
 })
