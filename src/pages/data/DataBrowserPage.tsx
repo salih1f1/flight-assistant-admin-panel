@@ -240,6 +240,17 @@ export function DataBrowserPage() {
   const selection = useRowSelection(items, keyColumn, viewKey)
   const selectedRows = selection.selectedRows
 
+  // Closes on the same view change (table, page, sort or filter) that drops the selection: otherwise
+  // Back could leave the dialog open against a different table's rows and key column, or leave a
+  // running Verify all shown still sending requests for a view the admin has already left.
+  // VerifyDialog's own effect (keyed on its `open` prop) is what actually stops an in-flight run once
+  // this closes it.
+  const [dialogView, setDialogView] = useState(viewKey)
+  if (viewKey !== dialogView) {
+    setDialogView(viewKey)
+    setVerifyDialogOpen(false)
+  }
+
   const toggleSort = useCallback(
     (column: string) => updateView({ sort: sort === column ? `-${column}` : sort === `-${column}` ? undefined : column }),
     [sort, updateView],

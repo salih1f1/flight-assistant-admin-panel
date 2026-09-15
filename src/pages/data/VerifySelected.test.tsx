@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -151,21 +151,18 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
 
     expect(screen.getByRole('button', { name: 'Verify selected (2)' })).toBeEnabled()
-    // Re-queried before each read/click rather than cached: TanStack Table's flexRender treats an
-    // inline header/cell function as a component, so DataBrowserPage's un-memoized `columns` (like
-    // its existing verify/actions columns) hands back a fresh checkbox element every render.
-    const headerCheckbox = () => screen.getByRole('checkbox', { name: 'Select all rows on this page' }) as HTMLInputElement
-    expect(headerCheckbox().checked).toBe(false)
-    expect(headerCheckbox().indeterminate).toBe(true)
+    const headerCheckbox = screen.getByRole('checkbox', { name: 'Select all rows on this page' }) as HTMLInputElement
+    expect(headerCheckbox.checked).toBe(false)
+    expect(headerCheckbox.indeterminate).toBe(true)
 
-    await user.click(headerCheckbox())
+    await user.click(headerCheckbox)
     expect(screen.getByRole('button', { name: 'Verify selected (3)' })).toBeInTheDocument()
-    expect(headerCheckbox().checked).toBe(true)
-    expect(headerCheckbox().indeterminate).toBe(false)
+    expect(headerCheckbox.checked).toBe(true)
+    expect(headerCheckbox.indeterminate).toBe(false)
 
-    await user.click(headerCheckbox())
+    await user.click(headerCheckbox)
     expect(screen.getByRole('button', { name: 'Verify selected (0)' })).toBeInTheDocument()
-    expect(headerCheckbox().checked).toBe(false)
+    expect(headerCheckbox.checked).toBe(false)
   })
 
   it('3. the selection drops on a filter or sort change, and does not come back', async () => {
@@ -427,7 +424,7 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(screen.getByRole('button', { name: 'Verify selected (0)' })).toBeInTheDocument()
   })
 
-  it('R2: a row with no value in the key column has no checkbox', async () => {
+  it('a row with no value in the key column has no checkbox', async () => {
     airports = [...airports, { ...airports[0], Id: null as unknown as number, Iata: 'ZZZ', Name: 'No-Id Airport' }]
     renderAt('/data/airports')
     await screen.findByText('Alpha Airport')
@@ -438,7 +435,7 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(screen.getAllByRole('checkbox', { name: /^Select row / })).toHaveLength(3)
   })
 
-  it('R10: closing the dialog keeps the selection', async () => {
+  it('closing the dialog keeps the selection', async () => {
     const user = userEvent.setup()
     renderAt('/data/airports')
     await screen.findByText('Alpha Airport')
@@ -482,7 +479,7 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await waitFor(() => expect(patches()).toHaveLength(3))
   })
 
-  it("M1: Verify all shown does not send a second PATCH for a row whose own per-row Verify is still in flight", async () => {
+  it("Verify all shown does not send a second PATCH for a row whose own per-row Verify is still in flight", async () => {
     let release!: () => void
     const gate = new Promise<void>(resolve => {
       release = resolve
@@ -515,7 +512,7 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(patches()).toHaveLength(3)
   })
 
-  it("M2: closing the dialog mid-run stops further requests, and a stopped run's outcome does not leak into a reopened dialog", async () => {
+  it("closing the dialog mid-run stops further requests, and a stopped run's outcome does not leak into a reopened dialog", async () => {
     let release!: () => void
     const gate = new Promise<void>(resolve => {
       release = resolve
@@ -541,17 +538,60 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
-    release()
-    // Give the released (and failing) request's microtasks a chance to run before checking that it
-    // didn't trigger a further one.
-    await new Promise(resolve => setTimeout(resolve, 10))
-    expect(patches()).toHaveLength(1)
-
+    // Reopen — with the held request still unsettled — before releasing it. Reopening resets the
+    // dialog's outcomes on its own, so releasing before this point would leave a missing generation
+    // guard undetected: the outcomes would already be empty either way. This is the case the guard
+    // actually exists for: a write that arrives *after* the reset, landing back on top of it.
     await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
     const reopened = await screen.findByRole('dialog')
     expect(within(reopened).getByRole('button', { name: 'Verify all shown' })).toBeEnabled()
+
+    release()
+    // Give the released (and failing) request's microtasks a chance to run before checking that its
+    // outcome never reached the reopened dialog, and that it triggered no further request.
+    await new Promise(resolve => setTimeout(resolve, 10))
+
     const alphaRow = (await within(reopened).findByText('Alpha Airport')).closest('tr')!
     expect(within(alphaRow).queryByText(/Couldn't verify/)).not.toBeInTheDocument()
     expect(within(alphaRow).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
+    expect(patches()).toHaveLength(1)
+  })
+
+  it('the dialog closes and a running Verify all shown stops when the view changes, e.g. Back', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    airportVerifyAnswer = async req => {
+      if (Number(req.url.split('/')[3]) === 1) await gate
+      return defaultAirportVerify(req)
+    }
+    const user = userEvent.setup()
+    const router = renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+    await waitFor(() => expect(patches()).toHaveLength(1))
+
+    // Stands in for Back: the same route element re-renders with a different :table param, with no
+    // remount.
+    await act(() => router.navigate('/data/countries'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    release()
+    // Give the released request's microtasks a chance to run before checking it triggered no further one.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(patches()).toHaveLength(1)
+
+    await screen.findByText('Germany')
+    await user.click(screen.getByRole('checkbox', { name: 'Select row DE' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    const reopened = await screen.findByRole('dialog')
+    expect(within(reopened).getByText('Germany')).toBeInTheDocument()
+    expect(within(reopened).queryByText(/Airport/)).not.toBeInTheDocument()
   })
 })

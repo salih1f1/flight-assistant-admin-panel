@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -14,17 +14,16 @@ type Row = Record<string, unknown>
 type Outcome = { status: 'pending' } | { status: 'verified' } | { status: 'error'; message: string }
 
 /**
- * Verifies a batch of already-selected rows. Today this only offers the Manually path below; a
- * separate, not-yet-built mode toggle will let the same dialog check rows against outside sources
- * instead.
+ * Verifies a batch of already-selected rows by hand, one at a time or all at once.
  *
  * `rows` is copied into `snapshot` the moment the dialog opens, via the "adjust state while
  * rendering" pattern (comparing `open` against the previous render's value) rather than an effect,
  * so a grid refetch behind the dialog can never add, remove or reorder what's shown here. Each row's
  * outcome — verified, or a per-row error — lives in `outcomes`, keyed by its key-column value, owned
  * by this component rather than derived from the snapshot so it survives whatever else gets added
- * around it later. `generationRef` counts open/close transitions so that closing mid-run — and a
- * possible later reopen with a different selection — can neither send a further request nor let a
+ * around it later. `generationRef` counts open/close transitions (bumped in an effect — see below)
+ * so that closing mid-run — including a close forced by the caller, e.g. on navigation — and a
+ * possible later reopen with a different selection can neither send a further request nor let a
  * stale write land in what's now showing.
  */
 export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manualColumns }: {
@@ -45,13 +44,26 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
 
   if (open !== wasOpen) {
     setWasOpen(open)
-    generationRef.current += 1
     if (open) {
       setSnapshot(rows)
       setOutcomes({})
       setRunningAll(false)
     }
   }
+
+  // Bumped whenever `open` changes, in either direction, in an effect rather than during the render
+  // above: mutating a ref while rendering is unsafe (a render can be discarded or run twice), and
+  // React's docs name effects as the escape hatch for exactly this — an imperative marker with no
+  // rendered output. Effects always flush before any later user-triggered event, including a click
+  // inside this same dialog, so verifyOne/verifyAllShown (only ever called from such a click) always
+  // read a ref that's already current for the render that's actually on screen — this key change is
+  // never observed mid-flight by code running inside the same render pass it happened in. `open`
+  // becoming false covers a caller-forced close (e.g. DataBrowserPage closing this dialog on a view
+  // change) the same way it covers this dialog's own Close button, Escape or an overlay click, since
+  // all of those already reach this component only via the `open` prop changing.
+  useEffect(() => {
+    generationRef.current += 1
+  }, [open])
 
   // The key column first, then the checked/default-visible columns DataBrowserPage computed, then
   // Status. manualColumns already contains the key column for a table whose checks include it
