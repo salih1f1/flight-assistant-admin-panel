@@ -18,25 +18,35 @@ const TABLES = [
   { slug: 'flight-statuses', displayName: 'Flight Statuses', rowCount: 1 },
 ]
 
-// Countries is verifiable but keyed by Code (CountryConfiguration: HasKey(x => x.Code)) and has
-// no Id column, while PATCH /admin/countries/{id:int}/verify only takes a number.
-const COUNTRIES = [
-  { Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid' },
-  { Code: 'BG', Name: 'Bulgaria', IsVerified: false, VerifiedAt: null, VerifiedBy: null },
+// Countries is verifiable but keyed by Code (CountryConfiguration: HasKey(x => x.Code)), so its
+// verify route is PATCH /admin/countries/{code}/verify — a string key, unlike the other 7 tables.
+type Country = {
+  Code: string; Name: string; IsVerified: boolean; VerifiedAt: string | null; VerifiedBy: string | null
+  VerificationSource: string | null; VerificationIssue: string | null
+}
+const makeCountries = (): Country[] => [
+  { Code: 'DE', Name: 'Germany', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid', VerificationSource: 'manual', VerificationIssue: null },
+  { Code: 'BG', Name: 'Bulgaria', IsVerified: false, VerifiedAt: null, VerifiedBy: null, VerificationSource: null, VerificationIssue: null },
 ]
 
-// Shaped like GET /admin/data/airlines rows (trimmed to a few columns): IsVerified,
-// VerifiedAt and VerifiedBy as the registry exposes them; unverified rows have both null.
-type Airline = { Id: number; Name: string; IsVerified: boolean; VerifiedAt: string | null; VerifiedBy: string | null }
+// Shaped like GET /admin/data/airlines rows (trimmed to a few columns): IsVerified, VerifiedAt,
+// VerifiedBy, VerificationSource and VerificationIssue as the registry exposes them. Alpha is
+// verified with a source, Beta is plainly unverified, Gamma is unverified with an issue.
+type Airline = {
+  Id: number; Name: string; IsVerified: boolean; VerifiedAt: string | null; VerifiedBy: string | null
+  VerificationSource: string | null; VerificationIssue: string | null
+}
 const makeAirlines = (): Airline[] => [
-  { Id: 1, Name: 'Alpha Air', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid' },
-  { Id: 2, Name: 'Beta Air', IsVerified: false, VerifiedAt: null, VerifiedBy: null },
-  { Id: 3, Name: 'Gamma Air', IsVerified: false, VerifiedAt: null, VerifiedBy: null },
+  { Id: 1, Name: 'Alpha Air', IsVerified: true, VerifiedAt: '2026-09-01T10:00:00Z', VerifiedBy: 'admin-oid', VerificationSource: 'manual', VerificationIssue: null },
+  { Id: 2, Name: 'Beta Air', IsVerified: false, VerifiedAt: null, VerifiedBy: null, VerificationSource: null, VerificationIssue: null },
+  { Id: 3, Name: 'Gamma Air', IsVerified: false, VerifiedAt: null, VerifiedBy: null, VerificationSource: null, VerificationIssue: 'AeroAPI: duplicate IATA code' },
 ]
 
 let airlines: Airline[]
+let countries: Country[]
 let sent: SentRequest[]
 let verifyAnswer: (req: SentRequest) => unknown
+let verifyCountryAnswer: (req: SentRequest) => unknown
 
 /** Reads like the data browser (IsVerified is a bool column, so the filter is an exact match); verify writes like VerifyEntityCommand. */
 function install() {
@@ -49,15 +59,22 @@ function install() {
     }
     if (req.method === 'GET' && req.url === '/admin/data/countries') {
       const filter = req.params?.filter as string | undefined
-      const rows = filter?.startsWith('IsVerified:') ? COUNTRIES.filter(c => String(c.IsVerified) === filter.slice('IsVerified:'.length)) : COUNTRIES
+      const rows = filter?.startsWith('IsVerified:') ? countries.filter(c => String(c.IsVerified) === filter.slice('IsVerified:'.length)) : countries
       return pagedResult(rows, req.params)
     }
-    if (req.method === 'GET' && req.url === '/admin/data/flight-statuses') return pagedResult([{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null }], req.params)
+    // flight-statuses is not verifiable, but carries an IsVerified-shaped field to prove the grid
+    // never mistakes a column name for verifiability: only a table with a verifier gets the badge.
+    if (req.method === 'GET' && req.url === '/admin/data/flight-statuses') {
+      return pagedResult([{ Id: 1, Code: 'SCH', Name: 'Scheduled', Description: null, IsVerified: true }], req.params)
+    }
     if (req.method === 'PATCH' && /^\/admin\/airlines\/\d+\/verify$/.test(req.url)) return verifyAnswer(req)
+    if (req.method === 'PATCH' && /^\/admin\/countries\/[A-Za-z]+\/verify$/.test(req.url)) return verifyCountryAnswer(req)
     throw httpError(404)
   }))
 }
 
+// Matches the real verify handler (spec §2.2/§4.4): manual verify stamps VerificationSource
+// 'manual' and clears VerificationIssue; unverify clears the source too.
 const defaultVerify = (req: SentRequest) => {
   const id = Number(req.url.split('/')[3])
   const { isVerified } = req.data as { isVerified: boolean }
@@ -65,8 +82,33 @@ const defaultVerify = (req: SentRequest) => {
   // Results.NotFound(): an empty body, not ProblemDetails.
   if (!row) throw httpError(404)
   airlines = airlines.map(a => (a.Id === id
-    ? { ...a, IsVerified: isVerified, VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null, VerifiedBy: isVerified ? 'admin-oid' : null }
+    ? {
+      ...a,
+      IsVerified: isVerified,
+      VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null,
+      VerifiedBy: isVerified ? 'admin-oid' : null,
+      VerificationSource: isVerified ? 'manual' : null,
+      VerificationIssue: null,
+    }
     : a))
+  return undefined
+}
+
+const defaultVerifyCountry = (req: SentRequest) => {
+  const code = req.url.split('/')[3]
+  const { isVerified } = req.data as { isVerified: boolean }
+  const row = countries.find(c => c.Code === code)
+  if (!row) throw httpError(404)
+  countries = countries.map(c => (c.Code === code
+    ? {
+      ...c,
+      IsVerified: isVerified,
+      VerifiedAt: isVerified ? '2026-09-13T21:00:00Z' : null,
+      VerifiedBy: isVerified ? 'admin-oid' : null,
+      VerificationSource: isVerified ? 'manual' : null,
+      VerificationIssue: null,
+    }
+    : c))
   return undefined
 }
 
@@ -90,10 +132,20 @@ function renderAt(entry: string) {
 const rowOf = async (name: string) => (await screen.findByText(name)).closest('tr')!
 const verifies = () => sent.filter(r => r.method === 'PATCH')
 
+/** The IsVerified column's position among the grid's headers, so a cell can be picked out by index. */
+const isVerifiedColumnIndex = () => within(screen.getByRole('table'))
+  .getAllByRole('columnheader')
+  .findIndex(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim() === 'IsVerified')
+
+/** The IsVerified cell of one row, not the whole row: scopes a badge assertion to the column it renders in. */
+const isVerifiedCell = async (rowName: string) => within(await rowOf(rowName)).getAllByRole('cell')[isVerifiedColumnIndex()]
+
 describe('DataBrowserPage verify', () => {
   beforeEach(() => {
     airlines = makeAirlines()
+    countries = makeCountries()
     verifyAnswer = defaultVerify
+    verifyCountryAnswer = defaultVerifyCountry
     install()
   })
 
@@ -173,13 +225,45 @@ describe('DataBrowserPage verify', () => {
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
   })
 
-  it("offers no Verify on a table keyed by code, since the verify route only takes a number, and says why", async () => {
+  it('offers Verify on an unverified country and Unverify on a verified one, keyed by its code', async () => {
     renderAt('/data/countries')
 
-    const row = await rowOf('Bulgaria')
-    expect(within(row).queryByRole('button', { name: /verify/i })).not.toBeInTheDocument()
-    expect(screen.getByText("Verifying isn't available for Countries: the API's verify route takes a numeric id, and these rows have none.")).toBeInTheDocument()
-    expect(verifies()).toHaveLength(0)
+    expect(within(await rowOf('Germany')).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    expect(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
+    expect(screen.queryByText(/Verifying isn't available/)).not.toBeInTheDocument()
+  })
+
+  it('Verify on a country sends isVerified true to the code route and shows the row as verified', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/countries')
+
+    await user.click(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' }))
+
+    expect(await within(await rowOf('Bulgaria')).findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    expect(verifies()).toEqual([{ method: 'PATCH', url: '/admin/countries/BG/verify', params: undefined, data: { isVerified: true } }])
+  })
+
+  it('Unverify on a country sends isVerified false to the code route', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/countries')
+
+    await user.click(within(await rowOf('Germany')).getByRole('button', { name: 'Unverify' }))
+
+    expect(await within(await rowOf('Germany')).findByRole('button', { name: 'Verify' })).toBeInTheDocument()
+    expect(verifies()).toEqual([expect.objectContaining({ url: '/admin/countries/DE/verify', data: { isVerified: false } })])
+  })
+
+  it("names a country row by its code when the API can't find it, and changes nothing", async () => {
+    verifyCountryAnswer = () => {
+      throw httpError(404)
+    }
+    const user = userEvent.setup()
+    renderAt('/data/countries')
+
+    await user.click(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't verify row BG: it no longer exists. Refresh to see the current rows.")
+    expect(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
   })
 
   it('still filters a table keyed by code by verified state', async () => {
@@ -199,5 +283,34 @@ describe('DataBrowserPage verify', () => {
     const row = await rowOf('Scheduled')
     expect(within(row).queryByRole('button', { name: /verify/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Unverified' })).not.toBeInTheDocument()
+  })
+
+  it('shows a status badge for each verification state in the IsVerified cell', async () => {
+    renderAt('/data/airlines')
+    await rowOf('Alpha Air')
+
+    expect(await isVerifiedCell('Alpha Air')).toHaveTextContent('Verified · manual')
+    expect(await isVerifiedCell('Beta Air')).toHaveTextContent('Unverified')
+    expect(await isVerifiedCell('Gamma Air')).toHaveTextContent('Needs attention')
+  })
+
+  it("renders a non-verifiable table's IsVerified-shaped column as plain text, never a badge", async () => {
+    renderAt('/data/flight-statuses')
+
+    const row = await rowOf('Scheduled')
+    expect(within(row).getByText('true')).toBeInTheDocument()
+    expect(within(row).queryByText('Verified')).not.toBeInTheDocument()
+  })
+
+  it('filters on VerificationSource, a hidden column, sending its raw value', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airlines')
+    await rowOf('Alpha Air')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'VerificationSource')
+    await user.type(screen.getByLabelText('Filter value'), 'manual')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+
+    await waitFor(() => expect(sent.some(r => r.params?.filter === 'VerificationSource:manual')).toBe(true))
   })
 })

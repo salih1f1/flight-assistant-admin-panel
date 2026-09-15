@@ -1383,14 +1383,14 @@ export function useAdminGetCiRunTests<TData = Awaited<ReturnType<typeof adminGet
  * @summary Verify or unverify a Country
  */
 export const adminVerifyCountry = (
-    id: number,
+    code: string,
     verifyRequest: BodyType<VerifyRequest>,
  options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
 ) => {
 
 
       return apiRequest<void>(
-      {url: `/admin/countries/${id}/verify`, method: 'PATCH',
+      {url: `/admin/countries/${code}/verify`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
       data: verifyRequest, signal
     },
@@ -1417,9 +1417,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminVerifyCountry>>, AdminVerifyCountryMutationVariables> = (props) => {
-          const {id,data} = props ?? {};
+          const {code,data} = props ?? {};
 
-          return  adminVerifyCountry(id,data,requestOptions)
+          return  adminVerifyCountry(code,data,requestOptions)
         }
 
 
@@ -1432,7 +1432,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type AdminVerifyCountryMutationResult = NonNullable<Awaited<ReturnType<typeof adminVerifyCountry>>>
     export type AdminVerifyCountryMutationBody = BodyType<VerifyRequest>
     export type AdminVerifyCountryMutationError = ErrorType<ProblemDetails>
-    export type AdminVerifyCountryMutationVariables = {id: number;data: BodyType<VerifyRequest>}
+    export type AdminVerifyCountryMutationVariables = {code: string;data: BodyType<VerifyRequest>}
 
     /**
  * @summary Verify or unverify a Country
@@ -3062,6 +3062,7 @@ export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHeal
 
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import alliances from CSV (run before countries, airports, airlines). Upserts by Code.
  */
 export const importAlliances = (
@@ -3134,6 +3135,7 @@ export const useImportAlliances = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import countries from CSV (run after alliances). Upserts by Code.
  */
 export const importCountries = (
@@ -3206,6 +3208,7 @@ export const useImportCountries = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import airports from CSV (run after countries). Upserts by IATA.
  */
 export const importAirports = (
@@ -3278,6 +3281,7 @@ export const useImportAirports = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import airlines from CSV (run after airports). Upserts by IATA, fallback ICAO.
  */
 export const importAirlines = (
@@ -3350,6 +3354,7 @@ export const useImportAirlines = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import lounge providers from CSV (run after airlines). Upserts by Code.
  */
 export const importLoungeProviders = (
@@ -3422,6 +3427,7 @@ export const useImportLoungeProviders = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import loyalty program kinds from CSV (run after airlines). Upserts by Code.
  */
 export const importLoyaltyProgramKinds = (
@@ -3494,6 +3500,7 @@ export const useImportLoyaltyProgramKinds = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import lounges from CSV (run after lounge-providers). Providers column is JSON-encoded. Upserts by Name+AirportIata+Terminal.
  */
 export const importLounges = (
@@ -3566,6 +3573,7 @@ export const useImportLounges = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
  * @summary Import loyalty programs from CSV (run after loyalty-program-kinds and airlines). Tiers column is JSON-encoded. Upserts by Code.
  */
 export const importLoyaltyPrograms = (
