@@ -594,4 +594,37 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(within(reopened).getByText('Germany')).toBeInTheDocument()
     expect(within(reopened).queryByText(/Airport/)).not.toBeInTheDocument()
   })
+
+  it('unmounting the dialog when the new table is not verifiable also stops a running Verify all shown', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    airportVerifyAnswer = async req => {
+      if (Number(req.url.split('/')[3]) === 1) await gate
+      return defaultAirportVerify(req)
+    }
+    const user = userEvent.setup()
+    const router = renderAt('/data/airports')
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+    await waitFor(() => expect(patches()).toHaveLength(1))
+
+    // flight-statuses isn't verifiable: `verifier` turns falsy in the same render pass the table
+    // changes, so DataBrowserPage drops <VerifyDialog> from its JSX outright instead of re-rendering
+    // it with open=false — this unmounts the dialog rather than closing it.
+    await act(() => router.navigate('/data/flight-statuses'))
+    await screen.findByText('Scheduled')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    release()
+    // Give the released request's microtasks a chance to run before checking it triggered no further one.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(patches()).toHaveLength(1)
+  })
 })

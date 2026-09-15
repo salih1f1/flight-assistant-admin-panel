@@ -61,8 +61,19 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // becoming false covers a caller-forced close (e.g. DataBrowserPage closing this dialog on a view
   // change) the same way it covers this dialog's own Close button, Escape or an overlay click, since
   // all of those already reach this component only via the `open` prop changing.
+  //
+  // The cleanup bumps it too. When the new table isn't verifiable (e.g. airports → flight-statuses),
+  // `verifier` turns falsy in the same render pass that the table changes, so DataBrowserPage drops
+  // `<VerifyDialog>` from its JSX outright — this component unmounts without ever being re-rendered
+  // with open=false, so the effect body above never runs again to bump it. The cleanup is the one
+  // hook React still guarantees on unmount, so it's what ends an in-flight run in that case. Two
+  // bumps for one ordinary open/close toggle (the old effect's cleanup, then the new effect's body)
+  // are harmless: every comparison against this ref only ever checks equality, never a specific value.
   useEffect(() => {
     generationRef.current += 1
+    return () => {
+      generationRef.current += 1
+    }
   }, [open])
 
   // The key column first, then the checked/default-visible columns DataBrowserPage computed, then
