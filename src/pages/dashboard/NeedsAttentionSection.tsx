@@ -32,7 +32,7 @@ export function NeedsAttentionSection() {
           {error ? (
             <NeedsAttentionError error={error} />
           ) : isLoading || !data ? (
-            <p className="text-sm text-gray-400">Loading…</p>
+            <p className="text-sm text-gray-400">Loading needs attention…</p>
           ) : (
             <NeedsAttentionCounts counts={data} />
           )}

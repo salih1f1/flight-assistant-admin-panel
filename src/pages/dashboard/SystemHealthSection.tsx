@@ -215,8 +215,9 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
         <p className="text-xs text-gray-500">{`${verification?.requestsProcessed ?? 0} requests processed, ${verification?.requestsFailed ?? 0} failed`}</p>
       )}
       {/* "Cannot tell" is a different claim from "none pending" (see Migrations above), so a null
-          count never renders as 0. */}
-      <p className="text-xs text-gray-500">
+          count never renders as 0 — and, matching Migrations' own "can't tell" state, it's amber
+          rather than the neutral gray a known count gets. */}
+      <p className={cn('text-xs', verification?.pendingCount == null ? 'text-amber-600' : 'text-gray-500')}>
         {verification?.pendingCount == null ? "Can't tell how many are pending" : `${verification.pendingCount} pending`}
       </p>
       {stuckAbandoned > 0 && <p className="text-xs text-amber-600">{plural(stuckAbandoned, 'stuck request')}</p>}
