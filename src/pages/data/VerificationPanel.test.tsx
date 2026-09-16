@@ -149,7 +149,8 @@ describe('VerificationPanel', () => {
     install()
     renderPanel()
 
-    await user.click(await screen.findByRole('button', { name: 'Take AeroAPI values' }))
+    // A single disagreeing source: the literal label applies, not the per-source form.
+    await user.click(await screen.findByRole('button', { name: 'Take source values' }))
 
     expect(posts()).toContainEqual({
       method: 'POST', url: '/admin/verification-requests/501/accept-source', params: undefined, data: { source: 'aeroapi' },
@@ -246,7 +247,7 @@ describe('VerificationPanel', () => {
     install()
     renderPanel()
 
-    await user.click(await screen.findByRole('button', { name: 'Take AeroAPI values' }))
+    await user.click(await screen.findByRole('button', { name: 'Take source values' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This row changed, or a check is already running')
     expect(screen.getByText('Needs attention')).toBeInTheDocument()

@@ -292,7 +292,10 @@ function NeedsAttention({
               disabled={takePending}
               onClick={() => onTakeSource(source)}
             >
-              {`Take ${sourceNames.get(source)} values`}
+              {/* The literal label almost always applies (today, a check has one source in nearly
+                  every case); the per-source form only earns its place once there are actually
+                  two-or-more buttons that would otherwise be indistinguishable. */}
+              {sources.length > 1 ? `Take ${sourceNames.get(source)} values` : 'Take source values'}
             </Button>
           ))}
           {keepOursButton}
