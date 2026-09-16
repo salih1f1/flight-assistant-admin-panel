@@ -5,6 +5,7 @@
  * OpenAPI spec version: v1
  */
 
+export * from './acceptVerificationSourceRequest';
 export * from './adminAuditAction';
 export * from './adminAuditDto';
 export * from './adminAuditDtoPagedResult';
@@ -30,6 +31,8 @@ export * from './adminHealthDto';
 export * from './adminHealthFlightSyncDto';
 export * from './adminHealthMigrationsDto';
 export * from './adminHealthSystemDto';
+export * from './adminHealthVerificationDto';
+export * from './adminListVerificationSourcesParams';
 export * from './adminLoungeDto';
 export * from './adminLoungeDtoPagedResult';
 export * from './adminMembershipDto';
@@ -72,6 +75,7 @@ export * from './loyaltyProgramDto';
 export * from './loyaltyProgramDtoPagedResult';
 export * from './loyaltyTierDto';
 export * from './problemDetails';
+export * from './queueVerificationRequestsRequest';
 export * from './revealedValueDto';
 export * from './revealValueRequest';
 export * from './stringObjectDictionaryPagedResult';
@@ -81,4 +85,6 @@ export * from './updateAirlineRequest';
 export * from './updateAirportRequest';
 export * from './updateLoungeRequest';
 export * from './updateLoyaltyProgramRequest';
+export * from './verificationEnqueueDto';
+export * from './verificationSourceDto';
 export * from './verifyRequest';

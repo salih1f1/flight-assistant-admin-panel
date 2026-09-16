@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type ColumnDef } from '@tanstack/react-table'
+import { type CellContext, type ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
@@ -17,6 +17,8 @@ import { ExportCsvButton } from './ExportCsvButton'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { VerificationStatusBadge } from './VerificationStatus'
+import { CHECKED_COLUMNS } from './verificationChecks'
+import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -39,6 +41,105 @@ const HIDDEN_COLUMNS = new Set([
 type VerifyTarget = { table: string; key: string; isVerified: boolean }
 
 type Row = Record<string, unknown>
+
+type SelectionContextValue = {
+  keyColumn: string
+  selectedKeys: Set<string>
+  allSelected: boolean
+  someSelected: boolean
+  toggleRow: (key: string) => void
+  toggleAllRows: () => void
+}
+
+/**
+ * Carries the checkbox column's live selection state down to SelectAllHeader/SelectRowCell without
+ * those two closing over it directly. `columns` is rebuilt every render (see the comment above
+ * `dataColumns`), and TanStack Table's `flexRender` treats each `header`/`cell` function as its own
+ * component type — a fresh inline closure there would mount a brand new checkbox every render,
+ * dropping DOM focus after each click or Space press. Reading the selection through context instead
+ * lets `header`/`cell` stay two permanently stable, module-level function references (`SELECT_COLUMN`
+ * below), so a selection change only re-renders the existing checkboxes instead of remounting them.
+ */
+const SelectionContext = createContext<SelectionContextValue | null>(null)
+
+function SelectAllHeader() {
+  const selection = useContext(SelectionContext)
+  if (!selection) return null
+  return (
+    <input
+      type="checkbox"
+      aria-label="Select all rows on this page"
+      checked={selection.allSelected}
+      ref={el => { if (el) el.indeterminate = selection.someSelected }}
+      onChange={selection.toggleAllRows}
+    />
+  )
+}
+
+function SelectRowCell({ row }: CellContext<Row, unknown>) {
+  const selection = useContext(SelectionContext)
+  if (!selection) return null
+  const keyValue = row.original[selection.keyColumn]
+  // A row with no value in the key column has nothing a selection could refer back to.
+  if (keyValue === null || keyValue === undefined) return null
+  const key = String(keyValue)
+  return (
+    <input
+      type="checkbox"
+      aria-label={`Select row ${key}`}
+      checked={selection.selectedKeys.has(key)}
+      onChange={() => selection.toggleRow(key)}
+    />
+  )
+}
+
+/** Module scope, not built inline: the one thing that actually needs to survive every render unchanged. */
+const SELECT_COLUMN: ColumnDef<Row> = { id: 'select', header: SelectAllHeader, cell: SelectRowCell }
+
+/**
+ * The checkbox column's selection state, scoped to one view (table + page + sort + filter):
+ * changing any of them drops the selection, and returning to an earlier view does not restore it —
+ * comparing the view against the previous render's and resetting when it differs adjusts state while
+ * rendering rather than in an effect. `selectedRows` is `items` intersected with the stored keys, in
+ * grid order, so a row that leaves the page (e.g. a refetch after it stops matching an Unverified
+ * filter) simply stops counting without the stored keys themselves being touched.
+ */
+function useRowSelection(items: Row[], keyColumn: string | undefined, viewKey: string) {
+  const [selectionView, setSelectionView] = useState(viewKey)
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  if (viewKey !== selectionView) {
+    setSelectionView(viewKey)
+    setSelectedKeys(new Set())
+  }
+
+  if (!keyColumn) {
+    return {
+      selectedRows: [] as Row[], selectedKeys, allSelected: false, someSelected: false,
+      toggleRow: () => {}, toggleAllRows: () => {},
+    }
+  }
+
+  const selectableItems = items.filter(row => row[keyColumn] !== null && row[keyColumn] !== undefined)
+  const selectedRows = items.filter(row => selectedKeys.has(String(row[keyColumn])))
+  const allSelected = selectableItems.length > 0 && selectableItems.every(row => selectedKeys.has(String(row[keyColumn])))
+  const someSelected = !allSelected && selectableItems.some(row => selectedKeys.has(String(row[keyColumn])))
+
+  const toggleRow = (key: string) => setSelectedKeys(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+  const toggleAllRows = () => setSelectedKeys(prev => {
+    const next = new Set(prev)
+    const keys = selectableItems.map(row => String(row[keyColumn]))
+    if (allSelected) keys.forEach(key => next.delete(key))
+    else keys.forEach(key => next.add(key))
+    return next
+  })
+
+  return { selectedRows, selectedKeys, allSelected, someSelected, toggleRow, toggleAllRows }
+}
 
 /**
  * A table's grid over GET /admin/data/{table}, and the one list page for every entity. Rows arrive
@@ -78,6 +179,8 @@ export function DataBrowserPage() {
   const queryClient = useQueryClient()
   const verifier = table ? lookup(VERIFIERS, table) : undefined
   const keyColumn = table ? recordKey(table) : undefined
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
+
   const verify = useMutation({
     mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
     // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
@@ -128,7 +231,25 @@ export function DataBrowserPage() {
   // A column masked on every row says nothing in a grid; the record page reveals it.
   const hiddenNames = columnNames.filter(name => HIDDEN_COLUMNS.has(name) || items.every(row => row[name] === MASKED))
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
+  // Independent of the "show all" toggle: the Manually dialog's default columns are the grid's
+  // normal view, not whatever the admin currently has expanded.
+  const defaultVisibleNames = columnNames.filter(name => !hiddenNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
+
+  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filter ?? ''}`
+  const selection = useRowSelection(items, keyColumn, viewKey)
+  const selectedRows = selection.selectedRows
+
+  // Closes on the same view change (table, page, sort or filter) that drops the selection: otherwise
+  // Back could leave the dialog open against a different table's rows and key column, or leave a
+  // running Verify all shown still sending requests for a view the admin has already left.
+  // VerifyDialog's own effect (keyed on its `open` prop) is what actually stops an in-flight run once
+  // this closes it.
+  const [dialogView, setDialogView] = useState(viewKey)
+  if (viewKey !== dialogView) {
+    setDialogView(viewKey)
+    setVerifyDialogOpen(false)
+  }
 
   const toggleSort = useCallback(
     (column: string) => updateView({ sort: sort === column ? `-${column}` : sort === `-${column}` ? undefined : column }),
@@ -163,8 +284,15 @@ export function DataBrowserPage() {
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
 
+  // The dialog itself prepends the key column and appends Status, so this is only the middle
+  // segment: the §3 checked columns where they exist, else the grid's own default-visible columns.
+  const checkedColumns = lookup(CHECKED_COLUMNS, table)
+  const manualColumns = checkedColumns ? [...checkedColumns] : defaultVisibleNames.filter(name => name !== 'IsVerified')
+
   // A new array, never a push: dataColumns is memoized and must not grow a column per render.
+  // SELECT_COLUMN is a stable, module-level reference (see its comment) — never rebuilt here.
   const columns: ColumnDef<Row>[] = [
+    ...(verifier && keyColumn ? [SELECT_COLUMN] : []),
     ...dataColumns,
     ...(verifier ? [{
       id: 'verify',
@@ -205,95 +333,122 @@ export function DataBrowserPage() {
   ]
 
   const hiddenWord = hiddenNames.length === 1 ? 'column' : 'columns'
+  const selectionContextValue = verifier && keyColumn ? {
+    keyColumn,
+    selectedKeys: selection.selectedKeys,
+    allSelected: selection.allSelected,
+    someSelected: selection.someSelected,
+    toggleRow: selection.toggleRow,
+    toggleAllRows: selection.toggleAllRows,
+  } : null
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{selected?.displayName ?? table}</h1>
-          <p className="text-sm text-gray-500">Sensitive columns are masked by the API; revealing one is audited.</p>
+    <SelectionContext.Provider value={selectionContextValue}>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{selected?.displayName ?? table}</h1>
+            <p className="text-sm text-gray-500">Sensitive columns are masked by the API; revealing one is audited.</p>
+          </div>
+          {editable && (
+            <Link to={editable.newPath} className={buttonVariants()}>
+              <Plus className="mr-2 h-4 w-4" /> {`Add ${editable.noun}`}
+            </Link>
+          )}
         </div>
-        {editable && (
-          <Link to={editable.newPath} className={buttonVariants()}>
-            <Plus className="mr-2 h-4 w-4" /> {`Add ${editable.noun}`}
-          </Link>
-        )}
-      </div>
 
-      <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {verifier && (
-            // The API takes one filter, so choosing one of these replaces any column filter.
-            <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
-              {VERIFIED_FILTERS.map(option => (
-                <button
-                  key={option.label}
-                  type="button"
-                  aria-pressed={filter === option.filter}
-                  onClick={() => updateView({ filter: option.filter })}
-                  className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-                >
-                  {option.label}
-                </button>
-              ))}
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {verifier && (
+              // The API takes one filter, so choosing one of these replaces any column filter.
+              <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
+                {VERIFIED_FILTERS.map(option => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    aria-pressed={filter === option.filter}
+                    onClick={() => updateView({ filter: option.filter })}
+                    className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Opens the Verify dialog on the rows selected via the checkbox column. */}
+            {verifier && (
+              <Button variant="outline" size="sm" disabled={selectedRows.length === 0} onClick={() => setVerifyDialogOpen(true)}>
+                {`Verify selected (${selectedRows.length})`}
+              </Button>
+            )}
+            {/* Only where it changes something: some tables have no bookkeeping or masked columns. */}
+            {hiddenNames.length > 0 && (
+              <Button variant="outline" size="sm" onClick={toggleAllColumns}>
+                {showAll ? `Hide ${hiddenNames.length} ${hiddenWord}` : `Show ${hiddenNames.length} hidden ${hiddenWord}`}
+              </Button>
+            )}
+          </div>
+          <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
+          <FilterForm
+            // Remount when the applied filter or table changes, so the inputs show what's applied.
+            key={`${table}|${filter ?? ''}`}
+            // Every column, hidden or not: filtering on one doesn't need it on screen.
+            columns={columnNames}
+            filter={filter}
+            onApply={value => updateView({ filter: value })}
+            onClear={() => updateView({ filter: undefined })}
+          />
+          {verify.error && verify.variables?.table === table && (
+            <VerifyError error={verify.error} target={verify.variables} />
+          )}
+          {remove.error && remove.variables?.table === table && (
+            <ActionError
+              text={`Couldn't delete ${DELETERS[table]?.noun ?? 'row'} ${String(remove.variables.row.Id)}`}
+              error={remove.error}
+            />
+          )}
+          {sync.error && table === 'flights' && sync.variables && (
+            <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
+          )}
+          {rows.error ? (
+            // In place of the table: an empty grid would read as "no rows match".
+            <ErrorAlert what="rows" error={rows.error} />
+          ) : rows.isLoading ? (
+            <p className="text-sm text-gray-400">Loading rows…</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={columns}
+                data={items}
+                pagination={{ page, pageSize: PAGE_SIZE, total: rows.data?.total ?? 0, onPageChange: p => updateView({ page: p }) }}
+              />
             </div>
           )}
-          {/* Only where it changes something: some tables have no bookkeeping or masked columns. */}
-          {hiddenNames.length > 0 && (
-            <Button variant="outline" size="sm" onClick={toggleAllColumns}>
-              {showAll ? `Hide ${hiddenNames.length} ${hiddenWord}` : `Show ${hiddenNames.length} hidden ${hiddenWord}`}
-            </Button>
-          )}
         </div>
-        <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
-        <FilterForm
-          // Remount when the applied filter or table changes, so the inputs show what's applied.
-          key={`${table}|${filter ?? ''}`}
-          // Every column, hidden or not: filtering on one doesn't need it on screen.
-          columns={columnNames}
-          filter={filter}
-          onApply={value => updateView({ filter: value })}
-          onClear={() => updateView({ filter: undefined })}
-        />
-        {verify.error && verify.variables?.table === table && (
-          <VerifyError error={verify.error} target={verify.variables} />
-        )}
-        {remove.error && remove.variables?.table === table && (
-          <ActionError
-            text={`Couldn't delete ${DELETERS[table]?.noun ?? 'row'} ${String(remove.variables.row.Id)}`}
-            error={remove.error}
+
+        {deleter && (
+          <ConfirmDeleteDialog
+            open={deleting !== null}
+            onOpenChange={open => !open && setDeleting(null)}
+            title={`Delete ${deleter.noun}`}
+            description={deleter.warning}
+            loading={remove.isPending}
+            onConfirm={() => deleting && remove.mutate({ table, row: deleting })}
           />
         )}
-        {sync.error && table === 'flights' && sync.variables && (
-          <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
-        )}
-        {rows.error ? (
-          // In place of the table: an empty grid would read as "no rows match".
-          <ErrorAlert what="rows" error={rows.error} />
-        ) : rows.isLoading ? (
-          <p className="text-sm text-gray-400">Loading rows…</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <DataTable
-              columns={columns}
-              data={items}
-              pagination={{ page, pageSize: PAGE_SIZE, total: rows.data?.total ?? 0, onPageChange: p => updateView({ page: p }) }}
-            />
-          </div>
+
+        {verifier && keyColumn && (
+          <VerifyDialog
+            open={verifyDialogOpen}
+            onOpenChange={setVerifyDialogOpen}
+            table={table}
+            keyColumn={keyColumn}
+            rows={selectedRows}
+            manualColumns={manualColumns}
+          />
         )}
       </div>
-
-      {deleter && (
-        <ConfirmDeleteDialog
-          open={deleting !== null}
-          onOpenChange={open => !open && setDeleting(null)}
-          title={`Delete ${deleter.noun}`}
-          description={deleter.warning}
-          loading={remove.isPending}
-          onConfirm={() => deleting && remove.mutate({ table, row: deleting })}
-        />
-      )}
-    </div>
+    </SelectionContext.Provider>
   )
 }
 
