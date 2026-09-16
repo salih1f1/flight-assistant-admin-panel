@@ -9,7 +9,8 @@ import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
+  adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey,
+  getAdminGetVerificationNeedsAttentionQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -22,6 +23,10 @@ import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
+
+// Retry belongs to this one table's grid, the same way Sync belongs to flights only — never
+// offered generically to every table.
+const VERIFICATION_REQUESTS_TABLE = 'verification-requests'
 
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
@@ -150,9 +155,10 @@ function useRowSelection(items: Row[], keyColumn: string | undefined, viewKey: s
  * view survives a reload and can be shared. Sort and filter column names go to the API as they
  * appear in the rows (the API matches them case-sensitively).
  *
- * Each row opens its record, and the table's typed API adds Edit, Delete and (for flights) Sync.
- * A masked value can be revealed, audited (RevealableValue). Each is keyed by table, row id
- * and column, so a different page, sort or filter mounts fresh, masked values.
+ * Each row opens its record, and the table's typed API adds Edit, Delete, (for flights) Sync and
+ * (for verification requests whose Status is Error) Retry. A masked value can be revealed,
+ * audited (RevealableValue). Each is keyed by table, row id and column, so a different page,
+ * sort or filter mounts fresh, masked values.
  */
 export function DataBrowserPage() {
   const { table } = useParams<{ table: string }>()
@@ -183,8 +189,14 @@ export function DataBrowserPage() {
 
   const verify = useMutation({
     mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
-    // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
-    onSuccess: (_, { table: slug }) => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) }),
+    onSuccess: (_, { table: slug }) => {
+      // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
+      void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) })
+      // The dashboard card's counts: verifying from the filtered "needs attention" grid this row
+      // linked from would otherwise leave the card showing a stale count for up to five minutes,
+      // pointing an admin back at a grid that's already empty.
+      void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+    },
   })
 
   const editable = table ? lookup(EDITABLE, table) : undefined
@@ -201,6 +213,27 @@ export function DataBrowserPage() {
     // The flight's times change, and the sync records status events.
     onSuccess: () => invalidateRawTables(queryClient),
   })
+  const retry = useMutation({
+    // The request's own Id column, never the entity key: the route is scoped to one check, not
+    // one entity. Carries `table` alongside it, the same way `remove` does below, so the banners
+    // can tell this table's own last retry apart from one left over from a table the admin has
+    // since switched away from.
+    mutationFn: ({ row }: { table: string; row: Row }) => adminRetryVerificationRequest(Number(row.Id)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(VERIFICATION_REQUESTS_TABLE) }),
+  })
+  // Retry is the one row action with a success line, not just an error one (Sync/Delete/Verify
+  // only ever show a failure), so its result must not survive leaving this table and coming back.
+  // DataBrowserPage never remounts on a plain :table param change — Tasks 1 and 2 rely on that to
+  // keep the row selection and the Verify dialog alive across it — so the retry mutation itself
+  // would otherwise outlive the switch, and `retry.variables?.table === table` below would be
+  // true again on return, showing the same banner as if a fresh retry had just run. Comparing
+  // `table` against the previous render's value and resetting on a change is this file's own
+  // "adjust state while rendering" idiom (selectionView/dialogView elsewhere in this component).
+  const [retryTable, setRetryTable] = useState(table)
+  if (table !== retryTable) {
+    setRetryTable(table)
+    retry.reset()
+  }
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
   const updateView = useCallback((changes: { page?: number; sort?: string; filter?: string }) => {
@@ -319,12 +352,17 @@ export function DataBrowserPage() {
       header: () => null,
       cell: ({ row }) => {
         const openTo = recordPath(table, row.original)
+        // Only a request that actually failed is worth retrying; a Mismatch is resolved from the
+        // record page instead, by taking a source's values or verifying by hand.
+        const canRetry = table === VERIFICATION_REQUESTS_TABLE && row.original.Status === 'Error'
         return (
           <RowActions
             openTo={openTo}
             editTo={editable && openTo ? `${openTo}?mode=edit` : undefined}
             onSync={table === 'flights' ? () => sync.mutate(row.original) : undefined}
             syncing={sync.isPending}
+            onRetry={canRetry ? () => retry.mutate({ table, row: row.original }) : undefined}
+            retrying={retry.isPending}
             onDelete={deleter ? () => setDeleting(row.original) : undefined}
           />
         )
@@ -409,6 +447,12 @@ export function DataBrowserPage() {
           )}
           {sync.error && table === 'flights' && sync.variables && (
             <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
+          )}
+          {retry.isSuccess && retry.variables?.table === table && (
+            <p role="status" className="text-sm text-gray-700">{`Queued ${retry.data?.queued ?? 0} · skipped ${retry.data?.skipped ?? 0}`}</p>
+          )}
+          {retry.error && retry.variables?.table === table && (
+            <ActionError text={`Could not retry request ${String(retry.variables.row.Id)}`} error={retry.error} />
           )}
           {rows.error ? (
             // In place of the table: an empty grid would read as "no rows match".

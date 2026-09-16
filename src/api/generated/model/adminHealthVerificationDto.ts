@@ -15,6 +15,8 @@ export interface AdminHealthVerificationDto {
   lastOutcome?: string | null;
   requestsProcessed?: number;
   requestsFailed?: number;
+  stuckAbandoned?: number;
+  failuresUnrecorded?: number;
   /** @nullable */
   nextRunDueUtc?: string | null;
   /** @nullable */

@@ -41,6 +41,7 @@ import type {
   AdminGetLoyaltyProgramsParams,
   AdminGetStatsParams,
   AdminHealthDto,
+  AdminListVerificationRequestsParams,
   AdminListVerificationSourcesParams,
   AdminLoungeDto,
   AdminLoungeDtoPagedResult,
@@ -86,6 +87,8 @@ import type {
   UpdateLoungeRequest,
   UpdateLoyaltyProgramRequest,
   VerificationEnqueueDto,
+  VerificationNeedsAttentionDto,
+  VerificationRequestDto,
   VerificationSourceDto,
   VerifyRequest
 } from './model';
@@ -1548,7 +1551,7 @@ export function useAdminListBrowsableTables<TData = Awaited<ReturnType<typeof ad
 
 
 /**
- * Strictly read-only. Every column SensitiveProperties marks sensitive is replaced with "<redacted>" server-side before this response is built — the full value never leaves the API from this endpoint (a full reveal, audited, is a separate future endpoint). 'sort' is a column name, optionally prefixed with '-' for descending (e.g. sort=-CreatedUtc); paging is stable even without an explicit sort, via an always-appended primary-key tiebreaker. 'filter' is 'column:value' — exact match for a non-string column, case-insensitive contains for a string column, split on the first ':' only so a value such as an ISO-8601 timestamp can itself contain colons. Both 'sort' and 'filter' column names are matched case-sensitively (e.g. 'CreatedUtc', not 'createdUtc') against the table's exposed-column whitelist and rejected with 400 if unknown, wrong-case or sensitive — a sensitive column would otherwise let a filter be used to guess a masked value one character at a time.
+ * Strictly read-only. Every column SensitiveProperties marks sensitive is replaced with "<redacted>" server-side before this response is built — the full value never leaves the API from this endpoint (a full reveal, audited, is a separate future endpoint). 'sort' is a column name, optionally prefixed with '-' for descending (e.g. sort=-CreatedUtc); paging is stable even without an explicit sort, via an always-appended primary-key tiebreaker. 'filter' is 'column:value' — exact match for a non-string column, case-insensitive contains for a string column, split on the first ':' only so a value such as an ISO-8601 timestamp can itself contain colons. On a string column, a value of exactly '*' means 'has a value' — not null, and not blank (non-empty after trimming whitespace); '*' anywhere else in the value is still a literal character to find by contains. On a non-string column '*' is not special-cased and is simply an unparseable value, a 400. Both 'sort' and 'filter' column names are matched case-sensitively (e.g. 'CreatedUtc', not 'createdUtc') against the table's exposed-column whitelist and rejected with 400 if unknown, wrong-case or sensitive — a sensitive column would otherwise let a filter be used to guess a masked value one character at a time.
  * @summary Read one browsable table's rows, masked and paginated
  */
 export const adminGetBrowsableTableData = (
@@ -5560,6 +5563,195 @@ export function useAdminListVerificationSources<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAdminListVerificationSourcesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * One entry per VerificationEntityType (Airport, Airline, Country), always all three, in enum order, with a count of 0 rather than an omitted entry. A row needs attention when its most recent automated check found a problem: IsVerified is false and VerificationIssue is set -- the state only the verification job's mismatch and not-found paths leave behind. A row that has simply never been checked (IsVerified false, no issue) does not count. No parameters.
+ * @summary Counts of reference-data rows that need attention
+ */
+export const adminGetVerificationNeedsAttention = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<VerificationNeedsAttentionDto[]>(
+      {url: `/admin/verification-needs-attention`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetVerificationNeedsAttentionQueryKey = () => {
+    return [
+    `/admin/verification-needs-attention`
+    ] as const;
+    }
+
+
+export const getAdminGetVerificationNeedsAttentionQueryOptions = <TData = Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetVerificationNeedsAttentionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>> = ({ signal }) => adminGetVerificationNeedsAttention(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetVerificationNeedsAttentionQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>>
+export type AdminGetVerificationNeedsAttentionQueryError = ErrorType<unknown>
+
+
+export function useAdminGetVerificationNeedsAttention<TData = Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetVerificationNeedsAttention<TData = Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetVerificationNeedsAttention<TData = Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Counts of reference-data rows that need attention
+ */
+
+export function useAdminGetVerificationNeedsAttention<TData = Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetVerificationNeedsAttention>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetVerificationNeedsAttentionQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * The entity's checks, newest first, at most 'limit' (default 5, range 1-50). Not a page: no total, and the full history stays browsable at GET /admin/data/verification-requests. Each row's sources, differences and source values come back typed, not as the stored comma-joined or JSON strings: sources is the list of source names checked; differences is { column, ours, source, sourceName } per differing column; sourceValues is keyed by source name, each value a map of column name to what that source reported. 'entityType' is required and must be exactly Airport, Airline or Country; 'entityKey' is required and canonicalised before matching, so a lower-case country code finds the upper-case row. An entity with no checks yet is an empty list, never a 404.
+ * @summary An entity's most recent verification checks
+ */
+export const adminListVerificationRequests = (
+    params?: AdminListVerificationRequestsParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<VerificationRequestDto[]>(
+      {url: `/admin/verification-requests`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminListVerificationRequestsQueryKey = (params?: AdminListVerificationRequestsParams,) => {
+    return [
+    `/admin/verification-requests`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminListVerificationRequestsQueryOptions = <TData = Awaited<ReturnType<typeof adminListVerificationRequests>>, TError = ErrorType<HttpValidationProblemDetails>>(params?: AdminListVerificationRequestsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminListVerificationRequestsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListVerificationRequests>>> = ({ signal }) => adminListVerificationRequests(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminListVerificationRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof adminListVerificationRequests>>>
+export type AdminListVerificationRequestsQueryError = ErrorType<HttpValidationProblemDetails>
+
+
+export function useAdminListVerificationRequests<TData = Awaited<ReturnType<typeof adminListVerificationRequests>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params: undefined |  AdminListVerificationRequestsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminListVerificationRequests>>,
+          TError,
+          Awaited<ReturnType<typeof adminListVerificationRequests>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminListVerificationRequests<TData = Awaited<ReturnType<typeof adminListVerificationRequests>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationRequestsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminListVerificationRequests>>,
+          TError,
+          Awaited<ReturnType<typeof adminListVerificationRequests>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminListVerificationRequests<TData = Awaited<ReturnType<typeof adminListVerificationRequests>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationRequestsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary An entity's most recent verification checks
+ */
+
+export function useAdminListVerificationRequests<TData = Awaited<ReturnType<typeof adminListVerificationRequests>>, TError = ErrorType<HttpValidationProblemDetails>>(
+ params?: AdminListVerificationRequestsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminListVerificationRequests>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminListVerificationRequestsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

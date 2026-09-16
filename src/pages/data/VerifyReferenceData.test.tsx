@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { DataBrowserPage } from './DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
@@ -112,7 +113,7 @@ const defaultVerifyCountry = (req: SentRequest) => {
   return undefined
 }
 
-function renderAt(entry: string) {
+function renderAt(entry: string, queryClient: QueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const router = createMemoryRouter(
     [
       { path: '/data', element: <DataBrowserPage /> },
@@ -120,7 +121,6 @@ function renderAt(entry: string) {
     ],
     { initialEntries: [entry] },
   )
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -166,6 +166,22 @@ describe('DataBrowserPage verify', () => {
     expect(await within(await rowOf('Beta Air')).findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(verifies()).toEqual([{ method: 'PATCH', url: '/admin/airlines/2/verify', params: undefined, data: { isVerified: true } }])
     expect(await rowOf('Beta Air')).toHaveTextContent('admin-oid')
+  })
+
+  it("verifying a row from the grid also invalidates the dashboard card's needs-attention counts", async () => {
+    // The dashboard card (NeedsAttentionSection) isn't mounted in this test's tree, so there's no
+    // behavioural way to show its count updating here — e.g. after verifying from the filtered
+    // "needs attention" grid the card linked from. Spying on the QueryClient and asserting the
+    // invalidated key is the closest available proof.
+    const user = userEvent.setup()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderAt('/data/airlines?columns=all', queryClient)
+
+    await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
+    await within(await rowOf('Beta Air')).findByRole('button', { name: 'Unverify' })
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
   })
 
   it('Unverify sends isVerified false and clears the verified details', async () => {

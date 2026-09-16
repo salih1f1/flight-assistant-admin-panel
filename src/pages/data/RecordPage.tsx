@@ -1,9 +1,8 @@
 import type { ComponentType, ReactNode } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { AirlineName, AirportName, LoyaltyProgramName } from '@/components/ReferenceNames'
 import { RevealableValue } from '@/components/RevealableValue'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
@@ -15,7 +14,8 @@ import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, VERIFIERS } from './records'
-import { VerificationStatusBadge } from './VerificationStatus'
+import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
+import { VerificationPanel } from './VerificationPanel'
 
 /** The tables the API can update, each with the form that edits one record. */
 const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void }>> = {
@@ -66,11 +66,6 @@ function Record({ table, id }: { table: string; id: string }) {
   )
   const verifier = lookup(VERIFIERS, table)
   const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
-  const verify = useMutation({
-    // Only offered when there's a verifier (below). id is the route key: Countries' Code, Id elsewhere.
-    mutationFn: (isVerified: boolean) => verifier!(id, { isVerified }),
-    onSuccess: refresh,
-  })
 
   const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
   const Form = lookup(EDIT_FORMS, table)
@@ -110,18 +105,10 @@ function Record({ table, id }: { table: string; id: string }) {
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
-                {verifier && 'IsVerified' in row && <VerificationStatusBadge row={row} />}
-              </div>
+              <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
               <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
             </div>
             <div className="flex items-center gap-2">
-              {verifier && 'IsVerified' in row && (
-                <Button variant="outline" disabled={verify.isPending} onClick={() => verify.mutate(row.IsVerified !== true)}>
-                  {row.IsVerified === true ? 'Unverify' : 'Verify'}
-                </Button>
-              )}
               {Form && (
                 <div role="group" aria-label="Mode" className="inline-flex overflow-hidden rounded-md border border-gray-200">
                   {[{ label: 'Read', edit: false }, { label: 'Edit', edit: true }].map(option => (
@@ -140,7 +127,17 @@ function Record({ table, id }: { table: string; id: string }) {
             </div>
           </div>
 
-          {verify.error && <ErrorAlert text={`Couldn't ${verify.variables ? 'verify' : 'unverify'} this record`} error={verify.error} />}
+          {verifier && 'IsVerified' in row && (
+            <VerificationPanel
+              table={table}
+              entityType={lookup(VERIFICATION_ENTITY_TYPES, table)}
+              recordKey={id}
+              row={row}
+              // Only when this table actually has a form to switch into (e.g. not countries) —
+              // otherwise Edit would change the URL to ?mode=edit and show nothing.
+              onEdit={Form ? () => setEditing(true) : undefined}
+            />
+          )}
 
           {editing && Form ? (
             <div className="max-w-xl">

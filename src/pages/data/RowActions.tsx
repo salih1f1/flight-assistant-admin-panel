@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom'
-import { Eye, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { Eye, Pencil, RefreshCw, RotateCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const iconLink = 'inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-900'
 
-/** A grid row's actions, each shown only when the table supports it: Sync, Open, Edit and Delete. */
-export function RowActions({ openTo, editTo, onSync, syncing, onDelete }: {
+/** A grid row's actions, each shown only when the table supports it: Sync, Retry, Open, Edit and Delete. */
+export function RowActions({ openTo, editTo, onSync, syncing, onRetry, retrying, onDelete }: {
   openTo?: string
   editTo?: string
   onSync?: () => void
   syncing?: boolean
+  onRetry?: () => void
+  retrying?: boolean
   onDelete?: () => void
 }) {
   return (
@@ -17,6 +19,11 @@ export function RowActions({ openTo, editTo, onSync, syncing, onDelete }: {
       {onSync && (
         <Button size="sm" variant="ghost" aria-label="Sync status" title="Sync status" disabled={syncing} onClick={onSync}>
           <RefreshCw className="h-4 w-4" />
+        </Button>
+      )}
+      {onRetry && (
+        <Button size="sm" variant="ghost" aria-label="Retry" title="Retry" disabled={retrying} onClick={onRetry}>
+          <RotateCw className="h-4 w-4" />
         </Button>
       )}
       {openTo && (

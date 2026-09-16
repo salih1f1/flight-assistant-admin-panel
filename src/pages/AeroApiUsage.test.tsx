@@ -34,6 +34,10 @@ let sent: SentRequest[]
 function installApi(usageAnswer: () => unknown) {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/usage/aeroapi') return usageAnswer()
+    // Dashboard also renders the needs-attention card; its response isn't paged like the rest.
+    if (req.method === 'GET' && req.url === '/admin/verification-needs-attention') {
+      return [{ entityType: 'Airport', count: 0 }, { entityType: 'Airline', count: 0 }, { entityType: 'Country', count: 0 }]
+    }
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))

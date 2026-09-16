@@ -71,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Import', to: '/import' },
       { label: 'Audit log', to: '/audit' },
+      table('Verification Requests', 'verification-requests'),
       { label: 'Tests', to: '/tests' },
       table('Seed Versions', 'seed-versions'),
     ],

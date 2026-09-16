@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAdminGetHealth } from '@/api/generated/admin'
 import type {
-  AdminHealthDto, AdminHealthFlightSyncDto, AdminHealthMigrationsDto, AdminHealthSystemDto,
+  AdminHealthDto, AdminHealthFlightSyncDto, AdminHealthMigrationsDto, AdminHealthSystemDto, AdminHealthVerificationDto,
 } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
@@ -101,6 +101,7 @@ function HealthReport({ health }: { health: AdminHealthDto }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Migrations migrations={health.migrations} />
         <FlightSync sync={health.flightSync} />
+        <Verification verification={health.verification} />
       </div>
 
       <SystemFacts system={health.system} />
@@ -178,6 +179,51 @@ function FlightSync({ sync }: { sync: AdminHealthFlightSyncDto | undefined }) {
       )}
       {sync?.lastError && <p className="text-xs text-red-600">{sync.lastError}</p>}
       {sync?.nextRunDueUtc && <p className="text-xs text-gray-500">{`Next run ${formatUtcMinute(sync.nextRunDueUtc)} UTC`}</p>}
+    </Panel>
+  )
+}
+
+/** "1 thing" / "2 things": simple pluralization for the two abnormal-only counts below. */
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+function Verification({ verification }: { verification: AdminHealthVerificationDto | undefined }) {
+  if (verification && verification.enabled === false) {
+    return (
+      <Panel title="Verification">
+        <p className="text-gray-500">Disabled (Verification:Enabled is false)</p>
+      </Panel>
+    )
+  }
+
+  const lastRunAt = verification?.lastRunCompletedUtc ?? verification?.lastRunStartedUtc
+  const finished = verification?.lastOutcome === 'Success' || verification?.lastOutcome === 'Failed'
+  const stuckAbandoned = verification?.stuckAbandoned ?? 0
+  const failuresUnrecorded = verification?.failuresUnrecorded ?? 0
+
+  return (
+    <Panel title="Verification">
+      {verification?.lastOutcome === 'Running' && verification.lastRunStartedUtc ? (
+        <p>{`Running since ${formatUtcMinute(verification.lastRunStartedUtc)} UTC`}</p>
+      ) : finished && lastRunAt ? (
+        <p className={verification?.lastOutcome === 'Failed' ? 'text-red-600' : 'text-green-600'}>
+          {`Last run ${verification?.lastOutcome === 'Failed' ? 'failed' : 'succeeded'} at ${formatUtcMinute(lastRunAt)} UTC`}
+        </p>
+      ) : (
+        <p className="text-gray-500">Not run since the API started</p>
+      )}
+      {finished && (
+        <p className="text-xs text-gray-500">{`${verification?.requestsProcessed ?? 0} requests processed, ${verification?.requestsFailed ?? 0} failed`}</p>
+      )}
+      {/* "Cannot tell" is a different claim from "none pending" (see Migrations above), so a null
+          count never renders as 0 — and, matching Migrations' own "can't tell" state, it's amber
+          rather than the neutral gray a known count gets. */}
+      <p className={cn('text-xs', verification?.pendingCount == null ? 'text-amber-600' : 'text-gray-500')}>
+        {verification?.pendingCount == null ? "Can't tell how many are pending" : `${verification.pendingCount} pending`}
+      </p>
+      {stuckAbandoned > 0 && <p className="text-xs text-amber-600">{plural(stuckAbandoned, 'stuck request')}</p>}
+      {failuresUnrecorded > 0 && <p className="text-xs text-amber-600">{plural(failuresUnrecorded, 'unrecorded failure')}</p>}
+      {verification?.lastError && <p className="text-xs text-red-600">{verification.lastError}</p>}
+      {verification?.nextRunDueUtc && <p className="text-xs text-gray-500">{`Next run ${formatUtcMinute(verification.nextRunDueUtc)} UTC`}</p>}
     </Panel>
   )
 }

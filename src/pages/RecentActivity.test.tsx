@@ -43,6 +43,9 @@ function install() {
     if (req.method === 'GET' && req.url === '/admin/audit') return auditAnswer(req)
     // The other Dashboard sections get something harmless; they aren't under test here.
     if (req.method === 'GET' && (req.url === '/admin/health' || req.url === '/admin/usage/aeroapi')) throw httpError(503)
+    if (req.method === 'GET' && req.url === '/admin/verification-needs-attention') {
+      return [{ entityType: 'Airport', count: 0 }, { entityType: 'Airline', count: 0 }, { entityType: 'Country', count: 0 }]
+    }
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))

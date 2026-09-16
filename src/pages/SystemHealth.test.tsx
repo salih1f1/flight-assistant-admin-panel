@@ -47,6 +47,20 @@ const makeHealth = () => ({
     nextRunDueUtc: '2026-09-13T20:20:00Z' as string | null,
     lastError: 'DomainException: The flight status request was rejected.' as string | null,
   },
+  // Different numbers from flightSync throughout, so a panel wired to the wrong field is caught.
+  verification: {
+    enabled: true,
+    lastRunStartedUtc: '2026-09-14T03:10:00Z' as string | null,
+    lastRunCompletedUtc: '2026-09-14T03:10:22Z' as string | null,
+    lastOutcome: 'Success',
+    requestsProcessed: 8,
+    requestsFailed: 1,
+    stuckAbandoned: 0,
+    failuresUnrecorded: 0,
+    nextRunDueUtc: '2026-09-14T03:15:00Z' as string | null,
+    lastError: null as string | null,
+    pendingCount: 5 as number | null,
+  },
 })
 
 let health: ReturnType<typeof makeHealth>
@@ -56,6 +70,10 @@ function installApi(healthAnswer: () => unknown) {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/health') return healthAnswer()
     if (req.method === 'GET' && req.url === '/admin/usage/aeroapi') throw httpError(503)
+    // Dashboard also renders the needs-attention card; its response isn't paged like the rest.
+    if (req.method === 'GET' && req.url === '/admin/verification-needs-attention') {
+      return [{ entityType: 'Airport', count: 0 }, { entityType: 'Airline', count: 0 }, { entityType: 'Country', count: 0 }]
+    }
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))
@@ -168,6 +186,72 @@ describe('Dashboard system health', () => {
     await within(section).findByText('Overall: Degraded')
 
     expect(panel(section, 'Flight status sync')).toHaveTextContent('Disabled (FlightSync:Enabled is false)')
+  })
+
+  it("shows the verification job's last run, counts, pending count and next run", async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Last run succeeded at 2026-09-14 03:10 UTC')
+    expect(verification).toHaveTextContent('8 requests processed, 1 failed')
+    expect(verification).toHaveTextContent('5 pending')
+    expect(verification).toHaveTextContent('Next run 2026-09-14 03:15 UTC')
+  })
+
+  it('says when the verification job has not run since the API started', async () => {
+    health.verification = { ...health.verification, lastOutcome: 'NeverRun', lastRunStartedUtc: null, lastRunCompletedUtc: null, requestsProcessed: 0, requestsFailed: 0, lastError: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Not run since the API started')
+    expect(verification).not.toHaveTextContent('requests processed')
+  })
+
+  it('says when the verification job is disabled', async () => {
+    health.verification = { ...health.verification, enabled: false }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Disabled (Verification:Enabled is false)')
+    expect(verification).not.toHaveTextContent('pending')
+  })
+
+  it("says the pending count can't be told, rather than 0, when it's null", async () => {
+    health.verification = { ...health.verification, pendingCount: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent("Can't tell how many are pending")
+    expect(verification).not.toHaveTextContent('0 pending')
+  })
+
+  it('hides the stuck and unrecorded-failure counts when they are zero', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).not.toHaveTextContent('stuck')
+    expect(verification).not.toHaveTextContent('unrecorded')
+  })
+
+  it('shows the stuck and unrecorded-failure counts when they are non-zero', async () => {
+    health.verification = { ...health.verification, stuckAbandoned: 2, failuresUnrecorded: 1 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('2 stuck requests')
+    expect(verification).toHaveTextContent('1 unrecorded failure')
   })
 
   it('shows the environment, version, build, uptime and what is configured', async () => {

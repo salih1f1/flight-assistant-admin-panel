@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { DataBrowserPage } from './DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
@@ -97,12 +98,11 @@ function install() {
   }))
 }
 
-function renderAt(entry: string) {
+function renderAt(entry: string, queryClient: QueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const router = createMemoryRouter(
     [{ path: '/data/:table', element: <DataBrowserPage /> }],
     { initialEntries: [entry] },
   )
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -283,6 +283,27 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(within(gridRow).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
   })
 
+  it("a per-row Verify also invalidates the dashboard card's needs-attention counts", async () => {
+    // The dashboard card (NeedsAttentionSection) isn't mounted in this test's tree, so there's no
+    // behavioural way to show its count updating here. Spying on the QueryClient and asserting
+    // the invalidated key is the closest available proof.
+    const user = userEvent.setup()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderAt('/data/airports', queryClient)
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    const dialog = await screen.findByRole('dialog')
+    const dialogRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
+    await user.click(within(dialogRow).getByRole('button', { name: 'Verify' }))
+
+    await within(dialogRow).findByText('Verified · manual')
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+  })
+
   it('7. Verify all shown skips an already-verified row, sending the rest in list order', async () => {
     airports = airports.map((airport, index) => (index === 1 ? { ...airport, IsVerified: true, VerificationSource: 'ourairports' } : airport))
     const user = userEvent.setup()
@@ -306,6 +327,28 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     const bravoRow = (await within(dialog).findByText('Bravo Airport')).closest('tr')!
     expect(within(bravoRow).getByText('Verified · ourairports')).toBeInTheDocument()
     expect(within(bravoRow).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
+  })
+
+  it("Verify all shown also invalidates the dashboard card's needs-attention counts, once for the whole run", async () => {
+    // Same reasoning as the per-row test above: no consumer mounted here, so this spies on the
+    // QueryClient instead of asserting on the (absent) dashboard card.
+    const user = userEvent.setup()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    renderAt('/data/airports', queryClient)
+    await screen.findByText('Alpha Airport')
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (3)' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Verify all shown' }))
+
+    const charlieRow = (await within(dialog).findByText('Charlie Airport')).closest('tr')!
+    await within(charlieRow).findByText('Verified · manual')
+
+    const needsAttentionKey = JSON.stringify(getAdminGetVerificationNeedsAttentionQueryKey())
+    const matches = invalidateSpy.mock.calls.filter(([arg]) => JSON.stringify((arg as { queryKey?: unknown })?.queryKey) === needsAttentionKey)
+    expect(matches).toHaveLength(1)
   })
 
   it('a Verify all shown run over 3 rows refetches the grid once, not once per verified row', async () => {

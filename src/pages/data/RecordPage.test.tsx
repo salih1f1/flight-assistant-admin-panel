@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -59,6 +59,10 @@ const ROWS: Record<string, () => Row[]> = {
 /** Filters like BrowsableDataRepository: exact on non-string columns, case-insensitive contains on strings. */
 function api(req: SentRequest) {
   if (req.method === 'GET' && req.url === '/admin/data/tables') return TABLES
+  // DE (countries, a checkable entity type) carries a VerificationIssue, so RecordPage's panel
+  // fetches this on render; no fixture row here has ever had an automated check, so it's always
+  // empty — the "no check at all" case, not a scenario this file needs to vary.
+  if (req.method === 'GET' && req.url === '/admin/verification-requests') return []
   const table = req.url.match(/^\/admin\/data\/([a-z-]+)$/)?.[1]
   if (req.method === 'GET' && table && ROWS[table]) {
     let rows = ROWS[table]()
@@ -135,8 +139,6 @@ const dataRequests = (table: string) => sent.filter(r => r.method === 'GET' && r
 /** The value shown for a field: the <dd> after its <dt>. */
 const field = (name: string) => screen.getByText(name, { selector: 'dt' }).nextElementSibling as HTMLElement
 const heading = (name: string) => screen.findByRole('heading', { level: 1, name })
-/** The h1's wrapping div, which also holds the status badge: scopes badge assertions to the header, not the whole screen. */
-const headerArea = async (name: string) => (await heading(name)).parentElement as HTMLElement
 
 describe('RecordPage', () => {
   beforeEach(() => {
@@ -207,28 +209,30 @@ describe('RecordPage', () => {
     expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/airlines/8/verify', data: { isVerified: true } }))
   })
 
-  it('verifies a country record by its code, not a numeric id, updating the header badge from refreshed data', async () => {
+  it('verifies a country record by its code, not a numeric id, updating the panel badge from refreshed data', async () => {
     const user = userEvent.setup()
     renderAt('/data/countries/DE')
     await heading('Germany')
     expect(field('IsVerified')).toHaveTextContent('No')
-    expect(within(await headerArea('Germany')).getByText('Needs attention')).toBeInTheDocument()
+    expect(screen.getByText('Needs attention')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    // DE needs attention with no check on file, so the panel offers "Keep ours and verify" rather
+    // than the plain Verify toggle — same verify route underneath.
+    await user.click(await screen.findByRole('button', { name: 'Keep ours and verify' }))
 
     expect(await screen.findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(field('IsVerified')).toHaveTextContent('Yes')
     // The badge reads the refetched row, not the one it first rendered with.
-    expect(within(await headerArea('Germany')).getByText('Verified · manual')).toBeInTheDocument()
-    expect(within(await headerArea('Germany')).queryByText('Needs attention')).not.toBeInTheDocument()
+    expect(screen.getByText('Verified · manual')).toBeInTheDocument()
+    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
     expect(sent).toContainEqual(expect.objectContaining({ method: 'PATCH', url: '/admin/countries/DE/verify', data: { isVerified: true } }))
   })
 
-  it('shows the verification status badge in the header', async () => {
+  it('shows the verification status badge', async () => {
     renderAt('/data/countries/DE')
     await heading('Germany')
 
-    expect(within(await headerArea('Germany')).getByText('Needs attention')).toBeInTheDocument()
+    expect(screen.getByText('Needs attention')).toBeInTheDocument()
   })
 
   it('shows VerificationSource and VerificationIssue as record fields, hidden or not in the grid', async () => {

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { getAdminGetBrowsableTableDataQueryKey } from '@/api/generated/admin'
+import { getAdminGetBrowsableTableDataQueryKey, getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
 import { cn } from '@/lib/utils'
 import { lookup, VERIFIERS } from './records'
@@ -139,7 +139,12 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       applyOutcome({ status: 'verified' })
       // The row really did change server-side, so the grid should refresh regardless of whether
       // this dialog is still open, or has since been closed (or closed and reopened).
-      if (invalidate) void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
+      if (invalidate) {
+        void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
+        // The dashboard card's counts: verifying from the filtered "needs attention" grid this
+        // dialog opened from would otherwise leave the card's count stale for up to five minutes.
+        void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+      }
     } catch (error) {
       // Matches the grid's own verify: the API answers a missing row with an empty 404.
       const status = (error as { response?: { status?: number } } | null)?.response?.status
@@ -164,6 +169,7 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       await verifyOne(row, { invalidate: false })
     }
     void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
+    void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
     if (generationRef.current === generation) setRunningAll(false)
   }
 
