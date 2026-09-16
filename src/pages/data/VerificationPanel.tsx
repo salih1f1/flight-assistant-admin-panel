@@ -268,17 +268,17 @@ function NeedsAttention({
     if (differences.length === 0) return noCheckFallback
 
     const columns = [...new Set(differences.map(d => d.column).filter((c): c is string => text(c) !== undefined))]
-    // Preserves first-seen order, and pairs each source's key with the display name its own
-    // entries carry (falling back to the key when the API ever omits sourceName).
-    const sourceNames = new Map<string, string>()
-    for (const d of differences) {
-      if (text(d.source) && !sourceNames.has(d.source!)) sourceNames.set(d.source!, text(d.sourceName) ?? d.source!)
-    }
-    const sources = [...sourceNames.keys()]
+    // Grouped by sourceName — the source's registry name ("ourairports", "mledoze"), which is
+    // also what sourceValues is keyed by and what accept-source's body expects. `source` on a
+    // difference is that source's reported VALUE for the column, not its name: grouping on it
+    // instead (as this used to) splits one source's several differing columns into that many
+    // fake "sources", all headed with the same name, and posts a column value where the API
+    // expects a source name — a guaranteed 400. Preserves first-seen order.
+    const sourceNames = [...new Set(differences.map(d => text(d.sourceName)).filter((n): n is string => n !== undefined))]
     // text() first so an empty string reads as "—" the same way a null does, like every other
     // field in this panel — not a blank cell.
     const oursFor = (column: string) => text(differences.find(d => d.column === column)?.ours) ?? '—'
-    const valueFor = (source: string, column: string) => text(check.sourceValues?.[source]?.[column]) ?? '—'
+    const valueFor = (sourceName: string, column: string) => text(check.sourceValues?.[sourceName]?.[column]) ?? '—'
 
     return (
       <div className="space-y-3">
@@ -287,7 +287,7 @@ function NeedsAttention({
             <TableRow>
               <TableHead>Column</TableHead>
               <TableHead>Ours</TableHead>
-              {sources.map(source => <TableHead key={source}>{sourceNames.get(source)}</TableHead>)}
+              {sourceNames.map(sourceName => <TableHead key={sourceName}>{sourceName}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -295,26 +295,26 @@ function NeedsAttention({
               <TableRow key={column}>
                 <TableCell className="font-medium">{column}</TableCell>
                 <TableCell>{oursFor(column)}</TableCell>
-                {sources.map(source => <TableCell key={source}>{valueFor(source, column)}</TableCell>)}
+                {sourceNames.map(sourceName => <TableCell key={sourceName}>{valueFor(sourceName, column)}</TableCell>)}
               </TableRow>
             ))}
           </TableBody>
         </Table>
 
         <div className="flex flex-wrap gap-2">
-          {sources.map(source => (
+          {sourceNames.map(sourceName => (
             <Button
-              key={source}
+              key={sourceName}
               type="button"
               variant="outline"
               size="sm"
               disabled={takePending}
-              onClick={() => onTakeSource(source)}
+              onClick={() => onTakeSource(sourceName)}
             >
               {/* The literal label almost always applies (today, a check has one source in nearly
                   every case); the per-source form only earns its place once there are actually
                   two-or-more buttons that would otherwise be indistinguishable. */}
-              {sources.length > 1 ? `Take ${sourceNames.get(source)} values` : 'Take source values'}
+              {sourceNames.length > 1 ? `Take ${sourceName} values` : 'Take source values'}
             </Button>
           ))}
           {keepOursButton}

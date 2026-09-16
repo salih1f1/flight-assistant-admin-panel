@@ -140,13 +140,17 @@ describe('VerificationPanel', () => {
   })
 
   it("3. a mismatch renders one column per source, with each row's ours and each source's value", async () => {
+    // Shaped like the backend's own AdminVerificationEndpointTests.SeedMismatchAsync payload:
+    // `source` is the disagreeing SOURCE's reported VALUE for that column; `sourceName` is its
+    // registry key ("aeroapi", "oag" here), which is what sourceValues is keyed by and what the
+    // header/button/accept-body all use. Two distinct sources here, one column each.
     airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
     checksAnswer = () => [{
       id: 501, status: 'Mismatch', sources: ['aeroapi', 'oag'],
       differences: [
-        { column: 'Iata', ours: 'JFK', source: 'aeroapi', sourceName: 'AeroAPI' },
-        { column: 'Name', ours: 'JFK Airport', source: 'aeroapi', sourceName: 'AeroAPI' },
-        { column: 'Iata', ours: 'JFK', source: 'oag', sourceName: 'OAG' },
+        { column: 'Iata', ours: 'JFK', source: 'JFK1', sourceName: 'aeroapi' },
+        { column: 'Name', ours: 'JFK Airport', source: 'John F Kennedy Intl', sourceName: 'aeroapi' },
+        { column: 'Iata', ours: 'JFK', source: 'JFK2', sourceName: 'oag' },
       ],
       sourceValues: { aeroapi: { Iata: 'JFK1', Name: 'John F Kennedy Intl' }, oag: { Iata: 'JFK2' } },
     }]
@@ -154,7 +158,7 @@ describe('VerificationPanel', () => {
     renderPanel(() => {})
 
     const table = await screen.findByRole('table')
-    expect(within(table).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Column', 'Ours', 'AeroAPI', 'OAG'])
+    expect(within(table).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Column', 'Ours', 'aeroapi', 'oag'])
 
     const iataRow = within(table).getByText('Iata').closest('tr')!
     expect(within(iataRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Iata', 'JFK', 'JFK1', 'JFK2'])
@@ -167,11 +171,49 @@ describe('VerificationPanel', () => {
     expect(within(nameRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Name', 'JFK Airport', 'John F Kennedy Intl', '—'])
   })
 
+  it('one source disagreeing on two columns renders one column, not two, and takes that one source by name', async () => {
+    // The common case today (AdminVerificationEndpointTests: each entity type has a single
+    // registered source — ourairports for Airport). Grouping by the differing VALUE instead of
+    // the source's name (the bug) would read these two entries as two different sources, both
+    // headed "ourairports", every cell blank, two buttons instead of the literal one, and a POST
+    // of a column value where the API expects a source name.
+    const user = userEvent.setup()
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{
+      id: 701, status: 'Mismatch', sources: ['ourairports'],
+      differences: [
+        { column: 'Iata', ours: 'JFK', source: 'JFK1', sourceName: 'ourairports' },
+        { column: 'Name', ours: 'JFK Airport', source: 'John F Kennedy Intl', sourceName: 'ourairports' },
+      ],
+      sourceValues: { ourairports: { Iata: 'JFK1', Name: 'John F Kennedy Intl' } },
+    }]
+    acceptAnswer = acceptSource
+    install()
+    renderPanel()
+
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Column', 'Ours', 'ourairports'])
+
+    const iataRow = within(table).getByText('Iata').closest('tr')!
+    expect(within(iataRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Iata', 'JFK', 'JFK1'])
+    const nameRow = within(table).getByText('Name').closest('tr')!
+    expect(within(nameRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Name', 'JFK Airport', 'John F Kennedy Intl'])
+
+    // One distinct source name, so exactly one button, in the literal form.
+    expect(screen.getAllByRole('button', { name: /Take/ })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Take source values' }))
+
+    expect(posts()).toContainEqual({
+      method: 'POST', url: '/admin/verification-requests/701/accept-source', params: undefined, data: { source: 'ourairports' },
+    })
+    expect(await screen.findByText('Verified · ourairports')).toBeInTheDocument()
+  })
+
   it('a country mismatch offers no Edit: countries has no edit form for the button to switch into', async () => {
     countries = [baseCountry({ VerificationIssue: 'Automated check found a problem' })]
     checksAnswer = () => [{
       id: 601, status: 'Mismatch', sources: ['mledoze'],
-      differences: [{ column: 'Name', ours: 'Germany', source: 'mledoze', sourceName: 'mledoze' }],
+      differences: [{ column: 'Name', ours: 'Germany', source: 'Deutschland', sourceName: 'mledoze' }],
       sourceValues: { mledoze: { Name: 'Deutschland' } },
     }]
     install()
@@ -200,7 +242,7 @@ describe('VerificationPanel', () => {
     airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
     checksAnswer = () => [{
       id: 501, status: 'Mismatch', sources: ['aeroapi'],
-      differences: [{ column: 'City', ours: '', source: 'aeroapi', sourceName: 'AeroAPI' }],
+      differences: [{ column: 'City', ours: '', source: '', sourceName: 'aeroapi' }],
       sourceValues: { aeroapi: { City: '' } },
     }]
     install()
@@ -231,7 +273,7 @@ describe('VerificationPanel', () => {
     airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
     checksAnswer = () => [{
       id: 501, status: 'Mismatch', sources: ['aeroapi'],
-      differences: [{ column: 'Iata', ours: 'JFK', source: 'aeroapi', sourceName: 'AeroAPI' }],
+      differences: [{ column: 'Iata', ours: 'JFK', source: 'JFK1', sourceName: 'aeroapi' }],
       sourceValues: { aeroapi: { Iata: 'JFK1' } },
     }]
     acceptAnswer = acceptSource
@@ -253,8 +295,8 @@ describe('VerificationPanel', () => {
     checksAnswer = () => [{
       id: 501, status: 'Mismatch', sources: ['aeroapi', 'oag'],
       differences: [
-        { column: 'Iata', ours: 'JFK', source: 'aeroapi', sourceName: 'AeroAPI' },
-        { column: 'Iata', ours: 'JFK', source: 'oag', sourceName: 'OAG' },
+        { column: 'Iata', ours: 'JFK', source: 'JFK1', sourceName: 'aeroapi' },
+        { column: 'Iata', ours: 'JFK', source: 'JFK2', sourceName: 'oag' },
       ],
       sourceValues: { aeroapi: { Iata: 'JFK1' }, oag: { Iata: 'JFK2' } },
     }]
@@ -262,10 +304,10 @@ describe('VerificationPanel', () => {
     install()
     renderPanel()
 
-    expect(await screen.findByRole('button', { name: 'Take AeroAPI values' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Take OAG values' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Take aeroapi values' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Take oag values' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Take OAG values' }))
+    await user.click(screen.getByRole('button', { name: 'Take oag values' }))
 
     await screen.findByText('Verified · oag')
     expect(posts().filter(r => r.url === '/admin/verification-requests/501/accept-source')).toEqual([
@@ -329,7 +371,7 @@ describe('VerificationPanel', () => {
     airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
     checksAnswer = () => [{
       id: 501, status: 'Mismatch', sources: ['aeroapi'],
-      differences: [{ column: 'Iata', ours: 'JFK', source: 'aeroapi', sourceName: 'AeroAPI' }],
+      differences: [{ column: 'Iata', ours: 'JFK', source: 'JFK1', sourceName: 'aeroapi' }],
       sourceValues: { aeroapi: { Iata: 'JFK1' } },
     }]
     // detail carries which of the four documented causes actually fired (outside Production); the
