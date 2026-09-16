@@ -209,10 +209,25 @@ export function DataBrowserPage() {
   })
   const retry = useMutation({
     // The request's own Id column, never the entity key: the route is scoped to one check, not
-    // one entity.
-    mutationFn: (request: Row) => adminRetryVerificationRequest(Number(request.Id)),
+    // one entity. Carries `table` alongside it, the same way `remove` does below, so the banners
+    // can tell this table's own last retry apart from one left over from a table the admin has
+    // since switched away from.
+    mutationFn: ({ row }: { table: string; row: Row }) => adminRetryVerificationRequest(Number(row.Id)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(VERIFICATION_REQUESTS_TABLE) }),
   })
+  // Retry is the one row action with a success line, not just an error one (Sync/Delete/Verify
+  // only ever show a failure), so its result must not survive leaving this table and coming back.
+  // DataBrowserPage never remounts on a plain :table param change — Tasks 1 and 2 rely on that to
+  // keep the row selection and the Verify dialog alive across it — so the retry mutation itself
+  // would otherwise outlive the switch, and `retry.variables?.table === table` below would be
+  // true again on return, showing the same banner as if a fresh retry had just run. Comparing
+  // `table` against the previous render's value and resetting on a change is this file's own
+  // "adjust state while rendering" idiom (selectionView/dialogView elsewhere in this component).
+  const [retryTable, setRetryTable] = useState(table)
+  if (table !== retryTable) {
+    setRetryTable(table)
+    retry.reset()
+  }
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
   const updateView = useCallback((changes: { page?: number; sort?: string; filter?: string }) => {
@@ -340,7 +355,7 @@ export function DataBrowserPage() {
             editTo={editable && openTo ? `${openTo}?mode=edit` : undefined}
             onSync={table === 'flights' ? () => sync.mutate(row.original) : undefined}
             syncing={sync.isPending}
-            onRetry={canRetry ? () => retry.mutate(row.original) : undefined}
+            onRetry={canRetry ? () => retry.mutate({ table, row: row.original }) : undefined}
             retrying={retry.isPending}
             onDelete={deleter ? () => setDeleting(row.original) : undefined}
           />
@@ -427,11 +442,11 @@ export function DataBrowserPage() {
           {sync.error && table === 'flights' && sync.variables && (
             <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
           )}
-          {table === VERIFICATION_REQUESTS_TABLE && retry.isSuccess && (
+          {retry.isSuccess && retry.variables?.table === table && (
             <p role="status" className="text-sm text-gray-700">{`Queued ${retry.data?.queued ?? 0} · skipped ${retry.data?.skipped ?? 0}`}</p>
           )}
-          {table === VERIFICATION_REQUESTS_TABLE && retry.error && retry.variables && (
-            <ActionError text={`Could not retry request ${String(retry.variables.Id)}`} error={retry.error} />
+          {retry.error && retry.variables?.table === table && (
+            <ActionError text={`Could not retry request ${String(retry.variables.row.Id)}`} error={retry.error} />
           )}
           {rows.error ? (
             // In place of the table: an empty grid would read as "no rows match".

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -92,6 +92,28 @@ describe('Retry on the verification-requests grid', () => {
     // The grid refetched: row 101 no longer shows Error, and its Retry button is gone.
     await waitFor(() => expect(within(screen.getByText('101').closest('tr')!).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument())
     expect(screen.getByText('101').closest('tr')).toHaveTextContent('Pending')
+  })
+
+  it('the success banner does not survive leaving this table and coming back', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/verification-requests')
+
+    await user.click(within(await rowOf('101')).getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Queued 2 · skipped 1')
+    const postsSoFar = writes().length
+
+    // DataBrowserPage never remounts on a plain :table param change (Tasks 1/2 rely on that to
+    // keep the row selection and the Verify dialog alive across it), so the retry mutation itself
+    // would otherwise outlive the switch and reappear as if a fresh retry had just run.
+    await act(() => router.navigate('/data/airlines'))
+    expect(await screen.findByText('Turkish Airlines')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+    await act(() => router.navigate('/data/verification-requests'))
+    await screen.findByText('101')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    // Switching tables never re-sends the retry itself; only a click does.
+    expect(writes()).toHaveLength(postsSoFar)
   })
 
   it('a 409 (the entity already has an open check) shows the message instead of failing silently', async () => {
