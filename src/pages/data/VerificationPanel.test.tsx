@@ -20,7 +20,16 @@ const baseAirport = (overrides: Partial<Row> = {}): Row => ({
   ...overrides,
 })
 
+// Shaped like a GET /admin/data/countries row: keyed by Code, not Id — countries has no entry in
+// EDIT_FORMS, so it's the table that exercises "no edit form" below.
+const baseCountry = (overrides: Partial<Row> = {}): Row => ({
+  Code: 'DE', Name: 'Germany', Alpha3: 'DEU', NumericCode: 276, Region: 'Europe', Subregion: 'Western Europe',
+  IsVerified: false, VerificationSource: null, VerificationIssue: null, VerifiedAt: null, VerifiedBy: null,
+  ...overrides,
+})
+
 let airports: Row[]
+let countries: Row[]
 let sent: SentRequest[]
 let checksAnswer: (req: SentRequest) => unknown
 let sourcesAnswer: (req: SentRequest) => unknown
@@ -44,6 +53,7 @@ function verifyAirport(req: SentRequest) {
 function install() {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/data/airports') return pagedResult(airports, req.params)
+    if (req.method === 'GET' && req.url === '/admin/data/countries') return pagedResult(countries, req.params)
     if (req.method === 'GET' && req.url === '/admin/verification-requests') return checksAnswer(req)
     if (req.method === 'GET' && req.url === '/admin/verification-sources') return sourcesAnswer(req)
     if (req.method === 'POST' && req.url === '/admin/verification-requests') return queueAnswer(req)
@@ -57,13 +67,20 @@ function install() {
  * Fetches the row the same way RecordPage does (the real hook, not a stub), so an action's
  * invalidation of the browsable-data query key genuinely refetches and re-renders the panel with
  * the updated row, proving the refresh-through-invalidation wiring actually works end to end
- * rather than assuming it.
+ * rather than assuming it. Defaults to airports (as every existing test used before countries
+ * joined); `onEdit` has no default, since whether it exists at all is what's under test here —
+ * RecordPage only ever supplies it for a table with an edit form.
  */
-function Harness({ onEdit = () => {} }: { onEdit?: () => void }) {
-  const rows = useAdminGetBrowsableTableData('airports', { Page: 1, PageSize: 50 })
+function Harness({ table = 'airports', entityType = 'Airport', onEdit }: {
+  table?: string
+  entityType?: 'Airport' | 'Airline' | 'Country'
+  onEdit?: () => void
+}) {
+  const rows = useAdminGetBrowsableTableData(table, { Page: 1, PageSize: 50 })
   const row = rows.data?.items?.[0]
   if (!row) return <p>Loading…</p>
-  return <VerificationPanel table="airports" entityType="Airport" recordKey={String(row.Id)} row={row} onEdit={onEdit} />
+  const key = table === 'countries' ? 'Code' : 'Id'
+  return <VerificationPanel table={table} entityType={entityType} recordKey={String(row[key])} row={row} onEdit={onEdit} />
 }
 
 function renderPanel(onEdit?: () => void) {
@@ -71,6 +88,16 @@ function renderPanel(onEdit?: () => void) {
   render(
     <QueryClientProvider client={queryClient}>
       <Harness onEdit={onEdit} />
+    </QueryClientProvider>,
+  )
+}
+
+/** Countries has no entry in EDIT_FORMS, so RecordPage never supplies onEdit for it — matched here by never passing one. */
+function renderCountryPanel() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Harness table="countries" entityType="Country" />
     </QueryClientProvider>,
   )
 }
@@ -124,7 +151,7 @@ describe('VerificationPanel', () => {
       sourceValues: { aeroapi: { Iata: 'JFK1', Name: 'John F Kennedy Intl' }, oag: { Iata: 'JFK2' } },
     }]
     install()
-    renderPanel()
+    renderPanel(() => {})
 
     const table = await screen.findByRole('table')
     expect(within(table).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Column', 'Ours', 'AeroAPI', 'OAG'])
@@ -132,9 +159,71 @@ describe('VerificationPanel', () => {
     const iataRow = within(table).getByText('Iata').closest('tr')!
     expect(within(iataRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Iata', 'JFK', 'JFK1', 'JFK2'])
 
+    // Airports have an edit form, so a mismatch offers Edit — unlike countries, see below.
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+
     // Name only differed for aeroapi: oag's cell has nothing to show, not a copy of "ours".
     const nameRow = within(table).getByText('Name').closest('tr')!
     expect(within(nameRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['Name', 'JFK Airport', 'John F Kennedy Intl', '—'])
+  })
+
+  it('a country mismatch offers no Edit: countries has no edit form for the button to switch into', async () => {
+    countries = [baseCountry({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{
+      id: 601, status: 'Mismatch', sources: ['mledoze'],
+      differences: [{ column: 'Name', ours: 'Germany', source: 'mledoze', sourceName: 'mledoze' }],
+      sourceValues: { mledoze: { Name: 'Deutschland' } },
+    }]
+    install()
+    renderCountryPanel()
+
+    expect(await screen.findByRole('button', { name: 'Take source values' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keep ours and verify' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+  })
+
+  it('a Mismatch with no actual differences falls back to the same rendering as no check on file', async () => {
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{ id: 501, status: 'Mismatch', sources: ['aeroapi'], differences: [] }]
+    install()
+    renderPanel()
+
+    expect(await screen.findByText('Automated check found a problem')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keep ours and verify' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Take/ })).not.toBeInTheDocument()
+  })
+
+  it('an empty-string difference value reads as — the same as a missing one, not blank', async () => {
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{
+      id: 501, status: 'Mismatch', sources: ['aeroapi'],
+      differences: [{ column: 'City', ours: '', source: 'aeroapi', sourceName: 'AeroAPI' }],
+      sourceValues: { aeroapi: { City: '' } },
+    }]
+    install()
+    renderPanel()
+
+    const table = await screen.findByRole('table')
+    const cityRow = within(table).getByText('City').closest('tr')!
+    expect(within(cityRow).getAllByRole('cell').map(c => c.textContent)).toEqual(['City', '—', '—'])
+  })
+
+  it('a needs-attention row on a table with no checkable entity type sends no check request', async () => {
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    install()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <VerificationPanel table="airports" entityType={undefined} recordKey="1" row={airports[0]} />
+      </QueryClientProvider>,
+    )
+
+    // Status-only: the plain toggle, not the needs-attention block.
+    expect(await screen.findByRole('button', { name: 'Verify' })).toBeInTheDocument()
+    expect(checkRequests()).toEqual([])
   })
 
   it("4. Take source values sends accept-source with that source's name, then the row shows as verified", async () => {
@@ -243,15 +332,21 @@ describe('VerificationPanel', () => {
       differences: [{ column: 'Iata', ours: 'JFK', source: 'aeroapi', sourceName: 'AeroAPI' }],
       sourceValues: { aeroapi: { Iata: 'JFK1' } },
     }]
-    acceptAnswer = () => { throw httpError(409, { title: 'Conflict' }) }
+    // detail carries which of the four documented causes actually fired (outside Production); the
+    // custom title above stands in for it, but the detail line itself must still come through.
+    acceptAnswer = () => { throw httpError(409, { title: 'Conflict', detail: 'A differing column changed since the check.' }) }
     install()
     renderPanel()
 
     await user.click(await screen.findByRole('button', { name: 'Take source values' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This row changed, or a check is already running')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('This row changed, or a check is already running')
+    expect(alert).toHaveTextContent('A differing column changed since the check.')
     expect(screen.getByText('Needs attention')).toBeInTheDocument()
     expect(field('Source')).toHaveTextContent('—')
+    // The row didn't change, so this is still a live option, not something the failure hid.
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
   })
 
   it('9. a Pending check shows "running" and offers no accept', async () => {
@@ -284,7 +379,7 @@ describe('VerificationPanel', () => {
       sourceValues: { aeroapi: { Iata: 'JFK1' } },
     }]
     install()
-    renderPanel()
+    renderPanel(() => {})
 
     expect(await screen.findByText('aeroapi')).toBeInTheDocument()
     expect(screen.getByText('Iata: JFK1')).toBeInTheDocument()

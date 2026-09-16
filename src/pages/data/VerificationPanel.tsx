@@ -47,7 +47,9 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
   entityType: EntityType | undefined
   recordKey: string
   row: Row
-  onEdit: () => void
+  // Undefined when the table has no edit form (e.g. countries): a button that cannot do anything
+  // must not be shown, so RecordPage only supplies this when there's somewhere for it to go.
+  onEdit?: () => void
 }) {
   const queryClient = useQueryClient()
   const state = verificationState(row)
@@ -168,10 +170,14 @@ function ErrorAlertMessage({ label, message: { title, detail } }: { label: strin
   )
 }
 
-/** A 409 from accept-source, worded per its two most likely causes rather than the raw ProblemDetails title. */
+/**
+ * A 409 from accept-source: the title is reworded to name the two most likely causes rather than
+ * showing the raw ProblemDetails title, but `detail` — the line saying which of the four the API
+ * actually hit, rendered outside Production — still comes through unchanged.
+ */
 function acceptSourceErrorMessage(error: unknown): { title: string; detail?: string } {
   const status = (error as { response?: { status?: number } } | null)?.response?.status
-  if (status === 409) return { title: 'This row changed, or a check is already running' }
+  if (status === 409) return { title: 'This row changed, or a check is already running', detail: apiErrorMessage(error).detail }
   return apiErrorMessage(error)
 }
 
@@ -191,7 +197,7 @@ function NeedsAttention({
   loadError: unknown
   check: VerificationRequestDto | undefined
   entityType: EntityType
-  onEdit: () => void
+  onEdit?: () => void
   onKeepOursAndVerify: () => void
   keepPending: boolean
   keepError: unknown
@@ -210,7 +216,9 @@ function NeedsAttention({
       Keep ours and verify
     </Button>
   )
-  const editButton = (
+  // Undefined (never null) when the table has no edit form; a falsy onEdit renders no button at
+  // all, rather than one that changes the URL and does nothing.
+  const editButton = onEdit && (
     <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit</Button>
   )
   const checkAgainButton = (
@@ -221,17 +229,22 @@ function NeedsAttention({
   const keepErrorAlert = Boolean(keepError) && <ErrorAlert text="Couldn't verify this record" error={keepError} />
   const checkAgainErrorAlert = Boolean(checkAgainError) && <ErrorAlert text="Couldn't queue a new check" error={checkAgainError} />
 
+  // The issue text plus Keep ours and verify / Check again: what "no check on file" shows, and
+  // also what a Mismatch with no actual differences falls back to below — there's nothing to
+  // compare or take either way.
+  const noCheckFallback = (
+    <div className="space-y-3">
+      <p className="text-gray-700">{issue}</p>
+      <div className="flex flex-wrap gap-2">{keepOursButton}{checkAgainButton}</div>
+      {keepErrorAlert}
+      {checkAgainErrorAlert}
+    </div>
+  )
+
   if (!check) {
     // The job set an issue but left no check row to explain it; kept simple since it should be
     // rare in practice (the job that leaves an issue also always leaves a check behind it).
-    return (
-      <div className="space-y-3">
-        <p className="text-gray-700">{issue}</p>
-        <div className="flex flex-wrap gap-2">{keepOursButton}{checkAgainButton}</div>
-        {keepErrorAlert}
-        {checkAgainErrorAlert}
-      </div>
-    )
+    return noCheckFallback
   }
 
   if (check.status === 'Pending' || check.status === 'Running') {
@@ -250,6 +263,10 @@ function NeedsAttention({
 
   if (check.status === 'Mismatch') {
     const differences = check.differences ?? []
+    // A Mismatch should always carry at least one difference; if it somehow doesn't there is
+    // nothing to compare or take, so this falls back to the same rendering as "no check on file".
+    if (differences.length === 0) return noCheckFallback
+
     const columns = [...new Set(differences.map(d => d.column).filter((c): c is string => text(c) !== undefined))]
     // Preserves first-seen order, and pairs each source's key with the display name its own
     // entries carry (falling back to the key when the API ever omits sourceName).
@@ -258,8 +275,10 @@ function NeedsAttention({
       if (text(d.source) && !sourceNames.has(d.source!)) sourceNames.set(d.source!, text(d.sourceName) ?? d.source!)
     }
     const sources = [...sourceNames.keys()]
-    const oursFor = (column: string) => differences.find(d => d.column === column)?.ours ?? '—'
-    const valueFor = (source: string, column: string) => check.sourceValues?.[source]?.[column] ?? '—'
+    // text() first so an empty string reads as "—" the same way a null does, like every other
+    // field in this panel — not a blank cell.
+    const oursFor = (column: string) => text(differences.find(d => d.column === column)?.ours) ?? '—'
+    const valueFor = (source: string, column: string) => text(check.sourceValues?.[source]?.[column]) ?? '—'
 
     return (
       <div className="space-y-3">

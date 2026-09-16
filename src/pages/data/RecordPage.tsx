@@ -133,7 +133,9 @@ function Record({ table, id }: { table: string; id: string }) {
               entityType={lookup(VERIFICATION_ENTITY_TYPES, table)}
               recordKey={id}
               row={row}
-              onEdit={() => setEditing(true)}
+              // Only when this table actually has a form to switch into (e.g. not countries) —
+              // otherwise Edit would change the URL to ?mode=edit and show nothing.
+              onEdit={Form ? () => setEditing(true) : undefined}
             />
           )}
 
