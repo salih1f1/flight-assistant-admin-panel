@@ -17,9 +17,12 @@ const TABLES = [
 
 type Row = Record<string, unknown>
 
-// Raw rows (GET /admin/data/{table}), trimmed to a few columns each. The request's own Id (1, 2,
-// 3) is deliberately far from the entity it checked (EntityKey), so a test sending the wrong one
-// is easy to tell apart.
+// Raw rows (GET /admin/data/{table}), trimmed to a few columns each. verification-requests'
+// columns are BrowsableTables.cs's own registry entry for it (Id, EntityType, EntityKey,
+// Sources, Trigger, Status, Attempts, ..., trimmed here to what this file's assertions need) —
+// the VerificationRequest entity's raw columns, not the typed VerificationRequestDto the record
+// page's own check-history read uses. The request's own Id (1, 2, 3) is deliberately far from the
+// entity it checked (EntityKey), so a test sending the wrong one is easy to tell apart.
 let rows: Record<string, Row[]>
 const makeRows = (): Record<string, Row[]> => ({
   'verification-requests': [

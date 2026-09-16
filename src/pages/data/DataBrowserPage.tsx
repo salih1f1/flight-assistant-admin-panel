@@ -9,8 +9,8 @@ import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData,
-  useAdminListBrowsableTables,
+  adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey,
+  getAdminGetVerificationNeedsAttentionQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -189,8 +189,14 @@ export function DataBrowserPage() {
 
   const verify = useMutation({
     mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
-    // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
-    onSuccess: (_, { table: slug }) => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) }),
+    onSuccess: (_, { table: slug }) => {
+      // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
+      void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) })
+      // The dashboard card's counts: verifying from the filtered "needs attention" grid this row
+      // linked from would otherwise leave the card showing a stale count for up to five minutes,
+      // pointing an admin back at a grid that's already empty.
+      void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+    },
   })
 
   const editable = table ? lookup(EDITABLE, table) : undefined

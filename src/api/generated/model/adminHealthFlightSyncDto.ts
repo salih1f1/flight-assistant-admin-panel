@@ -19,4 +19,6 @@ export interface AdminHealthFlightSyncDto {
   nextRunDueUtc?: string | null;
   /** @nullable */
   lastError?: string | null;
+  /** @nullable */
+  lastRunDurationSeconds?: number | null;
 }

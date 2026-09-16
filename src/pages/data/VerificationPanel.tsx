@@ -8,6 +8,7 @@ import {
   getAdminListVerificationRequestsQueryKey, useAdminAcceptVerificationSource, useAdminListVerificationRequests,
 } from '@/api/generated/admin'
 import type { VerificationRequestDto } from '@/api/generated/model'
+import { invalidateAirlines, invalidateAirports } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup, VERIFIERS } from './records'
@@ -72,7 +73,22 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
     onSuccess: refresh,
   })
 
-  const acceptSource = useAdminAcceptVerificationSource({ mutation: { onSuccess: refresh } })
+  const acceptSource = useAdminAcceptVerificationSource({
+    mutation: {
+      onSuccess: () => {
+        refresh()
+        // Accept-source writes real typed columns (Name, City, CountryCode, coordinates,
+        // elevation), but refresh() above only invalidates the raw table and the counts. The
+        // typed edit form prefetches from GET /admin/airports|airlines/{id}, which the
+        // QueryClient's 5-minute staleTime would otherwise leave stale: open Edit, back out,
+        // accept a source's values, open Edit again within five minutes, and it would show —
+        // and let an admin save back — the pre-accept values. Countries has no typed edit form
+        // (and so no invalidator here) to go stale in the first place.
+        if (table === 'airports') invalidateAirports(queryClient, Number(recordKey))
+        else if (table === 'airlines') invalidateAirlines(queryClient, Number(recordKey))
+      },
+    },
+  })
 
   const checkAgain = useMutation({
     // Re-checks with the sources that check actually used; only when it names none does this ask
@@ -135,7 +151,9 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
             onKeepOursAndVerify={() => verify.mutate(true)}
             keepPending={verify.isPending}
             keepError={verify.error}
-            onTakeSource={source => acceptSource.mutate({ id: check!.id!, data: { source } })}
+            // check.id is optional in the generated type; an undefined one would build a URL
+            // ending "/undefined/accept-source", so guard it rather than assert it non-null.
+            onTakeSource={source => check?.id !== undefined && acceptSource.mutate({ id: check.id, data: { source } })}
             takePending={acceptSource.isPending}
             takeError={acceptSource.error}
             onCheckAgain={() => checkAgain.mutate()}
@@ -279,6 +297,9 @@ function NeedsAttention({
     // field in this panel — not a blank cell.
     const oursFor = (column: string) => text(differences.find(d => d.column === column)?.ours) ?? '—'
     const valueFor = (sourceName: string, column: string) => text(check.sourceValues?.[sourceName]?.[column]) ?? '—'
+    // check.id is optional in the generated type; an undefined one would build a URL ending
+    // "/undefined/accept-source", so there is nothing safe to take without it.
+    const canTake = check.id !== undefined
 
     return (
       <div className="space-y-3">
@@ -302,7 +323,7 @@ function NeedsAttention({
         </Table>
 
         <div className="flex flex-wrap gap-2">
-          {sourceNames.map(sourceName => (
+          {canTake && sourceNames.map(sourceName => (
             <Button
               key={sourceName}
               type="button"

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
-import { useAdminGetBrowsableTableData } from '@/api/generated/admin'
+import { getAdminGetAirportByIdQueryKey, useAdminGetBrowsableTableData } from '@/api/generated/admin'
 import { VerificationPanel } from './VerificationPanel'
 
 vi.mock('@/api/client', () => ({
@@ -207,6 +207,54 @@ describe('VerificationPanel', () => {
       method: 'POST', url: '/admin/verification-requests/701/accept-source', params: undefined, data: { source: 'ourairports' },
     })
     expect(await screen.findByText('Verified · ourairports')).toBeInTheDocument()
+  })
+
+  it("accepting a source also invalidates the typed airport cache, so a later Edit can't show pre-accept values", async () => {
+    // AirportFormPage (the consumer of the typed useAdminGetAirportById cache this invalidates)
+    // isn't mounted in this test's tree, so there's no behavioural way to prove Edit picks up
+    // fresh data here. Spying on the QueryClient and asserting the invalidated key is the closest
+    // available proof, per the controller's ruling.
+    const user = userEvent.setup()
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{
+      id: 801, status: 'Mismatch', sources: ['ourairports'],
+      differences: [{ column: 'Name', ours: 'JFK Airport', source: 'John F Kennedy Intl', sourceName: 'ourairports' }],
+      sourceValues: { ourairports: { Name: 'John F Kennedy Intl' } },
+    }]
+    acceptAnswer = acceptSource
+    install()
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Take source values' }))
+    await screen.findByText('Verified · ourairports')
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetAirportByIdQueryKey(1) })
+  })
+
+  it('a Mismatch check with no id offers no Take buttons: nothing safe to post an accept-source to', async () => {
+    airports = [baseAirport({ VerificationIssue: 'Automated check found a problem' })]
+    checksAnswer = () => [{
+      // id omitted: the generated type marks it optional, and an undefined one would build a URL
+      // ending "/undefined/accept-source".
+      status: 'Mismatch', sources: ['ourairports'],
+      differences: [{ column: 'Name', ours: 'JFK Airport', source: 'John F Kennedy Intl', sourceName: 'ourairports' }],
+      sourceValues: { ourairports: { Name: 'John F Kennedy Intl' } },
+    }]
+    install()
+    renderPanel()
+
+    await screen.findByRole('table')
+    expect(screen.queryByRole('button', { name: /Take/ })).not.toBeInTheDocument()
+    // Every other action stays available: only the accept path needs the missing id.
+    expect(screen.getByRole('button', { name: 'Keep ours and verify' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
   })
 
   it('a country mismatch offers no Edit: countries has no edit form for the button to switch into', async () => {

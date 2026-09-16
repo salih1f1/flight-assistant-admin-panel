@@ -11,7 +11,10 @@ vi.mock('@/api/client', () => ({
 // Mirrors VERIFICATION_ENTITY_TYPES's slug -> entityType map (src/pages/data/verificationChecks.ts).
 const gridLink = (slug: string) => `/data/${slug}?${new URLSearchParams({ filter: 'VerificationIssue:*' })}`
 
-// GetVerificationNeedsAttentionQuery's shape: always all three, zero-filled.
+// Shaped like VerificationNeedsAttentionDto (FlightAssistant.Contracts), as
+// AdminVerificationEndpointTests.GetNeedsAttention_Returns200_WithAllThreeEntityTypes_InEnumOrder
+// asserts it: always all three types, in enum order (Airport, Airline, Country), zero-filled
+// rather than an omitted entry.
 const counts = (overrides: Partial<Record<'Airport' | 'Airline' | 'Country', number>> = {}) => [
   { entityType: 'Airport', count: overrides.Airport ?? 0 },
   { entityType: 'Airline', count: overrides.Airline ?? 0 },
