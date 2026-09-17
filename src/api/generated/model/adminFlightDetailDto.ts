@@ -30,4 +30,14 @@ export interface AdminFlightDetailDto {
   /** @nullable */
   statusHistory?: AdminFlightStatusEventDto[] | null;
   statusHistoryTruncated?: boolean;
+  /** @nullable */
+  lastSyncedUtc?: string | null;
+  /** @nullable */
+  nextSyncDueUtc?: string | null;
+  /** @nullable */
+  syncMode?: string | null;
+  /** @nullable */
+  scheduleMissingSinceUtc?: string | null;
+  /** @nullable */
+  cancelledAtUtc?: string | null;
 }

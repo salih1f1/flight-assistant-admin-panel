@@ -29,6 +29,7 @@ import type {
   AdminFlightDetailDto,
   AdminFlightDto,
   AdminFlightDtoPagedResult,
+  AdminFlightSyncResultDto,
   AdminGetAeroApiUsageParams,
   AdminGetAllAirlinesParams,
   AdminGetAllAirportsParams,
@@ -2910,7 +2911,7 @@ export const useAdminDeleteFlight = <TError = ErrorType<unknown>,
     }
 
 /**
- * Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise { updated: true } means an event was recorded — a new status, a revised time for the status the flight already has, or a gate, terminal or baggage-claim change on the current status — and { updated: false } means none was, which still allows a revised estimated arrival or aircraft type to have been saved. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503. Returns 404 if no flight with that id exists — unlike the traveler route, which answers 403 because it checks the tracking link first. 503 also covers the flight data provider throttling requests, not only the monthly budget; 502 is returned when the provider is unreachable or answers unexpectedly, and 500 for a provider configuration problem. Like every /admin route, an unauthenticated caller gets 401 and a caller without the admin role gets 403; neither is declared per-route because both are identical across the whole admin surface.
+ * Syncs the flight's status now and returns what it did, as an outcome name plus the sync plan it left behind. StatusUpdated means an event was recorded — a new status, a revised time for the status the flight already has, or a gate, terminal or baggage-claim change on the current status. NoChange means a call ran and found none of those, which still allows a revised estimated arrival or aircraft type to have been saved. NoDataYet means the call ran and the provider has no row for the service date, which is what a flight outside the live-status window gets. NotTracked means no traveler tracks the flight, so no call was made and its sync plan was cleared. ScheduleUpdated and NotInSchedule come from the daily schedule check and cannot occur until that check exists. Before #443 all of these were a single { updated } boolean, and the 200 was declared with no body at all, so a generated client saw a void response; the traveler route keeps { updated }. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503. Returns 404 if no flight with that id exists — unlike the traveler route, which answers 403 because it checks the tracking link first. 503 also covers the flight data provider throttling requests, not only the monthly budget; 502 is returned when the provider is unreachable or answers unexpectedly, and 500 for a provider configuration problem. Like every /admin route, an unauthenticated caller gets 401 and a caller without the admin role gets 403; neither is declared per-route because both are identical across the whole admin surface.
  * @summary Sync flight status
  */
 export const adminSyncFlightStatus = (
@@ -2919,7 +2920,7 @@ export const adminSyncFlightStatus = (
 ) => {
 
 
-      return apiRequest<void>(
+      return apiRequest<AdminFlightSyncResultDto>(
       {url: `/admin/flights/${id}/sync`, method: 'POST', signal
     },
       options);

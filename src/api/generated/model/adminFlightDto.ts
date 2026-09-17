@@ -25,4 +25,14 @@ export interface AdminFlightDto {
   actualArrivalUtc?: string | null;
   /** @nullable */
   equipmentAircraftIcao?: string | null;
+  /** @nullable */
+  lastSyncedUtc?: string | null;
+  /** @nullable */
+  nextSyncDueUtc?: string | null;
+  /** @nullable */
+  syncMode?: string | null;
+  /** @nullable */
+  scheduleMissingSinceUtc?: string | null;
+  /** @nullable */
+  cancelledAtUtc?: string | null;
 }
