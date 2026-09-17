@@ -60,6 +60,8 @@ const makeHealth = () => ({
     nextRunDueUtc: '2026-09-14T03:15:00Z' as string | null,
     lastError: null as string | null,
     pendingCount: 5 as number | null,
+    requestsPaused: 0,
+    recentFailures: [] as { failedSource: string | null; entityType: string; count: number }[] | null,
   },
 })
 
@@ -252,6 +254,102 @@ describe('Dashboard system health', () => {
     const verification = panel(section, 'Verification')
     expect(verification).toHaveTextContent('2 stuck requests')
     expect(verification).toHaveTextContent('1 unrecorded failure')
+  })
+
+  // A paused cycle (backend #401) worked its batch but held AeroAPI work back because the
+  // month's budget is gone. It is neither Success nor Failed, and the panel used to fall
+  // through to "Not run since the API started" — the one reading an operator must not get,
+  // since it describes an idle job rather than a job out of money.
+  it('shows a budget-paused cycle as paused, not as one that never ran', async () => {
+    health.verification = { ...health.verification, lastOutcome: 'Paused', requestsPaused: 4 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Last run paused at 2026-09-14 03:10 UTC — out of AeroAPI budget')
+    expect(verification).not.toHaveTextContent('Not run since the API started')
+  })
+
+  it('keeps reporting what a paused cycle did get through', async () => {
+    health.verification = { ...health.verification, lastOutcome: 'Paused', requestsPaused: 4 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    // The counts describe the cycle whatever its outcome; gating them on Success/Failed hid
+    // the work a paused cycle actually did.
+    expect(panel(section, 'Verification')).toHaveTextContent('8 requests processed, 1 failed')
+  })
+
+  it('shows how many requests the pause held back', async () => {
+    health.verification = { ...health.verification, lastOutcome: 'Paused', requestsPaused: 4 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Verification')).toHaveTextContent('4 paused requests')
+  })
+
+  it('hides the paused count when nothing was held back', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Verification')).not.toHaveTextContent('paused request')
+  })
+
+  it('groups the last 24 hours of failures by source and entity type', async () => {
+    health.verification = {
+      ...health.verification,
+      recentFailures: [
+        { failedSource: 'AeroAPI', entityType: 'Airport', count: 3 },
+        { failedSource: 'OurAirports', entityType: 'Airport', count: 1 },
+      ],
+    }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Failed in the last 24 hours')
+    expect(verification).toHaveTextContent('AeroAPI · Airport: 3')
+    expect(verification).toHaveTextContent('OurAirports · Airport: 1')
+  })
+
+  // A null failedSource is a real group the backend chose not to drop (deleted entity,
+  // unexpected exception, abandoned claim), so it has to be named rather than skipped.
+  it('names a failure group that is attributable to no one source', async () => {
+    health.verification = {
+      ...health.verification,
+      recentFailures: [{ failedSource: null, entityType: 'Country', count: 2 }],
+    }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Verification')).toHaveTextContent('Unattributed · Country: 2')
+  })
+
+  it('stays quiet when nothing failed in the last 24 hours', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Verification')).not.toHaveTextContent('Failed in the last 24 hours')
+  })
+
+  // Same distinction pendingCount already makes: an unreadable list is "cannot tell", which is
+  // a different claim from the empty list that means nothing failed.
+  it("says what failed recently can't be told, rather than nothing, when it's null", async () => {
+    health.verification = { ...health.verification, recentFailures: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent("Can't tell what failed recently")
+    expect(verification).not.toHaveTextContent('Failed in the last 24 hours')
   })
 
   it('shows the environment, version, build, uptime and what is configured', async () => {
