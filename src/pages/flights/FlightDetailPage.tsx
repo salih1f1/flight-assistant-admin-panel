@@ -1,12 +1,17 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AirlineName, AirportName } from '@/components/ReferenceNames'
-import { useAdminGetFlightDetail } from '@/api/generated/admin'
+import { adminSyncFlightStatus, getAdminGetFlightDetailQueryKey, useAdminGetFlightDetail } from '@/api/generated/admin'
 import type { AdminFlightDetailDto, AdminFlightStatusEventDto } from '@/api/generated/model'
+import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
+import { cn } from '@/lib/utils'
+import { isNextSyncOverdue, SYNC_MODE_TONES, syncResultMessage } from './syncOutcome'
 
 // GetAdminFlightDetailQueryHandler.MaxStatusHistory.
 const MAX_STATUS_HISTORY = 50
@@ -73,6 +78,8 @@ function FlightDetail({ flight }: { flight: AdminFlightDetailDto }) {
         </dl>
       </Section>
 
+      <SyncSection flight={flight} />
+
       <Section id="flight-current-status" title="Current status">
         {current ? (
           <p className="text-sm">
@@ -125,6 +132,76 @@ function FlightDetail({ flight }: { flight: AdminFlightDetailDto }) {
         )}
       </Section>
     </>
+  )
+}
+
+/**
+ * How this flight is being polled, and a way to poll it now (spec §3.2). The five fields behind it
+ * live on the flight and were previously visible only in the raw data browser, so an operator had
+ * no way to tell an actively-polled flight from one the loop has stopped touching.
+ */
+function SyncSection({ flight }: { flight: AdminFlightDetailDto }) {
+  const queryClient = useQueryClient()
+  const sync = useMutation({
+    mutationFn: () => adminSyncFlightStatus(flight.id!),
+    onSuccess: () => {
+      // The sync re-plans the flight and may record a status event, so the page it's shown on and
+      // the raw grids both go stale.
+      void queryClient.invalidateQueries({ queryKey: getAdminGetFlightDetailQueryKey(flight.id!) })
+      void invalidateRawTables(queryClient)
+    },
+  })
+
+  const mode = flight.syncMode
+  const overdue = isNextSyncOverdue(flight.nextSyncDueUtc, Date.now())
+
+  return (
+    <Section id="flight-sync" title="Sync">
+      <div className="flex flex-wrap items-center gap-3">
+        {mode ? (
+          <span className={cn('rounded-md px-2 py-0.5 text-sm font-medium', SYNC_MODE_TONES[mode] ?? 'bg-gray-100 text-gray-700')}>
+            {mode}
+          </span>
+        ) : (
+          // Not a blank mode: "no plan" is a fact about the flight, and its reason is the useful part.
+          <Empty>Not synced (no traveler tracks this flight)</Empty>
+        )}
+        <Button size="sm" variant="outline" disabled={sync.isPending} onClick={() => sync.mutate()}>
+          {sync.isPending ? 'Syncing…' : 'Sync now'}
+        </Button>
+      </div>
+
+      <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <Fact label="Last sync">{utc(flight.lastSyncedUtc)}</Fact>
+        <Fact label="Next sync">{utc(flight.nextSyncDueUtc)}</Fact>
+      </dl>
+
+      {overdue && (
+        <p className="text-sm text-amber-700">
+          Next sync overdue — the background sync may not be running.
+        </p>
+      )}
+      {flight.scheduleMissingSinceUtc && (
+        <p className="text-sm text-red-700">
+          {`Not in schedule since ${utc(flight.scheduleMissingSinceUtc)}.`}
+        </p>
+      )}
+
+      {sync.isSuccess && !sync.isPending && (
+        <p role="status" className="text-sm text-gray-700">{syncResultMessage(sync.data)}</p>
+      )}
+      {sync.error && <SyncError error={sync.error} />}
+    </Section>
+  )
+}
+
+function SyncError({ error }: { error: unknown }) {
+  const { title, detail } = apiErrorMessage(error)
+  return (
+    <Alert>
+      <p>{`Could not sync: ${title}`}</p>
+      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
+    </Alert>
   )
 }
 
