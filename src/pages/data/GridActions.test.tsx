@@ -57,7 +57,8 @@ function api(req: SentRequest) {
     const id = Number(m[1])
     // Syncing pulls the latest status from the provider; here the flight has departed.
     rows.flights = rows.flights.map(f => (f.Id === id ? { ...f, ActualDepartureUtc: '2026-09-13T10:05:00Z' } : f))
-    return undefined
+    // Shaped like AdminFlightSyncResultDto, which replaced the untyped { updated } in backend #443.
+    return { outcome: 'NoDataYet', lastSyncedUtc: '2026-09-13T10:05:00Z', nextSyncDueUtc: '2026-09-13T10:15:00Z', syncMode: 'Live', scheduleMissingSinceUtc: null }
   }
   throw httpError(404)
 }
@@ -203,5 +204,46 @@ describe('DataBrowserPage row actions', () => {
     await user.click(within(await rowOf('FA001')).getByRole('button', { name: 'Sync status' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not sync FA001: Request failed with status code 502')
+  })
+
+  // ── Sync result line (#81, spec §3.1) ──
+  //
+  // Until now Sync was one of the row actions with no success line at all, so an admin clicked it
+  // and — short of an error — nothing appeared. A sync that recorded a status, found nothing, found
+  // no live data, or declined to call because nobody tracks the flight all looked identical.
+
+  it('says what a sync did, naming the flight', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/flights')
+
+    await user.click(within(await rowOf('FA002')).getByRole('button', { name: 'Sync status' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'FA002: AeroAPI has no live data for this flight yet. Next sync 2026-09-13 10:15 UTC.')
+  })
+
+  it('shows no sync result before a sync has run', async () => {
+    renderAt('/data/flights')
+    await rowOf('FA002')
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  // DataBrowserPage doesn't remount on a plain :table change, so without an explicit reset the
+  // mutation outlives the switch and its banner reappears on return — the same trap Retry hit (#77).
+  it('does not carry a sync result back to the flights table after switching away', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/flights')
+
+    await user.click(within(await rowOf('FA002')).getByRole('button', { name: 'Sync status' }))
+    await screen.findByRole('status')
+
+    await router.navigate('/data/airlines')
+    await screen.findByText('British Airways')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+    await router.navigate('/data/flights')
+    await rowOf('FA002')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

@@ -15,6 +15,7 @@ export * from './adminFlightDetailDto';
 export * from './adminFlightDto';
 export * from './adminFlightDtoPagedResult';
 export * from './adminFlightStatusEventDto';
+export * from './adminFlightSyncResultDto';
 export * from './adminGetAeroApiUsageParams';
 export * from './adminGetAllAirlinesParams';
 export * from './adminGetAllAirportsParams';

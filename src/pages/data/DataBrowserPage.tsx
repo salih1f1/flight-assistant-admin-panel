@@ -17,12 +17,16 @@ import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
+import { syncResultMessage } from '../flights/syncOutcome'
 import { VerificationStatusBadge } from './VerificationStatus'
 import { CHECKED_COLUMNS } from './verificationChecks'
 import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
+
+/** How a sync line names its flight: its number, or its id when the column is hidden or empty. */
+const flightLabel = (flight: Row) => String(flight.FlightNumber ?? `flight ${flight.Id}`)
 
 // Retry belongs to this one table's grid, the same way Sync belongs to flights only — never
 // offered generically to every table.
@@ -229,10 +233,13 @@ export function DataBrowserPage() {
   // true again on return, showing the same banner as if a fresh retry had just run. Comparing
   // `table` against the previous render's value and resetting on a change is this file's own
   // "adjust state while rendering" idiom (selectionView/dialogView elsewhere in this component).
+  //
+  // Sync grew a success line in #81 and is now in exactly the same position, so it resets here too.
   const [retryTable, setRetryTable] = useState(table)
   if (table !== retryTable) {
     setRetryTable(table)
     retry.reset()
+    sync.reset()
   }
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
@@ -446,7 +453,12 @@ export function DataBrowserPage() {
             />
           )}
           {sync.error && table === 'flights' && sync.variables && (
-            <ActionError text={`Could not sync ${String(sync.variables.FlightNumber ?? `flight ${sync.variables.Id}`)}`} error={sync.error} />
+            <ActionError text={`Could not sync ${flightLabel(sync.variables)}`} error={sync.error} />
+          )}
+          {sync.isSuccess && table === 'flights' && sync.variables && (
+            <p role="status" className="text-sm text-gray-700">
+              {`${flightLabel(sync.variables)}: ${syncResultMessage(sync.data)}`}
+            </p>
           )}
           {retry.isSuccess && retry.variables?.table === table && (
             <p role="status" className="text-sm text-gray-700">{`Queued ${retry.data?.queued ?? 0} · skipped ${retry.data?.skipped ?? 0}`}</p>

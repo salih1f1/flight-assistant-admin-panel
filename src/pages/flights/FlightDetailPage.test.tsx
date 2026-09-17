@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,6 +34,12 @@ const makeDetail = () => ({
   currentStatus: DELAYED as typeof DELAYED | null,
   statusHistory: [DELAYED, SCHEDULED],
   statusHistoryTruncated: false,
+  // The sync plan (#81), as the admin flight DTOs carry it since backend #443.
+  lastSyncedUtc: '2026-09-20T09:41:00Z' as string | null,
+  nextSyncDueUtc: '2026-09-20T09:51:00Z' as string | null,
+  syncMode: 'Live' as string | null,
+  scheduleMissingSinceUtc: null as string | null,
+  cancelledAtUtc: null as string | null,
 })
 
 // Shaped like AirlineAdminDto and AirportAdminDto, as GET /admin/airlines/{id} and /admin/airports/{id} return them.
@@ -42,6 +49,8 @@ const JFK = { id: 12, iata: 'JFK', icao: 'KJFK', name: 'New York JFK', city: 'Ne
 
 let detail: ReturnType<typeof makeDetail>
 let sent: SentRequest[]
+/** Set by the one test that needs POST /admin/flights/{id}/sync to fail. */
+let syncFails: boolean
 
 function renderAt(id: string) {
   const router = createMemoryRouter(
@@ -61,7 +70,13 @@ const fact = (container: HTMLElement, label: string) => within(container).getByT
 describe('FlightDetailPage', () => {
   beforeEach(() => {
     detail = makeDetail()
+    syncFails = false
     ;({ sent } = installFakeApi(req => {
+      if (req.method === 'POST' && req.url === `/admin/flights/${FLIGHT_ID}/sync`) {
+        if (syncFails) throw httpError(503, 'Flight status can\'t be refreshed right now.')
+        // Shaped like AdminFlightSyncResultDto.
+        return { outcome: 'NoDataYet', lastSyncedUtc: '2026-09-20T09:41:00Z', nextSyncDueUtc: '2026-09-20T09:51:00Z', syncMode: 'Live', scheduleMissingSinceUtc: null }
+      }
       if (req.method === 'GET' && req.url === '/admin/airlines/7') return BRITISH_AIRWAYS
       if (req.method === 'GET' && req.url === '/admin/airports/11') return HEATHROW
       if (req.method === 'GET' && req.url === '/admin/airports/12') return JFK
@@ -168,5 +183,79 @@ describe('FlightDetailPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(`'${id}' isn't a flight id.`)
     await waitFor(() => expect(sent).toHaveLength(0))
+  })
+
+  // ── Sync section (#81, spec §3.2) ──
+
+  const syncSection = () => region('Sync')
+
+  it('shows the sync mode, last sync and next sync', async () => {
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    const sync = syncSection()
+    expect(within(sync).getByText('Live')).toBeInTheDocument()
+    expect(fact(sync, 'Last sync')).toHaveTextContent('2026-09-20 09:41 UTC')
+    expect(fact(sync, 'Next sync')).toHaveTextContent('2026-09-20 09:51 UTC')
+  })
+
+  it('says a flight nobody tracks is not synced, rather than showing a blank mode', async () => {
+    detail = { ...detail, syncMode: null, nextSyncDueUtc: null }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).toHaveTextContent('Not synced (no traveler tracks this flight)')
+  })
+
+  // A next sync well in the past means the background loop isn't running — the one thing this
+  // section exists to make visible, since nothing else in the panel would show it.
+  it('warns when the next sync is overdue', async () => {
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    detail = { ...detail, nextSyncDueUtc: '2026-09-20T09:51:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).toHaveTextContent('Next sync overdue')
+  })
+
+  it('does not call a next sync barely past overdue', async () => {
+    // Four minutes late: the loop runs every minute, so a small lag is normal, not a fault.
+    vi.setSystemTime(new Date('2026-09-20T09:55:00Z'))
+    detail = { ...detail, nextSyncDueUtc: '2026-09-20T09:51:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).not.toHaveTextContent('overdue')
+  })
+
+  it('warns when the flight has gone missing from the schedule', async () => {
+    detail = { ...detail, scheduleMissingSinceUtc: '2026-09-18T06:00:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).toHaveTextContent('Not in schedule since 2026-09-18 06:00 UTC')
+  })
+
+  it('syncs the flight and says what the sync did', async () => {
+    const user = userEvent.setup()
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    await user.click(within(syncSection()).getByRole('button', { name: 'Sync now' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'AeroAPI has no live data for this flight yet. Next sync 2026-09-20 09:51 UTC.')
+    expect(sent).toContainEqual(expect.objectContaining({ method: 'POST', url: `/admin/flights/${FLIGHT_ID}/sync` }))
+  })
+
+  it('shows a failed sync as an error, not as an outcome', async () => {
+    syncFails = true
+    const user = userEvent.setup()
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    await user.click(within(syncSection()).getByRole('button', { name: 'Sync now' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sync')
   })
 })
