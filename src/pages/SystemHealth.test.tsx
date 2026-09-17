@@ -46,6 +46,7 @@ const makeHealth = () => ({
     flightsFailed: 3,
     nextRunDueUtc: '2026-09-13T20:20:00Z' as string | null,
     lastError: 'DomainException: The flight status request was rejected.' as string | null,
+    lastRunDurationSeconds: 42.5 as number | null,
   },
   // Different numbers from flightSync throughout, so a panel wired to the wrong field is caught.
   verification: {
@@ -179,6 +180,47 @@ describe('Dashboard system health', () => {
     const sync = panel(section, 'Flight status sync')
     expect(sync).toHaveTextContent('Not run since the API started')
     expect(sync).not.toHaveTextContent('flights processed')
+  })
+
+  it('says how long the last flight-sync run took', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Flight status sync')).toHaveTextContent('took 42.5s')
+  })
+
+  // FlightSync:LoopInterval defaults to a minute, so a run at or past that is exactly the case an
+  // operator is looking for — it must not read as a wall of seconds.
+  it('reads a long run in minutes', async () => {
+    health.flightSync = { ...health.flightSync, lastRunDurationSeconds: 125 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Flight status sync')).toHaveTextContent('took 2m 5s')
+  })
+
+  // Same distinction the verification panel already makes for its null counts: not measured is a
+  // different claim from measured-as-zero, and an instant run is what 0 would say.
+  it("says the run time isn't measured yet, rather than 0, when it's null", async () => {
+    health.flightSync = { ...health.flightSync, lastRunDurationSeconds: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const sync = panel(section, 'Flight status sync')
+    expect(sync).not.toHaveTextContent('took 0')
+    expect(sync).not.toHaveTextContent('0s')
+  })
+
+  it('leaves the run time out until a run has finished', async () => {
+    health.flightSync = { ...health.flightSync, lastOutcome: 'Running', lastRunCompletedUtc: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Flight status sync')).not.toHaveTextContent('took')
   })
 
   it('says when the flight sync is disabled', async () => {

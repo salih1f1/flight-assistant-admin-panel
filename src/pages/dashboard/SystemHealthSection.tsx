@@ -176,12 +176,30 @@ function FlightSync({ sync }: { sync: AdminHealthFlightSyncDto | undefined }) {
         <p className="text-gray-500">Not run since the API started</p>
       )}
       {finished && (
-        <p className="text-xs text-gray-500">{`${sync?.flightsProcessed ?? 0} flights processed, ${sync?.flightsFailed ?? 0} failed`}</p>
+        <p className="text-xs text-gray-500">
+          {`${sync?.flightsProcessed ?? 0} flights processed, ${sync?.flightsFailed ?? 0} failed`}
+          {/* Null is "not measured yet", never 0 — 0 would claim an instant run. Omitted rather
+              than spelled out: the counts line beside it already says the run finished. */}
+          {sync?.lastRunDurationSeconds != null && `, took ${formatRunDuration(sync.lastRunDurationSeconds)}`}
+        </p>
       )}
       {sync?.lastError && <p className="text-xs text-red-600">{sync.lastError}</p>}
       {sync?.nextRunDueUtc && <p className="text-xs text-gray-500">{`Next run ${formatUtcMinute(sync.nextRunDueUtc)} UTC`}</p>}
     </Panel>
   )
+}
+
+/**
+ * How long a sync run took. Minutes once it reaches one, because FlightSync:LoopInterval defaults
+ * to a minute and a run at or past that is the case worth noticing — the next run starts
+ * immediately rather than on the tick, so each flight is polled less often than the interval
+ * suggests (#353). The panel can't say so outright: /admin/health doesn't publish the interval,
+ * so there is nothing to compare against here.
+ */
+function formatRunDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds * 10) / 10}s`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}m ${Math.round(seconds - minutes * 60)}s`
 }
 
 /** "1 thing" / "2 things": simple pluralization for the abnormal-only counts below. */
