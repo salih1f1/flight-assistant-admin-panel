@@ -463,7 +463,7 @@ export const adminUpdateAirline = (
 
 export const getAdminUpdateAirlineMutationKey = () => ['adminUpdateAirline'] as const;
 
-export const getAdminUpdateAirlineMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminUpdateAirlineMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirline>>, TError,AdminUpdateAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirline>>, TError,AdminUpdateAirlineMutationVariables, TContext> => {
 
@@ -492,13 +492,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminUpdateAirlineMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateAirline>>>
     export type AdminUpdateAirlineMutationBody = BodyType<UpdateAirlineRequest>
-    export type AdminUpdateAirlineMutationError = ErrorType<ProblemDetails>
+    export type AdminUpdateAirlineMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminUpdateAirlineMutationVariables = {id: number;data: BodyType<UpdateAirlineRequest>}
 
     /**
  * @summary Update airline
  */
-export const useAdminUpdateAirline = <TError = ErrorType<ProblemDetails>,
+export const useAdminUpdateAirline = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirline>>, TError,AdminUpdateAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminUpdateAirline>>,
@@ -529,7 +529,7 @@ export const adminDeleteAirline = (
 
 export const getAdminDeleteAirlineMutationKey = () => ['adminDeleteAirline'] as const;
 
-export const getAdminDeleteAirlineMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminDeleteAirlineMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirline>>, TError,AdminDeleteAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirline>>, TError,AdminDeleteAirlineMutationVariables, TContext> => {
 
@@ -558,13 +558,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteAirlineMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteAirline>>>
 
-    export type AdminDeleteAirlineMutationError = ErrorType<ProblemDetails>
+    export type AdminDeleteAirlineMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminDeleteAirlineMutationVariables = {id: number}
 
     /**
  * @summary Delete airline
  */
-export const useAdminDeleteAirline = <TError = ErrorType<ProblemDetails>,
+export const useAdminDeleteAirline = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirline>>, TError,AdminDeleteAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteAirline>>,
@@ -922,7 +922,7 @@ export const adminUpdateAirport = (
 
 export const getAdminUpdateAirportMutationKey = () => ['adminUpdateAirport'] as const;
 
-export const getAdminUpdateAirportMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminUpdateAirportMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirport>>, TError,AdminUpdateAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirport>>, TError,AdminUpdateAirportMutationVariables, TContext> => {
 
@@ -951,13 +951,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminUpdateAirportMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateAirport>>>
     export type AdminUpdateAirportMutationBody = BodyType<UpdateAirportRequest>
-    export type AdminUpdateAirportMutationError = ErrorType<ProblemDetails>
+    export type AdminUpdateAirportMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminUpdateAirportMutationVariables = {id: number;data: BodyType<UpdateAirportRequest>}
 
     /**
  * @summary Update airport
  */
-export const useAdminUpdateAirport = <TError = ErrorType<ProblemDetails>,
+export const useAdminUpdateAirport = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateAirport>>, TError,AdminUpdateAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminUpdateAirport>>,
@@ -988,7 +988,7 @@ export const adminDeleteAirport = (
 
 export const getAdminDeleteAirportMutationKey = () => ['adminDeleteAirport'] as const;
 
-export const getAdminDeleteAirportMutationOptions = <TError = ErrorType<unknown>,
+export const getAdminDeleteAirportMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirport>>, TError,AdminDeleteAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirport>>, TError,AdminDeleteAirportMutationVariables, TContext> => {
 
@@ -1017,13 +1017,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteAirportMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteAirport>>>
 
-    export type AdminDeleteAirportMutationError = ErrorType<unknown>
+    export type AdminDeleteAirportMutationError = ErrorType<HttpValidationProblemDetails>
     export type AdminDeleteAirportMutationVariables = {id: number}
 
     /**
  * @summary Delete airport
  */
-export const useAdminDeleteAirport = <TError = ErrorType<unknown>,
+export const useAdminDeleteAirport = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteAirport>>, TError,AdminDeleteAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteAirport>>,
@@ -2563,7 +2563,7 @@ export function useAdminSearchFlights<TData = Awaited<ReturnType<typeof adminSea
 
 
 /**
- * Returns the flight with its current status and its 50 most recent status events, newest first — the record of what the sync actually saw. Not the full history: a long-tracked flight polled every couple of minutes accumulates status-event rows without bound. StatusHistoryTruncated is true when the cap actually cut rows off; when it is, see GET /admin/data/flight-status-events for the rest.
+ * Returns the flight with its current status and its 50 most recent status events, most recently recorded first (by event id) — the record of what the sync actually saw, in the order it saw it. Not ordered by effectiveAtUtc, which can move backwards when an estimate returns to an earlier value. Not the full history: a long-tracked flight polled every couple of minutes accumulates status-event rows without bound. StatusHistoryTruncated is true when the cap actually cut rows off; when it is, see GET /admin/data/flight-status-events for the rest.
  * @summary Get flight detail
  */
 export const adminGetFlightDetail = (
@@ -2910,7 +2910,7 @@ export const useAdminDeleteFlight = <TError = ErrorType<unknown>,
     }
 
 /**
- * Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise returns { updated: true } if a new status was recorded. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503.
+ * Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise { updated: true } means an event was recorded — a new status, a revised time for the status the flight already has, or a gate, terminal or baggage-claim change on the current status — and { updated: false } means none was, which still allows a revised estimated arrival or aircraft type to have been saved. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503. Returns 404 if no flight with that id exists — unlike the traveler route, which answers 403 because it checks the tracking link first. 503 also covers the flight data provider throttling requests, not only the monthly budget; 502 is returned when the provider is unreachable or answers unexpectedly, and 500 for a provider configuration problem. Like every /admin route, an unauthenticated caller gets 401 and a caller without the admin role gets 403; neither is declared per-route because both are identical across the whole admin surface.
  * @summary Sync flight status
  */
 export const adminSyncFlightStatus = (
@@ -2930,7 +2930,7 @@ export const adminSyncFlightStatus = (
 
 export const getAdminSyncFlightStatusMutationKey = () => ['adminSyncFlightStatus'] as const;
 
-export const getAdminSyncFlightStatusMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminSyncFlightStatusMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext> => {
 
@@ -2959,13 +2959,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminSyncFlightStatusMutationResult = NonNullable<Awaited<ReturnType<typeof adminSyncFlightStatus>>>
 
-    export type AdminSyncFlightStatusMutationError = ErrorType<ProblemDetails>
+    export type AdminSyncFlightStatusMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminSyncFlightStatusMutationVariables = {id: number}
 
     /**
  * @summary Sync flight status
  */
-export const useAdminSyncFlightStatus = <TError = ErrorType<ProblemDetails>,
+export const useAdminSyncFlightStatus = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSyncFlightStatus>>, TError,AdminSyncFlightStatusMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminSyncFlightStatus>>,
@@ -4070,7 +4070,7 @@ export const adminUpdateLounge = (
 
 export const getAdminUpdateLoungeMutationKey = () => ['adminUpdateLounge'] as const;
 
-export const getAdminUpdateLoungeMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminUpdateLoungeMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLounge>>, TError,AdminUpdateLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLounge>>, TError,AdminUpdateLoungeMutationVariables, TContext> => {
 
@@ -4099,13 +4099,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminUpdateLoungeMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateLounge>>>
     export type AdminUpdateLoungeMutationBody = BodyType<UpdateLoungeRequest>
-    export type AdminUpdateLoungeMutationError = ErrorType<ProblemDetails>
+    export type AdminUpdateLoungeMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminUpdateLoungeMutationVariables = {id: number;data: BodyType<UpdateLoungeRequest>}
 
     /**
  * @summary Update lounge
  */
-export const useAdminUpdateLounge = <TError = ErrorType<ProblemDetails>,
+export const useAdminUpdateLounge = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLounge>>, TError,AdminUpdateLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminUpdateLounge>>,
@@ -4136,7 +4136,7 @@ export const adminDeleteLounge = (
 
 export const getAdminDeleteLoungeMutationKey = () => ['adminDeleteLounge'] as const;
 
-export const getAdminDeleteLoungeMutationOptions = <TError = ErrorType<unknown>,
+export const getAdminDeleteLoungeMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLounge>>, TError,AdminDeleteLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLounge>>, TError,AdminDeleteLoungeMutationVariables, TContext> => {
 
@@ -4165,13 +4165,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteLoungeMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteLounge>>>
 
-    export type AdminDeleteLoungeMutationError = ErrorType<unknown>
+    export type AdminDeleteLoungeMutationError = ErrorType<HttpValidationProblemDetails>
     export type AdminDeleteLoungeMutationVariables = {id: number}
 
     /**
  * @summary Delete lounge
  */
-export const useAdminDeleteLounge = <TError = ErrorType<unknown>,
+export const useAdminDeleteLounge = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLounge>>, TError,AdminDeleteLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteLounge>>,
@@ -4367,7 +4367,7 @@ export const adminUpdateLoyaltyProgram = (
 
 export const getAdminUpdateLoyaltyProgramMutationKey = () => ['adminUpdateLoyaltyProgram'] as const;
 
-export const getAdminUpdateLoyaltyProgramMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminUpdateLoyaltyProgramMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyProgram>>, TError,AdminUpdateLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyProgram>>, TError,AdminUpdateLoyaltyProgramMutationVariables, TContext> => {
 
@@ -4396,13 +4396,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminUpdateLoyaltyProgramMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateLoyaltyProgram>>>
     export type AdminUpdateLoyaltyProgramMutationBody = BodyType<UpdateLoyaltyProgramRequest>
-    export type AdminUpdateLoyaltyProgramMutationError = ErrorType<ProblemDetails>
+    export type AdminUpdateLoyaltyProgramMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminUpdateLoyaltyProgramMutationVariables = {id: number;data: BodyType<UpdateLoyaltyProgramRequest>}
 
     /**
  * @summary Update loyalty program
  */
-export const useAdminUpdateLoyaltyProgram = <TError = ErrorType<ProblemDetails>,
+export const useAdminUpdateLoyaltyProgram = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyProgram>>, TError,AdminUpdateLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminUpdateLoyaltyProgram>>,
@@ -4433,7 +4433,7 @@ export const adminDeleteLoyaltyProgram = (
 
 export const getAdminDeleteLoyaltyProgramMutationKey = () => ['adminDeleteLoyaltyProgram'] as const;
 
-export const getAdminDeleteLoyaltyProgramMutationOptions = <TError = ErrorType<unknown>,
+export const getAdminDeleteLoyaltyProgramMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyProgram>>, TError,AdminDeleteLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyProgram>>, TError,AdminDeleteLoyaltyProgramMutationVariables, TContext> => {
 
@@ -4462,13 +4462,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteLoyaltyProgramMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteLoyaltyProgram>>>
 
-    export type AdminDeleteLoyaltyProgramMutationError = ErrorType<unknown>
+    export type AdminDeleteLoyaltyProgramMutationError = ErrorType<HttpValidationProblemDetails>
     export type AdminDeleteLoyaltyProgramMutationVariables = {id: number}
 
     /**
  * @summary Delete loyalty program
  */
-export const useAdminDeleteLoyaltyProgram = <TError = ErrorType<unknown>,
+export const useAdminDeleteLoyaltyProgram = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyProgram>>, TError,AdminDeleteLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteLoyaltyProgram>>,
@@ -5201,7 +5201,7 @@ export const adminDeleteTraveler = (
 
 export const getAdminDeleteTravelerMutationKey = () => ['adminDeleteTraveler'] as const;
 
-export const getAdminDeleteTravelerMutationOptions = <TError = ErrorType<unknown>,
+export const getAdminDeleteTravelerMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteTraveler>>, TError,AdminDeleteTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteTraveler>>, TError,AdminDeleteTravelerMutationVariables, TContext> => {
 
@@ -5230,13 +5230,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteTravelerMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteTraveler>>>
 
-    export type AdminDeleteTravelerMutationError = ErrorType<unknown>
+    export type AdminDeleteTravelerMutationError = ErrorType<HttpValidationProblemDetails>
     export type AdminDeleteTravelerMutationVariables = {id: string}
 
     /**
  * @summary Delete traveler
  */
-export const useAdminDeleteTraveler = <TError = ErrorType<unknown>,
+export const useAdminDeleteTraveler = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteTraveler>>, TError,AdminDeleteTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteTraveler>>,
@@ -5339,7 +5339,7 @@ export const adminDeleteDeviceToken = (
 
 export const getAdminDeleteDeviceTokenMutationKey = () => ['adminDeleteDeviceToken'] as const;
 
-export const getAdminDeleteDeviceTokenMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getAdminDeleteDeviceTokenMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteDeviceToken>>, TError,AdminDeleteDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteDeviceToken>>, TError,AdminDeleteDeviceTokenMutationVariables, TContext> => {
 
@@ -5368,13 +5368,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminDeleteDeviceTokenMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteDeviceToken>>>
 
-    export type AdminDeleteDeviceTokenMutationError = ErrorType<ProblemDetails>
+    export type AdminDeleteDeviceTokenMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminDeleteDeviceTokenMutationVariables = {travelerId: string;tokenId: string}
 
     /**
  * @summary Delete device token
  */
-export const useAdminDeleteDeviceToken = <TError = ErrorType<ProblemDetails>,
+export const useAdminDeleteDeviceToken = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteDeviceToken>>, TError,AdminDeleteDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminDeleteDeviceToken>>,
@@ -5765,7 +5765,7 @@ export function useAdminListVerificationRequests<TData = Awaited<ReturnType<type
 
 
 /**
- * Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.
+ * Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped -- never the #418 error cooldown, which gates only the flight-tracking trigger, not this route. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.
  * @summary Queue verification checks for reference-data rows
  */
 export const adminQueueVerificationRequests = (
@@ -5904,7 +5904,7 @@ export const useAdminAcceptVerificationSource = <TError = ErrorType<HttpValidati
     }
 
 /**
- * Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request.
+ * Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request -- never the #418 error cooldown, which gates only the flight-tracking trigger: an admin retry always queues regardless of it.
  * @summary Check an entity again with an earlier request's sources
  */
 export const adminRetryVerificationRequest = (

@@ -4,6 +4,7 @@
  * FlightAssistant API
  * OpenAPI spec version: v1
  */
+import type { AdminHealthVerificationFailureDto } from './adminHealthVerificationFailureDto';
 
 export interface AdminHealthVerificationDto {
   enabled?: boolean;
@@ -23,4 +24,7 @@ export interface AdminHealthVerificationDto {
   lastError?: string | null;
   /** @nullable */
   pendingCount?: number | null;
+  requestsPaused?: number;
+  /** @nullable */
+  recentFailures?: AdminHealthVerificationFailureDto[] | null;
 }

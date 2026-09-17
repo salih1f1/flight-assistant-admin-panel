@@ -32,6 +32,7 @@ export * from './adminHealthFlightSyncDto';
 export * from './adminHealthMigrationsDto';
 export * from './adminHealthSystemDto';
 export * from './adminHealthVerificationDto';
+export * from './adminHealthVerificationFailureDto';
 export * from './adminListVerificationRequestsParams';
 export * from './adminListVerificationSourcesParams';
 export * from './adminLoungeDto';
