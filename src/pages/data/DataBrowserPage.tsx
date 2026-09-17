@@ -18,12 +18,34 @@ import { ExportCsvButton } from './ExportCsvButton'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
+import { SYNC_LEGEND, syncRowTone } from './syncRowTone'
 import { VerificationStatusBadge } from './VerificationStatus'
 import { CHECKED_COLUMNS } from './verificationChecks'
 import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
+
+/**
+ * What the flights grid's row colours mean. A list rather than a row of spans so the states are
+ * announced as the set they are, and each swatch is labelled — the colour is a shorthand for the
+ * SyncMode column beside it, never the only way to read a row.
+ */
+function SyncLegend() {
+  return (
+    <ul aria-label="Sync colours" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+      {SYNC_LEGEND.map(({ label, tone }) => (
+        <li key={label} className="flex items-center gap-1.5">
+          <span aria-hidden className={cn('inline-block h-3 w-3 rounded-sm', tone)} />
+          {label}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The one table whose rows are tinted by sync mode, and whose row actions include Sync. */
+const FLIGHTS_TABLE = 'flights'
 
 /** How a sync line names its flight: its number, or its id when the column is hidden or empty. */
 const flightLabel = (flight: Row) => String(flight.FlightNumber ?? `flight ${flight.Id}`)
@@ -466,6 +488,7 @@ export function DataBrowserPage() {
           {retry.error && retry.variables?.table === table && (
             <ActionError text={`Could not retry request ${String(retry.variables.row.Id)}`} error={retry.error} />
           )}
+          {table === FLIGHTS_TABLE && <SyncLegend />}
           {rows.error ? (
             // In place of the table: an empty grid would read as "no rows match".
             <ErrorAlert what="rows" error={rows.error} />
@@ -476,6 +499,8 @@ export function DataBrowserPage() {
               <DataTable
                 columns={columns}
                 data={items}
+                // Flights only: every other table's rows stay plain.
+                rowClassName={table === FLIGHTS_TABLE ? syncRowTone : undefined}
                 pagination={{ page, pageSize: PAGE_SIZE, total: rows.data?.total ?? 0, onPageChange: p => updateView({ page: p }) }}
               />
             </div>

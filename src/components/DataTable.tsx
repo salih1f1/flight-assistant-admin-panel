@@ -29,9 +29,14 @@ interface DataTableProps<TData> {
    * failed request otherwise hands the table [] and reads as "No results."
    */
   error?: unknown
+  /**
+   * Extra classes for one row, from its own data — the flights grid tints rows by sync mode.
+   * Every other grid leaves it out and rows render exactly as before.
+   */
+  rowClassName?: (row: TData) => string
 }
 
-export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn, pagination, error }: DataTableProps<TData>) {
+export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…', searchColumn, pagination, error, rowClassName }: DataTableProps<TData>) {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
@@ -82,7 +87,7 @@ export function DataTable<TData>({ columns, data, searchPlaceholder = 'Search…
               </TableRow>
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map(row => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className={rowClassName?.(row.original)}>
                   {row.getVisibleCells().map(cell => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
