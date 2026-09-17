@@ -203,6 +203,16 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -235,6 +245,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           },
           "409": {
             "description": "Conflict",
@@ -447,6 +467,16 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -479,6 +509,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -1231,7 +1271,7 @@
           "Admin - Flights"
         ],
         "summary": "Get flight detail",
-        "description": "Returns the flight with its current status and its 50 most recent status events, newest first — the record of what the sync actually saw. Not the full history: a long-tracked flight polled every couple of minutes accumulates status-event rows without bound. StatusHistoryTruncated is true when the cap actually cut rows off; when it is, see GET /admin/data/flight-status-events for the rest.",
+        "description": "Returns the flight with its current status and its 50 most recent status events, most recently recorded first (by event id) — the record of what the sync actually saw, in the order it saw it. Not ordered by effectiveAtUtc, which can move backwards when an estimate returns to an earlier value. Not the full history: a long-tracked flight polled every couple of minutes accumulates status-event rows without bound. StatusHistoryTruncated is true when the cap actually cut rows off; when it is, see GET /admin/data/flight-status-events for the rest.",
         "operationId": "AdminGetFlightDetail",
         "parameters": [
           {
@@ -1388,7 +1428,7 @@
           "Admin - Flights"
         ],
         "summary": "Sync flight status",
-        "description": "Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise returns { updated: true } if a new status was recorded. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503.",
+        "description": "Syncs the flight's status now. A flight not yet inside the provider's live-status window makes no provider call, and a flight no traveler tracks makes no call and has its sync plan cleared; both return { updated: false }. Otherwise { updated: true } means an event was recorded — a new status, a revised time for the status the flight already has, or a gate, terminal or baggage-claim change on the current status — and { updated: false } means none was, which still allows a revised estimated arrival or aircraft type to have been saved. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) makes a call; any other returns 503. Returns 404 if no flight with that id exists — unlike the traveler route, which answers 403 because it checks the tracking link first. 503 also covers the flight data provider throttling requests, not only the monthly budget; 502 is returned when the provider is unreachable or answers unexpectedly, and 500 for a provider configuration problem. Like every /admin route, an unauthenticated caller gets 401 and a caller without the admin role gets 403; neither is declared per-route because both are identical across the whole admin surface. ",
         "operationId": "AdminSyncFlightStatus",
         "parameters": [
           {
@@ -1404,6 +1444,46 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           },
           "503": {
             "description": "Service Unavailable",
@@ -2213,6 +2293,16 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -2245,6 +2335,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2362,6 +2462,16 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -2394,6 +2504,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2732,6 +2852,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2833,6 +2963,16 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not Found",
@@ -3059,7 +3199,7 @@
           "Admin - Verification"
         ],
         "summary": "Queue verification checks for reference-data rows",
-        "description": "Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.",
+        "description": "Queues one Pending request per key, checked against every selected source, with trigger 'admin', the caller as requested_by, and the selected sources' summed per-row cost as the estimated cost. Keys are not checked for existence: a missing entity completes as Error when the job runs it. A repeated key, or an entity that already has an open request, is counted as skipped -- never the #418 error cooldown, which gates only the flight-tracking trigger, not this route. 400 when entityType is not Airport, Airline or Country; keys or sources are empty; there are more than 1000 keys; a key is malformed for the entity type (the error names it, e.g. 'Keys[1]'); or a source is unknown or does not support the entity type. Queue rows are not audited; requested_by records who asked.",
         "operationId": "AdminQueueVerificationRequests",
         "requestBody": {
           "content": {
@@ -3167,7 +3307,7 @@
           "Admin - Verification"
         ],
         "summary": "Check an entity again with an earlier request's sources",
-        "description": "Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request.",
+        "description": "Queues a new Pending request for the same entity type, key and sources, with trigger 'admin', the caller as requested_by, and the sources' current cost. The earlier request is left as it is. 400 when one of its sources is no longer registered or no longer supports the entity type. 404 when the request does not exist. 409 when the entity already has an open request -- never the #418 error cooldown, which gates only the flight-tracking trigger: an admin retry always queues regardless of it.",
         "operationId": "AdminRetryVerificationRequest",
         "parameters": [
           {
@@ -3335,7 +3475,7 @@
           "Flights"
         ],
         "summary": "List tracked flights",
-        "description": "Returns a paginated list of flights the authenticated traveler is tracking. Supports ?page and ?pageSize (default 50, max 200).",
+        "description": "Returns a paginated list of flights the authenticated traveler is tracking. Supports ?page and ?pageSize (default 50, max 200). countsTowardCap is true while the status sync still polls the flight, which is what occupies a slot against the tracking cap POST /flights enforces; it turns false once the flight has landed or been cancelled for long enough, or its arrival time passed a day ago without a landing being reported. activeTrackedFlights counts every flight of this traveler that still occupies a slot, across all pages, and trackingCap is the configured limit — so remaining capacity is trackingCap minus activeTrackedFlights, floored at zero, without paging through the list. A traveler grandfathered above the cap, or one whose cap was later lowered in configuration, reports more active flights than the cap. Both numbers are as of this response: tracking can still be refused if capacity is used in the meantime. total is a different number — it counts every flight the traveler tracks, including ones that no longer occupy a slot. Tracking a flight the traveler already tracks still succeeds at the cap.",
         "operationId": "GetTrackedFlights",
         "parameters": [
           {
@@ -3361,7 +3501,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlightDtoPagedResult"
+                  "$ref": "#/components/schemas/TrackedFlightsDto"
                 }
               }
             }
@@ -3383,7 +3523,7 @@
           "Flights"
         ],
         "summary": "Track a flight",
-        "description": "Adds a flight to the authenticated traveler's tracking list. A row returned by GET /flights/search can be posted here unmodified — this body is exactly that shape. If the flight already exists in the system (same airline, number, and service date) it is reused; otherwise a new flight record is created. The airline is derived from the first two characters of FlightNumber (e.g. 'BA123' -> 'BA', '6E4120' -> '6E'); there is no separate airline field. Body fields: FlightNumber (e.g. 'BA123' or '6E4120'), ServiceDate (YYYY-MM-DD), DepartureAirportIata, ArrivalAirportIata, ScheduledDepartureUtc, ScheduledArrivalUtc. A traveler can track up to 20 flights at a time by default. A flight counts until its status sync stops: by default 30 minutes after it lands or is cancelled, or a day after its arrival time if no landing is reported. Tracking another returns 409 and adds nothing; tracking a flight the traveler already tracks still returns 201. Rate-limited per traveler: too many tracking requests return 429 with a Retry-After header.",
+        "description": "Adds a flight to the authenticated traveler's tracking list. A row returned by GET /flights/search can be posted here unmodified — this body is exactly that shape. If the flight already exists in the system (same airline, number, and service date) it is reused; otherwise a new flight record is created. The airline is derived from the first two characters of FlightNumber (e.g. 'BA123' -> 'BA', '6E4120' -> '6E'); there is no separate airline field. Body fields: FlightNumber (e.g. 'BA123' or '6E4120'), ServiceDate (YYYY-MM-DD), DepartureAirportIata, ArrivalAirportIata, ScheduledDepartureUtc, ScheduledArrivalUtc. A traveler can track a limited number of flights at a time. GET /flights reports the limit in force as trackingCap, and how many slots are in use as activeTrackedFlights (#397). A flight counts until its status sync stops: by default 30 minutes after it lands or is cancelled, or a day after its arrival time if no landing is reported. Tracking another returns 409 and adds nothing; tracking a flight the traveler already tracks still returns 201. Rate-limited per traveler: too many tracking requests return 429 with a Retry-After header. Returns 404 if the airline or either airport in the request is not known to the system. ",
         "operationId": "TrackFlight",
         "requestBody": {
           "content": {
@@ -3409,6 +3549,16 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflict",
             "content": {
@@ -3428,7 +3578,7 @@
           "Flights"
         ],
         "summary": "Stop tracking a flight",
-        "description": "Removes the specified flight from the authenticated traveler's tracking list. Route parameter: flightId — the numeric ID returned when the flight was tracked.",
+        "description": "Removes the specified flight from the authenticated traveler's tracking list. Route parameter: flightId — the numeric ID returned when the flight was tracked. Idempotent: untracking a flight the traveler does not track also returns 204, so there is no 404. ",
         "operationId": "UntrackFlight",
         "parameters": [
           {
@@ -3445,12 +3595,12 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -3464,7 +3614,7 @@
           "Flights"
         ],
         "summary": "Toggle flight notifications",
-        "description": "Enables or disables push notifications for a tracked flight. Route parameter: flightId — the numeric flight ID. Body: { \"notify\": true } (true to enable, false to disable). Notifications are delivered via APNs to device tokens registered for the traveler.",
+        "description": "Enables or disables push notifications for a tracked flight. Route parameter: flightId — the numeric flight ID. Body: { \"notify\": true } (true to enable, false to disable). Notifications are delivered via APNs to device tokens registered for the traveler. Returns 404 if the traveler does not track this flight — unlike DELETE /flights/{flightId}, which is idempotent and returns 204 either way. ",
         "operationId": "ToggleFlightNotifications",
         "parameters": [
           {
@@ -3491,6 +3641,16 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -3510,7 +3670,7 @@
           "Flights"
         ],
         "summary": "Get flight status history",
-        "description": "Returns the ordered list of status events recorded for the flight. Each event captures the status code, gate/terminal info, baggage claim, and the time it became effective. Route parameter: flightId — the numeric flight ID.",
+        "description": "Returns the flight's full status-event history — every event, not a page — most recently recorded first. The order is the order events were recorded (by event id), not effectiveAtUtc, which can move backwards when an estimate returns to an earlier value; so the first row is the flight's current status. Each event captures the status code, gate/terminal info, baggage claim, and the time it became effective. Route parameter: flightId — the numeric flight ID. Returns 403 if the authenticated traveler does not track this flight — including when no flight with that id exists, so the response does not reveal whether a flight id is real to someone who does not track it. There is no 404. ",
         "operationId": "GetFlightStatus",
         "parameters": [
           {
@@ -3537,8 +3697,18 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3556,7 +3726,7 @@
           "Flights"
         ],
         "summary": "Manually sync flight status",
-        "description": "Triggers an on-demand status refresh for the specified flight. Whether the external flight data provider is queried depends on the flight's sync mode: a flight not yet inside the provider's live-status window makes no provider call. A flight synced within the manual-sync cooldown (5 minutes by default) makes no call either. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) is refreshed; any other returns 503. Returns { updated: true } if a new status was recorded, or { updated: false } if nothing new was found or no call was made. Rate-limited per traveler: too many sync requests return 429 with a Retry-After header. Route parameter: flightId — the numeric flight ID.",
+        "description": "Triggers an on-demand status refresh for the specified flight. Whether the external flight data provider is queried depends on the flight's sync mode: a flight not yet inside the provider's live-status window makes no provider call. A flight synced within the manual-sync cooldown (5 minutes by default) makes no call either. Once this month's flight data budget is used up, only a flight in its near-departure window (by default, from 4 hours before departure until 30 minutes after it lands) is refreshed; any other returns 503. 503 also covers the flight data provider throttling requests, not only the monthly budget; 502 is returned when the provider is unreachable or answers unexpectedly, and 500 for a provider configuration problem. Returns { updated: true } when an event was recorded — a new status, a revised time for the status the flight already has, or a gate, terminal or baggage-claim change on the current status — and { updated: false } when none was: no call was made, or the response repeated what was already recorded. { updated: false } still does not mean nothing changed: a revised estimated arrival updates the flight and is visible immediately on GET /flights. Rate-limited per traveler: too many sync requests return 429 with a Retry-After header. Route parameter: flightId — the numeric flight ID. Returns 403 if the authenticated traveler does not track this flight — including when no flight with that id exists, so the response does not reveal whether a flight id is real to someone who does not track it. ",
         "operationId": "SyncFlightStatus",
         "parameters": [
           {
@@ -3573,8 +3743,38 @@
           "200": {
             "description": "OK"
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3602,7 +3802,7 @@
           "Lounges"
         ],
         "summary": "List lounges at an airport",
-        "description": "Returns all lounges at the specified airport, each annotated with whether the authenticated traveler is eligible to access it. Eligibility is computed from the traveler's loyalty memberships and tier benefits. Query parameter: airportIata — the IATA airport code (e.g. 'LHR', 'JFK').",
+        "description": "Returns all lounges at the specified airport, each annotated with whether the authenticated traveler is eligible to access it. Eligibility is computed from the traveler's loyalty memberships and tier benefits. Query parameter: airportIata — the IATA airport code (e.g. 'LHR', 'JFK'). An airport with no lounges is an empty list, not a 404 — this route never reports one. Returns 400 if airportIata is missing or is not a 3-letter IATA code. ",
         "operationId": "GetLoungesAtAirport",
         "parameters": [
           {
@@ -3628,12 +3828,12 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -3825,7 +4025,7 @@
           "Loyalty"
         ],
         "summary": "Update a loyalty membership",
-        "description": "Replaces the account number, tier, and expiry dates for the specified membership. Route parameter: id — the membership ID returned when it was added. Only the authenticated traveler's own memberships can be updated.",
+        "description": "Replaces the account number, tier, and expiry dates for the specified membership. Route parameter: id — the membership ID returned when it was added. Only the authenticated traveler's own memberships can be updated. Returns 404 if no membership with that id exists, and 403 if it belongs to another traveler.",
         "operationId": "UpdateMembership",
         "parameters": [
           {
@@ -3862,6 +4062,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -3879,7 +4089,7 @@
           "Loyalty"
         ],
         "summary": "Remove a loyalty membership",
-        "description": "Deletes a loyalty membership from the authenticated traveler's profile. Route parameter: id — the membership ID to remove.",
+        "description": "Deletes a loyalty membership from the authenticated traveler's profile. Route parameter: id — the membership ID to remove. Idempotent: removing a membership that does not exist also returns 204, so there is no 404. Returns 403 if the membership belongs to another traveler.",
         "operationId": "RemoveMembership",
         "parameters": [
           {
@@ -3896,8 +4106,18 @@
           "204": {
             "description": "No Content"
           },
-          "404": {
-            "description": "Not Found",
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4096,7 +4316,7 @@
           "Travelers"
         ],
         "summary": "Remove device token",
-        "description": "Removes a previously registered push notification device token. Use this when a user logs out or when the OS invalidates the token. Route parameter: deviceTokenId — the ID of the device token to remove.",
+        "description": "Removes a previously registered push notification device token. Use this when a user logs out or when the OS invalidates the token. Route parameter: deviceTokenId — the ID of the device token to remove. Idempotent in the token: removing one that is already gone returns 204. The 404 means the traveler is not registered — call POST /travelers first. ",
         "operationId": "RemoveDeviceToken",
         "parameters": [
           {
@@ -4749,6 +4969,35 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "requestsPaused": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recentFailures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminHealthVerificationFailureDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdminHealthVerificationFailureDto": {
+        "type": "object",
+        "properties": {
+          "failedSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -5685,31 +5934,9 @@
           },
           "notify": {
             "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "FlightDtoPagedResult": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FlightDto"
-            },
-            "nullable": true
           },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "page": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
+          "countsTowardCap": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -6208,6 +6435,39 @@
           "scheduledArrivalUtc": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TrackedFlightsDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlightDto"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeTrackedFlights": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trackingCap": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

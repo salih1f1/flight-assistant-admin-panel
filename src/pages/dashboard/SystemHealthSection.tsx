@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAdminGetHealth } from '@/api/generated/admin'
 import type {
   AdminHealthDto, AdminHealthFlightSyncDto, AdminHealthMigrationsDto, AdminHealthSystemDto, AdminHealthVerificationDto,
+  AdminHealthVerificationFailureDto,
 } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
@@ -183,8 +184,52 @@ function FlightSync({ sync }: { sync: AdminHealthFlightSyncDto | undefined }) {
   )
 }
 
-/** "1 thing" / "2 things": simple pluralization for the two abnormal-only counts below. */
+/** "1 thing" / "2 things": simple pluralization for the abnormal-only counts below. */
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/**
+ * How a completed verification cycle reads, keyed by VerificationJobOutcome. Membership here is
+ * what "the cycle finished" means, so an outcome the API adds later stays out until it's handled
+ * rather than silently reading as a run that never happened.
+ *
+ * Paused is amber rather than red: the cycle worked through its batch and left AeroAPI-sourced
+ * requests Pending because the month's budget is exhausted. Nothing broke — it declined to spend
+ * money it doesn't have — so it is neither Success (nothing held back) nor Failed.
+ */
+const FINISHED_RUN: Record<string, { verb: string; tone: string; because: string }> = {
+  Success: { verb: 'succeeded', tone: 'text-green-600', because: '' },
+  Failed: { verb: 'failed', tone: 'text-red-600', because: '' },
+  Paused: { verb: 'paused', tone: 'text-amber-600', because: ' — out of AeroAPI budget' },
+}
+
+/**
+ * Error completions in the last 24 hours, grouped by the source that failed and the entity type
+ * it failed for. Alone on this panel it spans many cycles rather than just the last one, so it is
+ * the only place a source that keeps failing shows up.
+ */
+function RecentFailures({ failures }: { failures: AdminHealthVerificationFailureDto[] | null | undefined }) {
+  // The same split the pending count makes above: null means the read itself failed, which is a
+  // different claim from the empty list that means nothing failed in the window.
+  if (failures == null) return <p className="text-xs text-amber-600">{"Can't tell what failed recently"}</p>
+  if (failures.length === 0) return null
+
+  return (
+    <>
+      <p className="text-xs text-amber-600">Failed in the last 24 hours:</p>
+      <ul className="list-inside list-disc text-xs text-amber-600">
+        {failures.map(failure => (
+          <li key={`${failure.failedSource ?? ''}|${failure.entityType}`}>
+            {/* A null source is a group in its own right, not a row to drop: a deleted entity, an
+                unexpected exception or an abandoned claim can't be pinned on one source. For the
+                first 24 hours after the backend's #424 migration, checks that errored before it
+                also land here whatever their real cause, until they age out of the window. */}
+            {`${failure.failedSource ?? 'Unattributed'} · ${failure.entityType}: ${failure.count}`}
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
 
 function Verification({ verification }: { verification: AdminHealthVerificationDto | undefined }) {
   if (verification && verification.enabled === false) {
@@ -196,22 +241,23 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
   }
 
   const lastRunAt = verification?.lastRunCompletedUtc ?? verification?.lastRunStartedUtc
-  const finished = verification?.lastOutcome === 'Success' || verification?.lastOutcome === 'Failed'
+  const run = FINISHED_RUN[verification?.lastOutcome ?? '']
   const stuckAbandoned = verification?.stuckAbandoned ?? 0
   const failuresUnrecorded = verification?.failuresUnrecorded ?? 0
+  const requestsPaused = verification?.requestsPaused ?? 0
 
   return (
     <Panel title="Verification">
       {verification?.lastOutcome === 'Running' && verification.lastRunStartedUtc ? (
         <p>{`Running since ${formatUtcMinute(verification.lastRunStartedUtc)} UTC`}</p>
-      ) : finished && lastRunAt ? (
-        <p className={verification?.lastOutcome === 'Failed' ? 'text-red-600' : 'text-green-600'}>
-          {`Last run ${verification?.lastOutcome === 'Failed' ? 'failed' : 'succeeded'} at ${formatUtcMinute(lastRunAt)} UTC`}
-        </p>
+      ) : run && lastRunAt ? (
+        <p className={run.tone}>{`Last run ${run.verb} at ${formatUtcMinute(lastRunAt)} UTC${run.because}`}</p>
       ) : (
         <p className="text-gray-500">Not run since the API started</p>
       )}
-      {finished && (
+      {/* The counts describe whichever cycle last completed, whatever its outcome — so a paused
+          cycle reports the work it did get through rather than hiding it. */}
+      {run && (
         <p className="text-xs text-gray-500">{`${verification?.requestsProcessed ?? 0} requests processed, ${verification?.requestsFailed ?? 0} failed`}</p>
       )}
       {/* "Cannot tell" is a different claim from "none pending" (see Migrations above), so a null
@@ -222,6 +268,10 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
       </p>
       {stuckAbandoned > 0 && <p className="text-xs text-amber-600">{plural(stuckAbandoned, 'stuck request')}</p>}
       {failuresUnrecorded > 0 && <p className="text-xs text-amber-600">{plural(failuresUnrecorded, 'unrecorded failure')}</p>}
+      {/* Amber, not red, for the same reason the Paused outcome is: these requests were left
+          untouched, with no attempt counted and no error recorded, not failed. */}
+      {requestsPaused > 0 && <p className="text-xs text-amber-600">{plural(requestsPaused, 'paused request')}</p>}
+      <RecentFailures failures={verification?.recentFailures} />
       {verification?.lastError && <p className="text-xs text-red-600">{verification.lastError}</p>}
       {verification?.nextRunDueUtc && <p className="text-xs text-gray-500">{`Next run ${formatUtcMinute(verification.nextRunDueUtc)} UTC`}</p>}
     </Panel>
