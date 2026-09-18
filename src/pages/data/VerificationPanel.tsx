@@ -12,7 +12,7 @@ import { invalidateAirlines, invalidateAirports } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup, VERIFIERS } from './records'
-import { verificationState } from './verificationState'
+import { needsAttention, verificationState } from './verificationState'
 import { VerificationStatusBadge } from './VerificationStatus'
 
 type Row = Record<string, unknown>
@@ -54,9 +54,8 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
 }) {
   const queryClient = useQueryClient()
   const state = verificationState(row)
-  const needsAttention = state.issue !== undefined
   // Both must hold: a checkable type, and a row that actually needs attention.
-  const fetchChecks = entityType !== undefined && needsAttention
+  const fetchChecks = entityType !== undefined && needsAttention(row)
 
   const checksParams = { entityType, entityKey: recordKey, limit: 1 }
   const checks = useAdminListVerificationRequests(checksParams, { query: { enabled: fetchChecks } })
