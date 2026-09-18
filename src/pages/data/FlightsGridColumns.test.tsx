@@ -1,0 +1,174 @@
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
+import { DataBrowserPage } from './DataBrowserPage'
+
+vi.mock('@/api/client', () => ({
+  apiClient: { request: vi.fn() },
+}))
+
+/** Shaped like BrowsableColumnDto, as GET /admin/data/tables publishes them. */
+const column = (name: string, kind: string, values: string[] | null = null) => ({ name, kind, values })
+
+const FLIGHT_COLUMNS = [
+  column('Id', 'Number'),
+  column('AirlineId', 'Number'),
+  column('FlightNumber', 'Text'),
+  column('DepartureAirportId', 'Number'),
+  column('ArrivalAirportId', 'Number'),
+  column('ServiceDateUtc', 'Date'),
+  column('ScheduledDepartureUtc', 'Date'),
+  column('ScheduledArrivalUtc', 'Date'),
+  column('EstimatedDepartureUtc', 'Date'),
+  column('EquipmentAircraftIcao', 'Text'),
+  column('SyncMode', 'Enum', ['Fast', 'Live', 'Schedule', 'Stopped']),
+  column('LastSyncedUtc', 'Date'),
+  column('CreatedUtc', 'Date'),
+]
+
+const LOUNGE_COLUMNS = [column('Id', 'Number'), column('AirportId', 'Number'), column('Name', 'Text')]
+
+const FLIGHT = {
+  Id: 16, AirlineId: 242, FlightNumber: 'LS988', DepartureAirportId: 2276, ArrivalAirportId: 4593,
+  ServiceDateUtc: '2026-09-30', ScheduledDepartureUtc: '2026-09-30T10:10:00Z',
+  ScheduledArrivalUtc: '2026-09-30T13:15:00Z', EstimatedDepartureUtc: null,
+  EquipmentAircraftIcao: 'B738', SyncMode: 'Schedule', LastSyncedUtc: '2026-09-29T22:00:00Z',
+  CreatedUtc: '2026-09-01T00:00:00Z',
+}
+
+const LOUNGE = { Id: 3, AirportId: 2276, Name: 'No1 Lounge' }
+
+const JET2 = { id: 242, iata: 'LS', icao: 'EXS', name: 'Jet2', countryCode: 'GB' }
+const GATWICK = { id: 2276, iata: 'LGW', icao: 'EGKK', name: 'London Gatwick', city: 'London', countryCode: 'GB' }
+const SCHIPHOL = { id: 4593, iata: 'AMS', icao: 'EHAM', name: 'Amsterdam Schiphol', city: 'Amsterdam', countryCode: 'NL' }
+
+let sent: SentRequest[]
+
+function install() {
+  sent = installFakeApi(req => {
+    if (req.method !== 'GET') throw httpError(404)
+    if (req.url === '/admin/data/tables') {
+      return [
+        { slug: 'flights', displayName: 'Flights', rowCount: 1, columns: FLIGHT_COLUMNS },
+        { slug: 'lounges', displayName: 'Lounges', rowCount: 1, columns: LOUNGE_COLUMNS },
+      ]
+    }
+    if (req.url === '/admin/data/flights') return pagedResult([FLIGHT], req.params)
+    if (req.url === '/admin/data/lounges') return pagedResult([LOUNGE], req.params)
+    if (req.url === '/admin/airlines/242') return JET2
+    if (req.url === '/admin/airports/2276') return GATWICK
+    if (req.url === '/admin/airports/4593') return SCHIPHOL
+    throw httpError(404)
+  }).sent
+}
+
+function renderAt(entry: string) {
+  const router = createMemoryRouter([{ path: '/data/:table', element: <DataBrowserPage /> }], { initialEntries: [entry] })
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  return router
+}
+
+const dataHeaders = () => within(screen.getByRole('table'))
+  .getAllByRole('columnheader')
+  .map(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim())
+  .filter((name): name is string => !!name)
+
+const filterOptions = () => within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+
+describe('The flights grid, as a list', () => {
+  beforeEach(install)
+
+  /**
+   * SyncMode is on this list deliberately: syncRowTone says the row tint is never the only signal
+   * because that column is rendered as text beside it, and the colour legend above the grid reads
+   * against it. The rest of the flight — its times, equipment and sync bookkeeping — is on the
+   * record and detail pages, and behind the grid's own hidden-columns button.
+   */
+  it('shows the route and nothing else', async () => {
+    renderAt('/data/flights')
+    await screen.findByRole('table')
+
+    expect(dataHeaders()).toEqual(['Airline', 'FlightNumber', 'From', 'To', 'ServiceDateUtc', 'SyncMode'])
+  })
+
+  it('leaves a table with no list of its own showing everything it has', async () => {
+    renderAt('/data/lounges')
+    await screen.findByRole('table')
+
+    expect(dataHeaders()).toEqual(['Id', 'Airport', 'Name'])
+  })
+
+  it('offers only the columns worth filtering a flight by', async () => {
+    renderAt('/data/flights')
+    await screen.findByRole('table')
+
+    expect(filterOptions()).toEqual(['Airline', 'FlightNumber', 'From', 'To', 'ServiceDateUtc', 'SyncMode'])
+  })
+
+  /** The toggle means "show me everything" in both places, so it is also how you reach the rest. */
+  it('offers every column to filter on once all columns are shown', async () => {
+    renderAt('/data/flights?columns=all')
+    await screen.findByRole('table')
+
+    expect(filterOptions()).toEqual(FLIGHT_COLUMNS.map(c => c.name === 'AirlineId' ? 'Airline'
+      : c.name === 'DepartureAirportId' ? 'From' : c.name === 'ArrivalAirportId' ? 'To' : c.name))
+  })
+
+  /** A shared link may filter on a column the list leaves out; the form must not silently show another. */
+  it('keeps showing a column a shared link filters on, off the list or not', async () => {
+    renderAt('/data/flights?filter=LastSyncedUtc:2026-09-29')
+    await screen.findByRole('table')
+
+    expect(screen.getByLabelText<HTMLSelectElement>('Filter column').value).toBe('LastSyncedUtc')
+    expect(filterOptions()).toContain('LastSyncedUtc')
+  })
+
+  it('still filters on the column name the API knows, whatever the picker calls it', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/flights')
+    await screen.findByRole('table')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await user.type(screen.getByLabelText('Filter value'), '2276')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+
+    expect(new URLSearchParams(router.state.location.search).get('filter')).toBe('DepartureAirportId:2276')
+  })
+
+  /** There is no by-code endpoint, so the box takes an id — it should at least say which one. */
+  it('names the airport an id stands for before the filter is applied', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/flights')
+    await screen.findByRole('table')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await user.type(screen.getByLabelText('Filter value'), '2276')
+
+    expect(await screen.findByRole('link', { name: 'London Gatwick (LGW)' })).toBeInTheDocument()
+  })
+
+  /** Every keystroke on the way to "2276" is an id of its own — 2, 22, 227 — and each would be a
+   *  lookup for a record nobody asked about if the preview read the box as it was typed. */
+  it('asks for nothing while an id is still being typed', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/flights')
+    await screen.findByRole('table')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await user.type(screen.getByLabelText('Filter value'), '2276')
+    await screen.findByRole('link', { name: 'London Gatwick (LGW)' })
+
+    // The ids asked about, not the number of requests: this client has no staleTime, so a second
+    // mount of an already-cached lookup refetches it. What matters is that 2, 22 and 227 — the ids
+    // on the way to 2276 — were never records anyone asked for.
+    const asked = [...new Set(sent.filter(r => /^\/admin\/airports\/\d+$/.test(r.url)).map(r => r.url))].sort()
+    expect(asked).toEqual(['/admin/airports/2276', '/admin/airports/4593'])
+  })
+})

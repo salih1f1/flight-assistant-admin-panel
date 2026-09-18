@@ -17,22 +17,31 @@ export type FilterColumn = {
  *
  * `applied` is the column the current filter names: it stays pickable even when neither source
  * mentions it — an empty page under a filter has no rows to name its own column, and a form
- * silently showing a different column than the URL filters on is worse than an extra option.
+ * silently showing a different column than the URL filters on is worse than an extra option. That
+ * is also why it survives `allowed` below, keeping whatever the sources said about it.
+ *
+ * `allowed` is a table's own list of the columns worth filtering it by (LIST_COLUMNS), so a grid
+ * showing six of a flight's twenty columns doesn't offer the other fourteen in its picker.
+ * Undefined — most tables, and any table with all columns shown — offers everything.
  */
 export function filterColumns(
   published: BrowsableColumnDto[] | null | undefined,
   inferred: string[],
   applied: string | undefined,
+  allowed?: string[],
 ): FilterColumn[] {
   const columns: FilterColumn[] = (published ?? [])
     .filter(column => typeof column.name === 'string' && column.name !== '')
     .map(column => ({ name: column.name!, kind: column.kind ?? undefined, values: column.values }))
 
   const offered = columns.length > 0 ? columns : inferred.map(name => ({ name }))
-
-  return applied && !offered.some(column => column.name === applied)
-    ? [{ name: applied }, ...offered]
+  const listed = allowed
+    ? offered.filter(column => allowed.includes(column.name) || column.name === applied)
     : offered
+
+  return applied && !listed.some(column => column.name === applied)
+    ? [{ name: applied }, ...listed]
+    : listed
 }
 
 /** Which value control a column's kind calls for. */

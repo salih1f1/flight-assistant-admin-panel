@@ -80,6 +80,21 @@ export function recordPath(table: string, row: Record<string, unknown>): string 
   return lookup(OWN_DETAIL_PAGES, table)?.(id) ?? `/data/${table}/${encodeURIComponent(id)}`
 }
 
+/**
+ * Tables whose grid is a list of something, rather than a dump of every column the entity has: the
+ * columns worth seeing at a glance, in place of the "hide the bookkeeping columns" rule every other
+ * table falls back on. They are also the columns the filter form offers, since the two answer the
+ * same question — what this list is about. Everything outside the list is one press away behind
+ * the grid's hidden-columns button, and always in full on the record and detail pages.
+ *
+ * Flights: the route and the day it flies. SyncMode is on the list deliberately — syncRowTone.ts
+ * says the row tint is never the only signal precisely because that column is on screen beside it,
+ * and the colour legend above the grid is read against it.
+ */
+export const LIST_COLUMNS: Record<string, string[]> = {
+  flights: ['AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'SyncMode'],
+}
+
 /** Tables the API can create and update: the noun for one record, and the page that creates one. */
 export const EDITABLE: Record<string, { noun: string; newPath: string }> = {
   airlines: { noun: 'airline', newPath: '/airlines/new' },

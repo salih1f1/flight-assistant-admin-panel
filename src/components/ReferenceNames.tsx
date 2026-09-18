@@ -33,8 +33,8 @@ function NotFound({ label }: { label: string }) {
   return <span className="text-amber-700">{`${label}, not found`}</span>
 }
 
-function NameLink({ to, children }: { to: string; children: string }) {
-  return <Link to={to} className="underline decoration-gray-300 hover:decoration-gray-900">{children}</Link>
+function NameLink({ to, title, children }: { to: string; title?: string; children: string }) {
+  return <Link to={to} title={title} className="underline decoration-gray-300 hover:decoration-gray-900">{children}</Link>
 }
 
 /** "British Airways (BA)", linking to the airline. */
@@ -59,6 +59,28 @@ export function AirportName({ id }: { id: number | null | undefined }) {
   if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
   if (!data) return <Pending label={`#${id}`} />
   return <NameLink to={`/data/airports/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
+}
+
+/**
+ * "LGW", the airport's full name on hover, linking to the airport: AirportName in the width a grid
+ * cell has. A route is read as three letters, and a column of "London Gatwick (LGW)" is mostly the
+ * part you already know — so the code carries the column and the name stays a hover away, spelled
+ * out in full wherever there is room for it (the record and detail pages keep AirportName).
+ */
+export function AirportCode({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, error } = useAdminGetAirportById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
+  if (id == null) return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
+  // An airport with neither code is shown by name: there is nothing shorter to call it.
+  return (
+    <NameLink to={`/data/airports/${id}`} title={data.name ?? undefined}>
+      {data.iata ?? data.icao ?? data.name ?? 'Unnamed'}
+    </NameLink>
+  )
 }
 
 /** "Executive Club (EXEC_CLUB)", linking to the program. There is no by-id endpoint; the lookup walks the list. */
