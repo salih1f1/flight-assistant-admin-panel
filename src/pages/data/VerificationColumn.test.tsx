@@ -77,6 +77,15 @@ const headers = () => within(screen.getByRole('table'))
   .map(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim())
   .filter((name): name is string => !!name)
 
+/** The index of a named column among every header, sr-only ones included, so a cell can be picked out. */
+const columnIndex = (column: string) => within(screen.getByRole('table'))
+  .getAllByRole('columnheader')
+  .findIndex(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim() === column)
+
+/** One row's cell under a named column — what makes a claim about WHERE the icon sits a real one. */
+const cellOf = async (rowName: string, column: string) =>
+  within(await rowOf(rowName)).getAllByRole('cell')[columnIndex(column)]
+
 describe('the grid says a row\'s verification state with one icon, and only offers Verify', () => {
   beforeEach(() => {
     airlines = makeAirlines()
@@ -180,6 +189,37 @@ describe('the grid says a row\'s verification state with one icon, and only offe
 
     await waitFor(async () =>
       expect(within(await rowOf('Beta Air')).getByRole('img', { name: 'Verified · manual' })).toBeInTheDocument())
+  })
+
+  /**
+   * The state belongs beside the thing it describes. Row-scoped assertions elsewhere in this file
+   * pass wherever in the row the icon happens to be, so these three name the cell.
+   */
+  it('11. puts the icon in the Name cell, in front of the name', async () => {
+    renderAt('/data/airlines')
+    await rowOf('Alpha Air')
+
+    const nameCell = within(await cellOf('Alpha Air', 'Name'))
+    expect(nameCell.getByRole('img', { name: 'Verified · manual' })).toBeInTheDocument()
+    expect(nameCell.getByText('Alpha Air')).toBeInTheDocument()
+  })
+
+  it('12. leaves the verify column holding the button alone, with no icon of its own', async () => {
+    renderAt('/data/airlines')
+    const row = within(await rowOf('Beta Air'))
+
+    // One icon in the row, not two: it moved rather than being copied.
+    expect(row.getAllByRole('img', { name: 'Unverified' })).toHaveLength(1)
+    const verifyCell = row.getAllByRole('cell').find(cell => within(cell).queryByRole('button', { name: 'Verify' }))!
+    expect(within(verifyCell).queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('13. links a flagged row to its record page from the name, not from the end of the row', async () => {
+    renderAt('/data/airlines')
+    await rowOf('Gamma Air')
+
+    const nameCell = within(await cellOf('Gamma Air', 'Name'))
+    expect(nameCell.getByRole('link', { name: 'Needs attention' })).toHaveAttribute('href', '/data/airlines/3')
   })
 
   it('9. keeps IsVerified out of the default columns, reachable behind the hidden-columns toggle', async () => {

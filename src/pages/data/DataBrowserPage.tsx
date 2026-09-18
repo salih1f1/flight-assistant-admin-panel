@@ -57,6 +57,9 @@ const flightLabel = (flight: Row) => String(flight.FlightNumber ?? `flight ${fli
 // offered generically to every table.
 const VERIFICATION_REQUESTS_TABLE = 'verification-requests'
 
+/** The column the verification icon is drawn in front of, on every table that has one. */
+const ICON_COLUMN = 'Name'
+
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
   { label: 'Verified', filter: 'IsVerified:true' },
@@ -309,6 +312,11 @@ export function DataBrowserPage() {
   const defaultVisibleNames = columnNames.filter(name => !hiddenNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
 
+  // A row's verification state belongs beside the name that identifies it, not at the far end of a
+  // wide table. Set only where the table actually has that column: all 8 verifiable tables do, and
+  // if one ever doesn't, the verify column below keeps the icon rather than the state vanishing.
+  const iconColumn = verifier && visibleNames.includes(ICON_COLUMN) ? ICON_COLUMN : undefined
+
   const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filter ?? ''}`
   const selection = useRowSelection(items, keyColumn, viewKey)
   const selectedRows = selection.selectedRows
@@ -346,11 +354,21 @@ export function DataBrowserPage() {
       const value = row.original[name]
       // Every table with a sensitive column is keyed by a single Id, which is what the reveal endpoint takes.
       const id = row.original.Id
-      if (value !== MASKED || id === null || id === undefined || !table) return <Cell value={value} />
-      // Keyed so another row, page, sort or filter never inherits a revealed value.
-      return <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
+      const content = value !== MASKED || id === null || id === undefined || !table
+        ? <Cell value={value} />
+        // Keyed so another row, page, sort or filter never inherits a revealed value.
+        : <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
+      if (name !== iconColumn || !table) return content
+      // min-w-0 so the name still truncates: a flex item will not shrink below its content without
+      // it. jsdom can't lay this out, so that one class has no test — check it in a browser.
+      return (
+        <div className="flex items-center gap-2">
+          <VerificationIcon table={table} row={row.original} />
+          <div className="min-w-0">{content}</div>
+        </div>
+      )
     },
-  })), [columnKey, table, sort, toggleSort])
+  })), [columnKey, table, sort, toggleSort, iconColumn])
 
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
@@ -366,31 +384,24 @@ export function DataBrowserPage() {
     ...(verifier && keyColumn ? [SELECT_COLUMN] : []),
     ...dataColumns,
     ...(verifier ? [{
-      id: 'verification',
-      header: () => <span className="sr-only">Verification</span>,
+      id: 'verify',
+      header: () => <span className="sr-only">Verify</span>,
       cell: ({ row }) => {
         const keyValue = keyColumn ? row.original[keyColumn] : undefined
-        const flagged = needsAttention(row.original)
-        // A flagged row's local values and its sources' disagree. Verifying it here would sign that
-        // difference off without anyone having read it, so its icon only links to the record page,
-        // which shows what the check found and the ways to resolve it (take the source's values,
-        // keep ours, edit, check again). A table with no single-key record page keeps the plain
-        // icon — there is nowhere to send the admin, and one-click verify is still wrong.
-        const openTo = flagged ? recordPath(table, row.original) : undefined
         // Verified rows offer nothing: unverifying belongs on the record page, which shows what the
         // verification actually was — its source, its date and who did it — rather than in a list,
-        // where it would be one stray click away with none of that on screen. A row with no value
-        // in the key column has nothing the dialog could verify either.
-        const canVerify = !flagged
+        // where it would be one stray click away with none of that on screen. A flagged row offers
+        // nothing either: its icon, in front of its name, is what links to the record page where
+        // the difference a check found can be read. And a row with no value in the key column has
+        // nothing the dialog could verify.
+        const canVerify = !needsAttention(row.original)
           && row.original.IsVerified !== true
           && keyValue !== null
           && keyValue !== undefined
-        const icon = <VerificationStatusIcon row={row.original} />
         return (
           <div className="flex items-center justify-end gap-2">
-            {openTo
-              ? <Link to={openTo} className="inline-flex items-center rounded-md p-1.5 hover:bg-gray-100">{icon}</Link>
-              : icon}
+            {/* Only when the icon has nowhere better to be — see iconColumn above. */}
+            {iconColumn === undefined && <VerificationIcon table={table} row={row.original} />}
             {canVerify && (
               <Button size="sm" variant="outline" onClick={() => setVerifyRows([row.original])}>Verify</Button>
             )}
@@ -553,6 +564,20 @@ export function DataBrowserPage() {
       </div>
     </SelectionContext.Provider>
   )
+}
+
+/**
+ * A row's verification state, linking to its record page when the row needs attention: a flagged
+ * row's local values and its sources' disagree, and that difference is read and resolved there
+ * (take the source's values, keep ours, edit, check again), never signed off from a list. A table
+ * with no single-key record page shows the plain icon — there is nowhere to send the admin.
+ */
+function VerificationIcon({ table, row }: { table: string; row: Row }) {
+  const openTo = needsAttention(row) ? recordPath(table, row) : undefined
+  const icon = <VerificationStatusIcon row={row} />
+  return openTo
+    ? <Link to={openTo} className="inline-flex items-center rounded-md p-1 hover:bg-gray-100">{icon}</Link>
+    : icon
 }
 
 function Cell({ value }: { value: unknown }) {
