@@ -177,7 +177,7 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col">
         <DialogHeader>
-          <DialogTitle>{`Verify ${snapshot.length} selected ${snapshot.length === 1 ? 'row' : 'rows'}`}</DialogTitle>
+          <DialogTitle>{`Verify ${snapshot.length} ${snapshot.length === 1 ? 'row' : 'rows'}`}</DialogTitle>
           <DialogDescription>
             {mode === 'sources' ? 'Queue an outside source to check these rows.' : 'Verify rows by hand, one at a time or all at once.'}
           </DialogDescription>

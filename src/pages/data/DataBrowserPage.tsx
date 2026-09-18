@@ -10,7 +10,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey,
-  getAdminGetVerificationNeedsAttentionQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
+  useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
@@ -21,7 +21,7 @@ import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } 
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
 import { SYNC_LEGEND, syncRowTone } from './syncRowTone'
-import { VerificationStatusBadge } from './VerificationStatus'
+import { VerificationStatusIcon } from './VerificationStatus'
 import { needsAttention } from './verificationState'
 import { CHECKED_COLUMNS } from './verificationChecks'
 import { VerifyDialog } from './VerifyDialog'
@@ -71,8 +71,6 @@ const HIDDEN_COLUMNS = new Set([
   'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
-
-type VerifyTarget = { table: string; key: string; isVerified: boolean }
 
 type Row = Record<string, unknown>
 
@@ -226,19 +224,11 @@ export function DataBrowserPage() {
   const queryClient = useQueryClient()
   const verifier = table ? lookup(VERIFIERS, table) : undefined
   const keyColumn = table ? recordKey(table) : undefined
-  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
-
-  const verify = useMutation({
-    mutationFn: ({ table: slug, key, isVerified }: VerifyTarget) => VERIFIERS[slug](key, { isVerified }),
-    onSuccess: (_, { table: slug }) => {
-      // Every page, sort and filter of this table: a verified row may now fall out of an Unverified view.
-      void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(slug) })
-      // The dashboard card's counts: verifying from the filtered "needs attention" grid this row
-      // linked from would otherwise leave the card showing a stale count for up to five minutes,
-      // pointing an admin back at a grid that's already empty.
-      void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
-    },
-  })
+  // The rows the Verify dialog is open on, or null for closed: the checkbox selection when the
+  // toolbar opened it, the one row when its own Verify button did. Nothing in the grid verifies
+  // directly any more — every verify goes through that dialog, which is what shows the row's data
+  // and the choice between verifying by hand and queueing an outside source's check.
+  const [verifyRows, setVerifyRows] = useState<Row[] | null>(null)
 
   const editable = table ? lookup(EDITABLE, table) : undefined
   const deleter = table ? lookup(DELETERS, table) : undefined
@@ -305,8 +295,14 @@ export function DataBrowserPage() {
 
   const items = (rows.data?.items ?? []) as Row[]
   const columnNames = items.length > 0 ? Object.keys(items[0]) : []
-  // A column masked on every row says nothing in a grid; the record page reveals it.
-  const hiddenNames = columnNames.filter(name => HIDDEN_COLUMNS.has(name) || items.every(row => row[name] === MASKED))
+  // A column masked on every row says nothing in a grid; the record page reveals it. IsVerified
+  // joins them on a verifiable table: the verification column below already says what it means, in
+  // less room than a column of its own, so the raw true/false is kept for the toggle rather than
+  // shown twice. A table with no verifier has no such column and keeps IsVerified in place.
+  const hiddenNames = columnNames.filter(name =>
+    HIDDEN_COLUMNS.has(name)
+    || (name === 'IsVerified' && verifier !== undefined)
+    || items.every(row => row[name] === MASKED))
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
   // Independent of the "show all" toggle: the Manually dialog's default columns are the grid's
   // normal view, not whatever the admin currently has expanded.
@@ -325,7 +321,7 @@ export function DataBrowserPage() {
   const [dialogView, setDialogView] = useState(viewKey)
   if (viewKey !== dialogView) {
     setDialogView(viewKey)
-    setVerifyDialogOpen(false)
+    setVerifyRows(null)
   }
 
   const toggleSort = useCallback(
@@ -348,15 +344,13 @@ export function DataBrowserPage() {
     ),
     cell: ({ row }) => {
       const value = row.original[name]
-      // The one column a verifiable table's badge replaces; non-verifiable tables keep the raw value.
-      if (name === 'IsVerified' && verifier) return <VerificationStatusBadge row={row.original} />
       // Every table with a sensitive column is keyed by a single Id, which is what the reveal endpoint takes.
       const id = row.original.Id
       if (value !== MASKED || id === null || id === undefined || !table) return <Cell value={value} />
       // Keyed so another row, page, sort or filter never inherits a revealed value.
       return <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
     },
-  })), [columnKey, table, sort, toggleSort, verifier])
+  })), [columnKey, table, sort, toggleSort])
 
   // The route always carries a table: the side menu lists them, and /data redirects to the dashboard.
   if (!table) return null
@@ -364,7 +358,7 @@ export function DataBrowserPage() {
   // The dialog itself prepends the key column and appends Status, so this is only the middle
   // segment: the §3 checked columns where they exist, else the grid's own default-visible columns.
   const checkedColumns = lookup(CHECKED_COLUMNS, table)
-  const manualColumns = checkedColumns ? [...checkedColumns] : defaultVisibleNames.filter(name => name !== 'IsVerified')
+  const manualColumns = checkedColumns ? [...checkedColumns] : [...defaultVisibleNames]
 
   // A new array, never a push: dataColumns is memoized and must not grow a column per render.
   // SELECT_COLUMN is a stable, module-level reference (see its comment) — never rebuilt here.
@@ -372,33 +366,35 @@ export function DataBrowserPage() {
     ...(verifier && keyColumn ? [SELECT_COLUMN] : []),
     ...dataColumns,
     ...(verifier ? [{
-      id: 'verify',
-      header: () => <span className="sr-only">Verify</span>,
+      id: 'verification',
+      header: () => <span className="sr-only">Verification</span>,
       cell: ({ row }) => {
         const keyValue = keyColumn ? row.original[keyColumn] : undefined
-        if (keyValue === null || keyValue === undefined) return null
-        const key = String(keyValue)
+        const flagged = needsAttention(row.original)
         // A flagged row's local values and its sources' disagree. Verifying it here would sign that
-        // difference off without anyone having read it, so the grid only points at the record page,
+        // difference off without anyone having read it, so its icon only links to the record page,
         // which shows what the check found and the ways to resolve it (take the source's values,
-        // keep ours, edit, check again). A table with no single-key record page gets neither
-        // button — there is nowhere to send the admin, and one-click verify is still wrong.
-        if (needsAttention(row.original)) {
-          const openTo = recordPath(table, row.original)
-          return openTo
-            ? <Link to={openTo} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Review</Link>
-            : null
-        }
-        const verified = row.original.IsVerified === true
+        // keep ours, edit, check again). A table with no single-key record page keeps the plain
+        // icon — there is nowhere to send the admin, and one-click verify is still wrong.
+        const openTo = flagged ? recordPath(table, row.original) : undefined
+        // Verified rows offer nothing: unverifying belongs on the record page, which shows what the
+        // verification actually was — its source, its date and who did it — rather than in a list,
+        // where it would be one stray click away with none of that on screen. A row with no value
+        // in the key column has nothing the dialog could verify either.
+        const canVerify = !flagged
+          && row.original.IsVerified !== true
+          && keyValue !== null
+          && keyValue !== undefined
+        const icon = <VerificationStatusIcon row={row.original} />
         return (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={verify.isPending}
-            onClick={() => verify.mutate({ table, key, isVerified: !verified })}
-          >
-            {verified ? 'Unverify' : 'Verify'}
-          </Button>
+          <div className="flex items-center justify-end gap-2">
+            {openTo
+              ? <Link to={openTo} className="inline-flex items-center rounded-md p-1.5 hover:bg-gray-100">{icon}</Link>
+              : icon}
+            {canVerify && (
+              <Button size="sm" variant="outline" onClick={() => setVerifyRows([row.original])}>Verify</Button>
+            )}
+          </div>
         )
       },
     } satisfies ColumnDef<Row>] : []),
@@ -470,7 +466,7 @@ export function DataBrowserPage() {
             )}
             {/* Opens the Verify dialog on the rows selected via the checkbox column. */}
             {verifier && (
-              <Button variant="outline" size="sm" disabled={selectedRows.length === 0} onClick={() => setVerifyDialogOpen(true)}>
+              <Button variant="outline" size="sm" disabled={selectedRows.length === 0} onClick={() => setVerifyRows(selectedRows)}>
                 {`Verify selected (${selectedRows.length})`}
               </Button>
             )}
@@ -494,9 +490,6 @@ export function DataBrowserPage() {
             onApply={value => updateView({ filter: value })}
             onClear={() => updateView({ filter: undefined })}
           />
-          {verify.error && verify.variables?.table === table && (
-            <VerifyError error={verify.error} target={verify.variables} />
-          )}
           {remove.error && remove.variables?.table === table && (
             <ActionError
               text={`Couldn't delete ${DELETERS[table]?.noun ?? 'row'} ${String(remove.variables.row.Id)}`}
@@ -549,11 +542,11 @@ export function DataBrowserPage() {
 
         {verifier && keyColumn && (
           <VerifyDialog
-            open={verifyDialogOpen}
-            onOpenChange={setVerifyDialogOpen}
+            open={verifyRows !== null}
+            onOpenChange={open => !open && setVerifyRows(null)}
             table={table}
             keyColumn={keyColumn}
-            rows={selectedRows}
+            rows={verifyRows ?? []}
             manualColumns={manualColumns}
           />
         )}
@@ -567,20 +560,6 @@ function Cell({ value }: { value: unknown }) {
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <span className="block max-w-xs truncate" title={text}>{text}</span>
-}
-
-function VerifyError({ error, target }: { error: unknown; target: VerifyTarget }) {
-  // The verify endpoints answer a missing row with an empty 404 (Results.NotFound()), not ProblemDetails.
-  const status = (error as { response?: { status?: number } } | null)?.response?.status
-  const { title, detail } = status === 404
-    ? { title: 'it no longer exists. Refresh to see the current rows.', detail: undefined }
-    : apiErrorMessage(error)
-  return (
-    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <p>{`Couldn't ${target.isVerified ? 'verify' : 'unverify'} row ${target.key}: ${title}`}</p>
-      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
-    </div>
-  )
 }
 
 function ActionError({ text, error }: { text: string; error: unknown }) {
