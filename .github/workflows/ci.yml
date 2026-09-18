@@ -17,9 +17,9 @@ jobs:
     name: Lint, build and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # What the panel is developed on; npm's cache is keyed on package-lock.json.
           node-version: 22
