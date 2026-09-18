@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
-  AirlineName, AirportCode, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
+  AirlineName, AirportCode, AirportName, AllianceName, FlightName, LoyaltyProgramKindName, LoyaltyProgramName,
+  LoyaltyTierName, TravelerName,
 } from '@/components/ReferenceNames'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup } from './records'
@@ -33,8 +34,12 @@ const REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
   // The only place the API names a tier is inside its program, so this one reads its row's sibling
   // column rather than its own value alone.
   TierId: (value, row) => <LoyaltyTierName programId={asId(row.ProgramId)} tierId={asId(value)} />,
+  KindId: value => <LoyaltyProgramKindName id={asId(value)} />,
   TravelerId: value => <TravelerName id={typeof value === 'string' ? value : null} />,
   FlightId: value => <FlightName id={asId(value)} />,
+  // The one reference the API stores as a code rather than an id (programs, tiers and airlines all
+  // carry it), which is why it is named rather than linked: see AllianceName.
+  AllianceCode: value => <AllianceName code={typeof value === 'string' ? value : null} />,
 }
 
 /**
@@ -76,3 +81,21 @@ export function columnValue(
   }
   return undefined
 }
+
+/**
+ * What a column is headed and labelled, where the value under it is a record rather than the id or
+ * code the API stores. Shared by the grid's header — which is also its sort control, and still
+ * sorts by the raw column name, so "Airline ↑" orders by AirlineId — and the record page's field
+ * labels, so a field never reads "KindId" over a value naming a kind.
+ */
+const COLUMN_LABELS: Record<string, string> = {
+  AirlineId: 'Airline',
+  AirportId: 'Airport',
+  DepartureAirportId: 'From',
+  ArrivalAirportId: 'To',
+  KindId: 'Kind',
+  AllianceCode: 'Alliance',
+}
+
+/** What a column is called on screen: its label where it has one, otherwise the API's own name. */
+export const columnLabel = (column: string) => lookup(COLUMN_LABELS, column) ?? column

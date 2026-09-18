@@ -13,7 +13,7 @@ import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
 import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
-import { columnValue } from './columnValue'
+import { columnLabel, columnValue } from './columnValue'
 import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, RELATED_VIEWS, VERIFIERS } from './records'
 import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
 import { VerificationPanel } from './VerificationPanel'
@@ -155,7 +155,7 @@ function Record({ table, id }: { table: string; id: string }) {
                 <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                   {Object.entries(row).map(([column, value]) => (
                     <div key={column} className="min-w-0">
-                      <dt className="text-xs font-medium text-gray-500">{column}</dt>
+                      <dt className="text-xs font-medium text-gray-500">{columnLabel(column)}</dt>
                       <dd className="mt-1 break-words text-gray-900">
                         <FieldValue table={table} id={id} column={column} value={value} row={row} />
                       </dd>
