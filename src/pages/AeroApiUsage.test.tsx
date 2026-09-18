@@ -128,19 +128,97 @@ describe('Dashboard AeroAPI usage', () => {
     expect(await within(section).findByText('2026-09-01 00:00 – 2026-09-13 20:10 UTC')).toBeInTheDocument()
   })
 
-  it('says the throttle is free when there is no pending slot', async () => {
+  // The line is live throttle state, so it only earns its place when something is actually
+  // queued. "available now" was a line of text carrying no information.
+  it('says nothing about the throttle when no call is queued', async () => {
     renderWithProviders(<Dashboard />)
     const section = await usageSection()
+    await within(section).findByText(/of \$5\.00/)
 
-    expect(await within(section).findByText('Next AeroAPI slot: available now')).toBeInTheDocument()
+    expect(within(section).queryByText(/outbound throttle/i)).not.toBeInTheDocument()
   })
 
-  it('says how long until the next throttle slot', async () => {
+  it('says how long the next call waits, and that the wait is ours not FlightAware reporting it', async () => {
     usage.nextSlotUtc = '2026-09-13T20:14:07+00:00'
     renderWithProviders(<Dashboard />)
     const section = await usageSection()
 
-    expect(await within(section).findByText('Next AeroAPI slot: in 7s')).toBeInTheDocument()
+    expect(await within(section).findByText(/next call waits ~7s/i)).toBeInTheDocument()
+    // Without this the number is meaningless: it is our own queue, not a FlightAware figure.
+    expect(within(section).getByText(/5 calls a minute/i)).toBeInTheDocument()
+  })
+
+  // A 10-minute server cache backs this report, so a slot that has already come due is stale
+  // data. Rendering it would claim a wait that has already elapsed.
+  it('drops a throttle slot that has already passed', async () => {
+    usage.nextSlotUtc = '2026-09-13T20:13:00+00:00'
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+    await within(section).findByText(/of \$5\.00/)
+
+    expect(within(section).queryByText(/outbound throttle/i)).not.toBeInTheDocument()
+  })
+
+  it('links to FlightAware so the numbers can be reconciled', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+
+    const link = await within(section).findByRole('link', { name: /flightaware/i })
+    expect(link).toHaveAttribute('href', 'https://www.flightaware.com/aeroapi/portal/')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('says which operation the failed calls came from', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+
+    const row = (await within(section).findByText('GET /schedules/{date_start}/{date_end}')).closest('tr')!
+    expect(within(row).getByText('1')).toHaveClass('text-amber-600')
+  })
+
+  it('does not colour an operation that has never failed', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+
+    const row = (await within(section).findByText('GET /flights/{ident}')).closest('tr')!
+    expect(within(row).getByText('0')).not.toHaveClass('text-amber-600')
+  })
+
+  it('hides the discount tile when nothing was discounted', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+    await within(section).findByText(/of \$5\.00/)
+
+    expect(within(section).queryByText(/discount/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the discount when there is one', async () => {
+    usage.totalDiscountCostUsd = 1.25
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+
+    expect(await within(section).findByText(/discount/i)).toBeInTheDocument()
+    expect(within(section).getByText('$1.25')).toBeInTheDocument()
+  })
+
+  it('says the average daily spend and how much of the period is left', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+
+    // $3.75 over 12.84 days elapsed is $0.29/day; September has 30, so 17 remain.
+    expect(await within(section).findByText(/\$0\.29 a day/)).toBeInTheDocument()
+    expect(within(section).getByText(/17 days left/i)).toBeInTheDocument()
+  })
+
+  // A range shorter than a day must not divide spend by a fraction and report a wild daily rate.
+  it('does not report a daily average before a full day has elapsed', async () => {
+    usage.rangeStartUtc = '2026-09-13T18:00:00+00:00'
+    usage.rangeEndUtc = '2026-09-13T20:10:00+00:00'
+    renderWithProviders(<Dashboard />)
+    const section = await usageSection()
+    await within(section).findByText(/of \$5\.00/)
+
+    expect(within(section).queryByText(/a day/i)).not.toBeInTheDocument()
   })
 
   it("shows the API's reason when the report can't be loaded", async () => {
