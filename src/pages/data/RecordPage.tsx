@@ -13,7 +13,7 @@ import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
 import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
-import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, VERIFIERS } from './records'
+import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, RELATED_VIEWS, VERIFIERS } from './records'
 import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
 import { VerificationPanel } from './VerificationPanel'
 
@@ -69,6 +69,8 @@ function Record({ table, id }: { table: string; id: string }) {
 
   const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
   const Form = lookup(EDIT_FORMS, table)
+  // A view that adds to this page rather than replacing it (RELATED_VIEWS, not OWN_DETAIL_PAGES).
+  const relatedView = lookup(RELATED_VIEWS, table)?.(id)
   const editing = Form !== undefined && searchParams.get('mode') === 'edit'
   const setEditing = (edit: boolean) => {
     const next = new URLSearchParams(searchParams)
@@ -109,6 +111,11 @@ function Record({ table, id }: { table: string; id: string }) {
               <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
             </div>
             <div className="flex items-center gap-2">
+              {relatedView && (
+                <Link to={relatedView.to} className="text-sm text-blue-600 hover:underline">
+                  {relatedView.label}
+                </Link>
+              )}
               {Form && (
                 <div role="group" aria-label="Mode" className="inline-flex overflow-hidden rounded-md border border-gray-200">
                   {[{ label: 'Read', edit: false }, { label: 'Edit', edit: true }].map(option => (

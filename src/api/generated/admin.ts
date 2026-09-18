@@ -57,6 +57,7 @@ import type {
   AirportAdminDto,
   AirportAdminDtoPagedResult,
   AllianceAdminDto,
+  AllianceDetailAdminDto,
   BrowsableTableDto,
   CiRunDto,
   CiTestReportDto,
@@ -742,6 +743,7 @@ export function useAdminGetAllAirports<TData = Awaited<ReturnType<typeof adminGe
 
 
 /**
+ * 409 when CountryCode names a country that is not in the countries table.
  * @summary Create airport
  */
 export const adminCreateAirport = (
@@ -763,7 +765,7 @@ export const adminCreateAirport = (
 
 export const getAdminCreateAirportMutationKey = () => ['adminCreateAirport'] as const;
 
-export const getAdminCreateAirportMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
+export const getAdminCreateAirportMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirport>>, TError,AdminCreateAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirport>>, TError,AdminCreateAirportMutationVariables, TContext> => {
 
@@ -792,13 +794,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminCreateAirportMutationResult = NonNullable<Awaited<ReturnType<typeof adminCreateAirport>>>
     export type AdminCreateAirportMutationBody = BodyType<CreateAirportRequest>
-    export type AdminCreateAirportMutationError = ErrorType<HttpValidationProblemDetails>
+    export type AdminCreateAirportMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminCreateAirportMutationVariables = {data: BodyType<CreateAirportRequest>}
 
     /**
  * @summary Create airport
  */
-export const useAdminCreateAirport = <TError = ErrorType<HttpValidationProblemDetails>,
+export const useAdminCreateAirport = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirport>>, TError,AdminCreateAirportMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminCreateAirport>>,
@@ -903,6 +905,7 @@ export function useAdminGetAirportById<TData = Awaited<ReturnType<typeof adminGe
 
 
 /**
+ * 409 when CountryCode names a country that is not in the countries table.
  * @summary Update airport
  */
 export const adminUpdateAirport = (
@@ -1105,6 +1108,100 @@ export const useAdminVerifyAlliance = <TError = ErrorType<ProblemDetails>,
       > => {
       return useMutation(getAdminVerifyAllianceMutationOptions(options), queryClient);
     }
+
+/**
+ * Returns the alliance together with every airline whose AllianceCode is its Code, ordered by name. The list is not capped: it is bounded by how many airlines exist in the alliance rather than growing with usage, so there is no truncation flag. An alliance no airline belongs to is a 200 with an empty list, not a 404. Verification state is deliberately absent — it lives with the raw record at GET /admin/data/alliances.
+ * @summary Get alliance detail
+ */
+export const adminGetAllianceDetail = (
+    id: number,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AllianceDetailAdminDto>(
+      {url: `/admin/alliances/${id}/detail`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetAllianceDetailQueryKey = (id: number,) => {
+    return [
+    `/admin/alliances/${id}/detail`
+    ] as const;
+    }
+
+
+export const getAdminGetAllianceDetailQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError = ErrorType<ProblemDetails>>(id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetAllianceDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetAllianceDetail>>> = ({ signal }) => adminGetAllianceDetail(id, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetAllianceDetailQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetAllianceDetail>>>
+export type AdminGetAllianceDetailQueryError = ErrorType<ProblemDetails>
+
+
+export function useAdminGetAllianceDetail<TData = Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError = ErrorType<ProblemDetails>>(
+ id: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAllianceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAllianceDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAllianceDetail<TData = Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError = ErrorType<ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAllianceDetail>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAllianceDetail>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAllianceDetail<TData = Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError = ErrorType<ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get alliance detail
+ */
+
+export function useAdminGetAllianceDetail<TData = Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError = ErrorType<ProblemDetails>>(
+ id: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAllianceDetail>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetAllianceDetailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 /**
  * One row per admin write (#313 Tasks 1-2), newest first by ActionUtc then Id (a tiebreaker: many rows from the same write batch can share one ActionUtc instant). EntityType and EntityId together answer 'history of this row'; ActorId and Action narrow by who/what — ActorId matches case-insensitively, EntityType does not. FromUtc/ToUtc bound the range and are both inclusive; pass an explicit time-of-day, since a date alone (e.g. toUtc=2026-09-02) means midnight at the start of that day and so excludes everything that happened on it. All filters are optional and combine with AND. EntityId is null on a create of an entity with a store-generated key (the database assigns it during the very write this row records, so it does not exist yet) — such a row can never be found through the EntityId filter and is identified through its After payload instead, which holds the created entity's full property set.
@@ -3890,6 +3987,7 @@ export function useAdminGetAllLounges<TData = Awaited<ReturnType<typeof adminGet
 
 
 /**
+ * 409 when AirportId names an airport that does not exist.
  * @summary Create lounge
  */
 export const adminCreateLounge = (
@@ -3911,7 +4009,7 @@ export const adminCreateLounge = (
 
 export const getAdminCreateLoungeMutationKey = () => ['adminCreateLounge'] as const;
 
-export const getAdminCreateLoungeMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
+export const getAdminCreateLoungeMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLounge>>, TError,AdminCreateLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminCreateLounge>>, TError,AdminCreateLoungeMutationVariables, TContext> => {
 
@@ -3940,13 +4038,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminCreateLoungeMutationResult = NonNullable<Awaited<ReturnType<typeof adminCreateLounge>>>
     export type AdminCreateLoungeMutationBody = BodyType<CreateLoungeRequest>
-    export type AdminCreateLoungeMutationError = ErrorType<HttpValidationProblemDetails>
+    export type AdminCreateLoungeMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminCreateLoungeMutationVariables = {data: BodyType<CreateLoungeRequest>}
 
     /**
  * @summary Create lounge
  */
-export const useAdminCreateLounge = <TError = ErrorType<HttpValidationProblemDetails>,
+export const useAdminCreateLounge = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLounge>>, TError,AdminCreateLoungeMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminCreateLounge>>,
@@ -4280,6 +4378,7 @@ export function useAdminGetLoyaltyPrograms<TData = Awaited<ReturnType<typeof adm
 
 
 /**
+ * 409 when KindId or AirlineId names a row that does not exist.
  * @summary Create loyalty program
  */
 export const adminCreateLoyaltyProgram = (
@@ -4301,7 +4400,7 @@ export const adminCreateLoyaltyProgram = (
 
 export const getAdminCreateLoyaltyProgramMutationKey = () => ['adminCreateLoyaltyProgram'] as const;
 
-export const getAdminCreateLoyaltyProgramMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
+export const getAdminCreateLoyaltyProgramMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyProgram>>, TError,AdminCreateLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyProgram>>, TError,AdminCreateLoyaltyProgramMutationVariables, TContext> => {
 
@@ -4330,13 +4429,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminCreateLoyaltyProgramMutationResult = NonNullable<Awaited<ReturnType<typeof adminCreateLoyaltyProgram>>>
     export type AdminCreateLoyaltyProgramMutationBody = BodyType<CreateLoyaltyProgramRequest>
-    export type AdminCreateLoyaltyProgramMutationError = ErrorType<HttpValidationProblemDetails>
+    export type AdminCreateLoyaltyProgramMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminCreateLoyaltyProgramMutationVariables = {data: BodyType<CreateLoyaltyProgramRequest>}
 
     /**
  * @summary Create loyalty program
  */
-export const useAdminCreateLoyaltyProgram = <TError = ErrorType<HttpValidationProblemDetails>,
+export const useAdminCreateLoyaltyProgram = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyProgram>>, TError,AdminCreateLoyaltyProgramMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminCreateLoyaltyProgram>>,
@@ -4348,6 +4447,7 @@ export const useAdminCreateLoyaltyProgram = <TError = ErrorType<HttpValidationPr
     }
 
 /**
+ * 409 when KindId or AirlineId names a row that does not exist.
  * @summary Update loyalty program
  */
 export const adminUpdateLoyaltyProgram = (

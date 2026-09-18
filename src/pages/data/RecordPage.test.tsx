@@ -309,4 +309,23 @@ describe('RecordPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/data/airlines/7'))
     expect(search(router).get('mode')).toBe('edit')
   })
+
+  /**
+   * An alliance's record page links to its airlines view. It links rather than redirects (which is
+   * what OWN_DETAIL_PAGES does): the airlines page is not a superset of this one — the raw columns
+   * and the verify toggle live only here — so redirecting would leave verifying with no route to it.
+   */
+  it('links an alliance record to the airlines in that alliance', async () => {
+    renderAt('/data/alliances/1')
+
+    const link = await screen.findByRole('link', { name: /airlines in this alliance/i })
+    expect(link).toHaveAttribute('href', '/alliances/1')
+  })
+
+  it('a record with no related view shows no such link', async () => {
+    renderAt('/data/airlines/8')
+
+    await heading('British Airways')
+    expect(screen.queryByRole('link', { name: /airlines in this alliance/i })).not.toBeInTheDocument()
+  })
 })
