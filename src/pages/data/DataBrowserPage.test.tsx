@@ -173,8 +173,8 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByText('Traveler 001')).toBeInTheDocument()
     expect(screen.getByText('Traveler 050')).toBeInTheDocument()
     expect(screen.queryByText('Traveler 051')).not.toBeInTheDocument()
-    // Email is masked on every row, so it starts hidden.
-    expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
+    // Email is masked on every row and Id is bookkeeping (#153), so both start hidden.
+    expect(headers()).toEqual(['DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(screen.getByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
   })
 
@@ -191,14 +191,14 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.click(screen.getByRole('button', { name: 'Show 1 hidden column' }))
+    await user.click(screen.getByRole('button', { name: 'Show 2 hidden columns' }))
 
     expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBe('all')
 
-    await user.click(screen.getByRole('button', { name: 'Hide 1 column' }))
+    await user.click(screen.getByRole('button', { name: 'Hide 2 columns' }))
 
-    expect(headers()).toEqual(['Id', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
+    expect(headers()).toEqual(['DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBeNull()
   })
 
@@ -310,7 +310,7 @@ describe('DataBrowserPage', () => {
 
     const row = (await screen.findByText('Scheduled')).closest('tr')!
     // The last cell is the row's Open link, which has no text.
-    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['1', 'SCH', 'Scheduled', '—', ''])
+    expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['SCH', 'Scheduled', '—', ''])
   })
 
   it('Next requests page 2 and keeps the page in the URL', async () => {
@@ -534,7 +534,7 @@ describe('DataBrowserPage', () => {
     await screen.findByText('IST')
 
     expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['Id', 'EntityKey', 'Status', 'RequestedUtc', 'SourceValuesJson'])
+      .toEqual(['EntityKey', 'Status', 'RequestedUtc', 'SourceValuesJson'])
   })
 
   /** An API predating #451 publishes no columns: the form keeps inferring names from the rows and
@@ -545,7 +545,7 @@ describe('DataBrowserPage', () => {
     await screen.findByText('Scheduled')
 
     expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
-      .toEqual(['Id', 'Code', 'Name', 'Description'])
+      .toEqual(['Code', 'Name', 'Description'])
 
     await user.selectOptions(screen.getByLabelText('Filter column'), 'Code')
     const value = screen.getByLabelText('Filter value')

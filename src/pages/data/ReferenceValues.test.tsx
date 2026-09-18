@@ -140,8 +140,11 @@ describe('references in the raw grid', () => {
     expect(shown).toHaveAttribute('title', '2026-09-18T21:44:30.987798Z')
   })
 
+  // With all columns shown, since Id is hidden by default (#153). The rule is about what the key
+  // column renders as wherever it is on screen, not about whether the grid opens on it: TravelerId
+  // holding this same guid renders as Ann Example, and Id holding it must not.
   it("leaves the row's own key alone, since that is the value an admin copies", async () => {
-    renderAt('/data/traveler-flights')
+    renderAt('/data/traveler-flights?columns=all')
     const row = await rowOf(ANN)
 
     expect(within(row).getByText(ANN)).toBeInTheDocument()
