@@ -214,12 +214,65 @@ describe('DataBrowserPage', () => {
     expect(search(router).get('columns')).toBe('all')
   })
 
-  it('still offers hidden columns to filter on', async () => {
+  /**
+   * The picker offers exactly what the grid is showing (#149). Email is masked on every row, so the
+   * grid hides it — and the API rejects a filter on a sensitive column with a 400, which is all
+   * offering it here could ever produce.
+   */
+  it('offers only the columns the table is showing', async () => {
     renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
     const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
-    expect(options).toEqual(expect.arrayContaining(['Email']))
+    expect(options).toEqual(headers())
+    expect(options).not.toContain('Email')
+  })
+
+  it('offers the hidden columns too, once they are shown', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
+
+    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    expect(options).toContain('Email')
+  })
+
+  /**
+   * Narrowing a filter to nothing must not empty the picker — there would be no way left to change
+   * the filter that emptied it. The grid keeps the columns it last showed, so the picker stays
+   * exactly as it was, masked columns still absent.
+   */
+  it('keeps the picker when the filter matches nothing', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await user.type(screen.getByLabelText('Filter value'), 'nothingmatchesthis')
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
+    await screen.findByText('Page 1 of 1 · 0 total')
+
+    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    expect(options).toContain('DisplayName')
+    expect(options).not.toContain('Email')
+  })
+
+  /**
+   * A cold link straight to a view that matches nothing has no rows to learn from, so it falls back
+   * to what the API published for the table. That fallback cannot know a column is masked — the API
+   * publishes a sensitive column as ordinary Text, and it takes rows to see every value redacted —
+   * so it may offer one; picking it answers a plain 400 saying so. What matters is that the picker
+   * is usable at all.
+   */
+  it('still offers a usable picker on a cold link that matches nothing', async () => {
+    renderAt('/data/travelers?filter=DisplayName%3Anothingmatchesthis')
+    await screen.findByText('Page 1 of 1 · 0 total')
+
+    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    expect(options).toContain('DisplayName')
+    expect(options).toContain('CreatedUtc')
   })
 
   it('has no Manage | Raw data tabs: the grid is the only list', async () => {
@@ -449,6 +502,10 @@ describe('DataBrowserPage', () => {
     renderAt('/data/airports')
     await screen.findByText('Istanbul')
 
+    // On a verifiable table IsVerified is not a grid column — the verification column says it in
+    // less room, and the Verified toggle filters on it. So it reaches the picker the same way it
+    // reaches the grid: by showing the hidden columns (#149).
+    await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
     await user.selectOptions(screen.getByLabelText('Filter column'), 'IsVerified')
 
     const value = screen.getByLabelText('Filter value')

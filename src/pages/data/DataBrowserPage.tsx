@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CellContext, type ColumnDef } from '@tanstack/react-table'
@@ -361,6 +361,10 @@ export function DataBrowserPage() {
   }
 
   const items = (rows.data?.items ?? []) as Row[]
+  const lastVisibleNames = useRef<string[]>([])
+  // What GET /admin/data/tables published about this table's columns (#451): the kinds the value
+  // control reads, and the column names a page with no rows of its own falls back to.
+  const publishedColumns = tables.data?.find(t => t.slug === table)?.columns
   const columnNames = items.length > 0 ? Object.keys(items[0]) : []
   // A column masked on every row says nothing in a grid; the record page reveals it. IsVerified
   // joins them on a verifiable table: the verification column below already says what it means, in
@@ -377,6 +381,36 @@ export function DataBrowserPage() {
     ? columnNames.filter(name => bookkeepingNames.includes(name) || !listColumns.includes(name))
     : bookkeepingNames
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
+
+  // The filter offers exactly the columns the grid is showing (#149) — no bookkeeping columns on
+  // any table, and "Show hidden columns" widens the grid and the picker together. Offering more
+  // than the grid shows was never useful: on travelers it offered Email, which the API rejects as
+  // sensitive, so the only thing picking it could produce was a 400.
+  //
+  // A page with no rows has no columns to read off its rows, so it falls back to what the API
+  // published for the table under the same rules. Without that, a filter matching nothing would
+  // empty the picker, leaving no way to change the filter that emptied it. The all-masked rule is
+  // absent from the fallback: it takes rows to know, and there are none.
+  const publishedNames = (publishedColumns ?? [])
+    .map(column => column.name)
+    .filter((name): name is string => typeof name === 'string' && name !== '')
+  const filterableNames = columnNames.length > 0
+    ? visibleNames
+    : lastVisibleNames.current.length > 0
+      ? lastVisibleNames.current
+      : showAll
+        ? publishedNames
+        : publishedNames.filter(name =>
+          !HIDDEN_COLUMNS.has(name)
+          && !(name === 'IsVerified' && verifier !== undefined)
+          && (listColumns ? listColumns.includes(name) : true))
+
+  // What this table's grid last showed, so narrowing a filter to nothing leaves the picker exactly
+  // as it was rather than falling back. The grid is mounted per table, so this never carries
+  // another table's columns. Only a cold link straight to an empty view reaches the fallback above
+  // — and that fallback cannot know about a masked column, since the API publishes a sensitive
+  // column as ordinary Text and it takes rows to see that every value is redacted.
+  if (visibleNames.length > 0) lastVisibleNames.current = visibleNames
   // Independent of the "show all" toggle, and of the table's list: the Manually dialog's columns are
   // the record, not the list. Verifying a lounge by hand is confirming every field it has, and a
   // list showing three columns is a choice about scanning a page, not about what an admin is
@@ -600,14 +634,12 @@ export function DataBrowserPage() {
           <FilterForm
             // Remount on a table change, so the inputs never carry another table's columns.
             key={table}
-            // Every column, hidden or not: filtering on one doesn't need it on screen.
-            columns={columnNames}
-            // What GET /admin/data/tables published about this table's columns (#451), so the value
-            // control can match the column's kind. Undefined against an API that publishes none.
-            published={tables.data?.find(t => t.slug === table)?.columns}
-            // The table's own list of what it is about, so the picker isn't longer than the useful
-            // part of it. "Show all columns" means everything in both places, so it passes none.
-            allowed={showAll ? undefined : listColumns}
+            // Exactly the columns the grid is showing — the picker and the table agree (#149).
+            columns={filterableNames}
+            // The published kinds, so the value control can match the column's kind. Undefined
+            // against an API that publishes none.
+            published={publishedColumns}
+            allowed={filterableNames}
             appliedColumns={filters.map(applied => parseFilter(applied).column)}
             onAdd={value => updateView({ filters: withFilter(filters, value) })}
           />
