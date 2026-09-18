@@ -113,6 +113,17 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // (countries' Code), so it is never listed twice.
   const columns = [keyColumn, ...manualColumns.filter(name => name !== keyColumn), 'Status']
 
+  // Whether the sources panel is what's on screen — the mode toggle only exists for the three
+  // tables an outside source can check, so "sources" alone doesn't settle it.
+  const sourcesShown = mode === 'sources' && entityType
+  // One row is a confirmation of that record, not a batch to work through: it gets the field list
+  // below and a Verify in the footer, in place of the one-line table, "Verify all shown" and a
+  // per-row button that would all say the same thing. Reached identically from the grid row's own
+  // Verify and from "Verify selected (1)". The sources side is a list of sources either way, so it
+  // keeps its own layout and its plain Close.
+  const single = snapshot.length === 1 && !sourcesShown ? snapshot[0] : null
+  const singleOutcome = single ? outcomes[String(single[keyColumn])] : undefined
+
   const isVerified = (row: Row) => row.IsVerified === true || outcomes[String(row[keyColumn])]?.status === 'verified'
   const isPending = (row: Row) => outcomes[String(row[keyColumn])]?.status === 'pending'
   // A pending row doesn't count as remaining either: it already has a request in flight, whether
@@ -123,7 +134,10 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
   // false and invalidates once itself after the whole run, so a bulk run over N rows triggers one
   // grid refetch instead of up to N interleaved ones (each discarding the last, since the grid query
   // behind the dialog is an active observer and refetches on every invalidation).
-  async function verifyOne(row: Row, { invalidate = true }: { invalidate?: boolean } = {}) {
+  //
+  // Answers whether the row was verified, for the single-row footer's close-on-success; the batch
+  // callers ignore it and read the row's outcome out of `outcomes` instead.
+  async function verifyOne(row: Row, { invalidate = true }: { invalidate?: boolean } = {}): Promise<boolean> {
     const generation = generationRef.current
     const key = String(row[keyColumn])
     // Only applies the outcome while it's still this same open dialog session — see the
@@ -145,12 +159,25 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
         // dialog opened from would otherwise leave the card's count stale for up to five minutes.
         void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
       }
+      return true
     } catch (error) {
       // Matches the grid's own verify: the API answers a missing row with an empty 404.
       const status = (error as { response?: { status?: number } } | null)?.response?.status
       const message = status === 404 ? 'it no longer exists' : apiErrorMessage(error).title
       applyOutcome({ status: 'error', message })
+      return false
     }
+  }
+
+  // The single-row footer's Verify. Closing on success is what makes this a confirmation of one
+  // record rather than a list to work through: the row behind it is already refreshed by the
+  // invalidation verifyOne does, and a failure is the only thing worth staying open for. The
+  // generation check is the same guard verifyOne applies to its own outcome write — a dialog the
+  // admin closed and reopened on a different row must not be closed again by this run.
+  async function verifySingle(row: Row) {
+    const generation = generationRef.current
+    const verified = await verifyOne(row)
+    if (verified && generationRef.current === generation) onOpenChange(false)
   }
 
   // Skips already-verified and already-in-flight rows, sends one request at a time in list order,
@@ -175,11 +202,16 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col">
+      {/* A record reads better narrow than at the batch table's width. Keyed on the row count
+          rather than on `single`, so switching to Against sources and back doesn't resize the
+          dialog around the admin mid-decision. */}
+      <DialogContent className={cn('flex max-h-[90vh] flex-col', snapshot.length === 1 ? 'max-w-lg' : 'max-w-4xl')}>
         <DialogHeader>
-          <DialogTitle>{`Verify ${snapshot.length} ${snapshot.length === 1 ? 'row' : 'rows'}`}</DialogTitle>
+          <DialogTitle>{single ? 'Verify this row' : `Verify ${snapshot.length} ${snapshot.length === 1 ? 'row' : 'rows'}`}</DialogTitle>
           <DialogDescription>
-            {mode === 'sources' ? 'Queue an outside source to check these rows.' : 'Verify rows by hand, one at a time or all at once.'}
+            {mode === 'sources' ? 'Queue an outside source to check these rows.'
+              : single ? 'Check the values, then sign this row off.'
+              : 'Verify rows by hand, one at a time or all at once.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -209,7 +241,7 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
           </div>
         )}
 
-        {mode === 'sources' && entityType ? (
+        {sourcesShown ? (
           // Same scroll cap as the Manually table below, so the header (title + mode toggle) and
           // the footer's Close button stay on screen regardless of how many sources or how long the
           // cost/queue text gets. jsdom can't lay this out, so it has no test — check in a browser.
@@ -223,6 +255,21 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
               onQueued={setSourceQueueResult}
             />
           </div>
+        ) : single ? (
+          // Same scroll cap as the batch table below, so a table with many checked columns still
+          // keeps the header above and the footer's buttons below on screen. Each pair is its own
+          // grid row rather than a two-column grid over the whole list, so one long value wraps
+          // under its own label instead of stretching every label's column.
+          <dl className="min-h-0 flex-1 space-y-2 overflow-auto text-sm">
+            {columns.map(name => (
+              <div key={name} className="grid grid-cols-[9rem_1fr] items-baseline gap-4">
+                <dt className="text-gray-500">{name}</dt>
+                <dd>
+                  {name === 'Status' ? <VerificationStatusBadge row={single} /> : <CellValue value={single[name]} />}
+                </dd>
+              </div>
+            ))}
+          </dl>
         ) : (
           <>
             <div className="flex justify-end">
@@ -285,8 +332,30 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
           </>
         )}
 
+        {/* Above the footer, not inside it: DialogFooter lays its children out in a reversed
+            column on a narrow screen, which would put this message under the buttons there. */}
+        {singleOutcome?.status === 'error' && (
+          <p className="text-sm text-red-600">{`Couldn't verify: ${singleOutcome.message}`}</p>
+        )}
+
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          {single ? (
+            <>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              {/* Disabled for a row that arrived already verified — only "Verify selected (1)" can
+                  bring one here, since a verified row has no Verify button of its own — and while
+                  its own request is in flight. Unverifying stays the record page's job. */}
+              <Button
+                type="button"
+                disabled={isVerified(single) || isPending(single)}
+                onClick={() => void verifySingle(single)}
+              >
+                Verify
+              </Button>
+            </>
+          ) : (
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
