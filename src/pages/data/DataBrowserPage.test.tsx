@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
-import { DataBrowserPage } from './DataBrowserPage'
+import { DataBrowserPage, DataBrowserRoute } from './DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -116,6 +116,21 @@ let sent: SentRequest[]
 function renderAt(entry: string) {
   const router = createMemoryRouter(
     [{ path: '/data/:table', element: <DataBrowserPage /> }],
+    { initialEntries: [entry] },
+  )
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  return router
+}
+
+/** The route as the router mounts it, which is what decides whether a table change remounts. */
+function renderRoute(entry: string) {
+  const router = createMemoryRouter(
+    [{ path: '/data/:table', element: <DataBrowserRoute /> }],
     { initialEntries: [entry] },
   )
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -479,5 +494,19 @@ describe('DataBrowserPage', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Loading rows…')
     expect(placeholderRows().length).toBeGreaterThan(0)
+  })
+
+  it('gives each table a fresh grid, carrying nothing of the last one over', async () => {
+    const user = userEvent.setup()
+    const router = renderRoute('/data/travelers')
+    await screen.findByText('Traveler 001')
+    // A confirmation raised against one table's row means nothing on the next table.
+    await user.click(screen.getAllByRole('button', { name: 'Delete record' })[0])
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Delete traveler')
+
+    await act(() => router.navigate('/data/airports'))
+
+    expect(await screen.findByText('Istanbul')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

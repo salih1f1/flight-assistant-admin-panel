@@ -10,7 +10,7 @@ import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
 import { AirportFormPage } from '@/pages/airports/AirportFormPage'
 import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
-import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
+import { DataBrowserRoute } from '@/pages/data/DataBrowserPage'
 import { RecordPage, RedirectToRecord } from '@/pages/data/RecordPage'
 import { SystemHealthPage } from './pages/health/SystemHealthPage'
 import { ImportPage } from '@/pages/import/ImportPage'
@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
           { path: '/lounges/:id/edit', element: <RedirectToRecord table="lounges" /> },
           // The tables are in the side menu now; the old table picker has no page of its own.
           { path: '/data', element: <Navigate to="/" replace /> },
-          { path: '/data/:table', element: <DataBrowserPage /> },
+          { path: '/data/:table', element: <DataBrowserRoute /> },
           { path: '/data/:table/:id', element: <RecordPage /> },
           { path: '/health', element: <SystemHealthPage /> },
           { path: '/import', element: <ImportPage /> },

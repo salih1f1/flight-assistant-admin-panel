@@ -211,6 +211,22 @@ function useRowSelection(items: Row[], keyColumn: string | undefined, viewKey: s
  * audited (RevealableValue). Each is keyed by table, row id and column, so a different page,
  * sort or filter mounts fresh, masked values.
  */
+/**
+ * The grid as the router mounts it: one instance per table, never one instance re-pointed at
+ * another table. Keeping the same instance across a table change made React re-render the whole
+ * grid inside the navigation's transition without ever settling it, so nothing committed until the
+ * transition expired — the panel sat on the old table for exactly five seconds, with the sidebar
+ * still marking it and no loading state on screen, because the bar and the skeleton were in the
+ * tree React had not committed (#123). Mounting fresh is the path that was always fast.
+ *
+ * It is also what the grid means: a different table is a different grid, and state raised against
+ * one table's rows — a delete confirmation, a revealed value — has nothing to say about the next.
+ */
+export function DataBrowserRoute() {
+  const { table } = useParams<{ table: string }>()
+  return <DataBrowserPage key={table} />
+}
+
 export function DataBrowserPage() {
   const { table } = useParams<{ table: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
