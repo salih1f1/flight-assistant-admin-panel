@@ -1,14 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  adminGetBrowsableTableData,
-  adminGetLoyaltyPrograms,
-  getAdminGetBrowsableTableDataQueryKey,
-  getAdminGetLoyaltyProgramsQueryKey,
-} from './generated/admin'
+import { adminGetLoyaltyPrograms, getAdminGetLoyaltyProgramsQueryKey } from './generated/admin'
 import type { LoyaltyProgramDto } from './generated/model'
-
-// The API's upper bound on PageSize (PagedRequestValidator).
-const MAX_PAGE_SIZE = 200
+import { listRawTable, MAX_PAGE_SIZE, rawTableQueryKey } from './rawTableLookups'
 
 export type LoyaltyProgramKind = { id: number; code: string; name: string }
 
@@ -31,12 +24,8 @@ export async function findLoyaltyProgram(id: number, signal?: AbortSignal): Prom
  * are keyed by the entity's PascalCase property names.
  */
 export async function listLoyaltyProgramKinds(signal?: AbortSignal): Promise<LoyaltyProgramKind[]> {
-  const kinds: LoyaltyProgramKind[] = []
-  for (let page = 1; ; page++) {
-    const result = await adminGetBrowsableTableData('loyalty-program-kinds', { Page: page, PageSize: MAX_PAGE_SIZE }, undefined, signal)
-    kinds.push(...(result.items ?? []).map(row => ({ id: Number(row.Id), code: String(row.Code), name: String(row.Name) })))
-    if (page * MAX_PAGE_SIZE >= (result.total ?? 0)) return kinds
-  }
+  const rows = await listRawTable('loyalty-program-kinds', signal)
+  return rows.map(row => ({ id: Number(row.Id), code: String(row.Code), name: String(row.Name) }))
 }
 
 /**
@@ -55,7 +44,7 @@ export function useLoyaltyProgram(id: number | undefined) {
 
 export function useLoyaltyProgramKinds() {
   return useQuery({
-    queryKey: [...getAdminGetBrowsableTableDataQueryKey('loyalty-program-kinds'), 'all'],
+    queryKey: rawTableQueryKey('loyalty-program-kinds'),
     queryFn: ({ signal }) => listLoyaltyProgramKinds(signal),
   })
 }

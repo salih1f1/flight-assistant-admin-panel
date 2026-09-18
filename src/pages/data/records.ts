@@ -94,10 +94,21 @@ export function recordPath(table: string, row: Record<string, unknown>): string 
  * Lounges: which airport, which lounge, which terminal — the three things that tell one lounge at
  * an airport from another. The location hint, the opening hours, the three flags and the amenities
  * are what you read once you have found it, not what you find it by.
+ *
+ * Countries: the code, the name and where the country is. IsEU, IsSchengen and IsEEA are a lounge's
+ * flags again — facts about a country you have already found, three columns wide and reading
+ * `false` on most of the rows on screen. CHECKED_COLUMNS.countries says as much already: what an
+ * outside source compares is Code, Name, Alpha3, NumericCode, Region and Subregion, and the three
+ * memberships are not on it.
  */
 export const LIST_COLUMNS: Record<string, string[]> = {
   flights: ['AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'SyncMode'],
   lounges: ['AirportId', 'Name', 'Terminal'],
+  countries: ['Code', 'Name', 'Alpha3', 'NumericCode', 'Region', 'Subregion'],
+  // The two codes, the name and the place: what an airport is found by. The coordinate pair and the
+  // elevation are read once it has been found, never scanned for, and three numeric columns push
+  // the rest of the row sideways. (Id is hidden for every table by #153, not by this list.)
+  airports: ['Iata', 'Icao', 'Name', 'City', 'CountryCode'],
 }
 
 /** Tables the API can create and update: the noun for one record, and the page that creates one. */

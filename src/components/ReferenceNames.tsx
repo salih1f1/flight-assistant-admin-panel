@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import {
-  useAdminGetAirlineById, useAdminGetAirportById, useAdminGetAllAlliances, useAdminGetFlightById, useAdminGetTravelerById,
+  useAdminGetAirlineById, useAdminGetAirportById, useAdminGetAllAlliances, useAdminGetFlightById,
+  useAdminGetLoungeById, useAdminGetTravelerById,
 } from '@/api/generated/admin'
+import { useLoungeProvider } from '@/api/loungeLookups'
 import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
 import { isTravelerId, shortId } from '@/lib/travelerId'
 
@@ -83,6 +85,46 @@ export function AirportCode({ id }: { id: number | null | undefined }) {
       {data.iata ?? data.icao ?? data.name ?? 'Unnamed'}
     </NameLink>
   )
+}
+
+/**
+ * "Galleries Club · LHR T3", linking to the lounge. A lounge's name identifies nothing on its own:
+ * Galleries Club is a lounge in two Heathrow terminals and one at Gatwick. Which airport and which
+ * terminal is what tells them apart — the same three things the lounges grid is a list of — so both
+ * ride along, the airport as its code with the full name on hover. Until the airport lookup lands
+ * (or where the lounge names no airport) the name stands alone, which is what the API sent.
+ */
+export function LoungeName({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, error } = useAdminGetLoungeById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
+  const airportId = data?.airportId
+  const { data: airport } = useAdminGetAirportById(isApiId(airportId) ? airportId : 0, { query: { enabled: isApiId(airportId), retry: retryUnless404 } })
+  if (id == null) return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
+  const where = [airport?.iata ?? airport?.icao, data.terminal].filter(Boolean).join(' ')
+  return (
+    <NameLink to={`/data/lounges/${id}`} title={airport?.name ?? undefined}>
+      {[data.name ?? `#${id}`, where].filter(Boolean).join(' · ')}
+    </NameLink>
+  )
+}
+
+/**
+ * "Priority Pass (PP)", linking to the provider. The API has no route that returns one — only
+ * verify, import and export — so the name comes from the browsable table, read once for the page.
+ */
+export function LoungeProviderName({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, isSuccess } = useLoungeProvider(valid ? id : null)
+  if (id == null) return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (isSuccess && !data) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
+  return <NameLink to={`/data/lounge-providers/${id}`}>{withCode(data.name, data.code)}</NameLink>
 }
 
 /** "Executive Club (EXEC_CLUB)", linking to the program. There is no by-id endpoint; the lookup walks the list. */

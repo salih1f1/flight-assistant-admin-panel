@@ -76,7 +76,8 @@ describe('Id, on a table with no list of its own', () => {
     renderAt('/data/traveler-flights')
     await screen.findByRole('table')
 
-    expect(dataHeaders()).toEqual(['TravelerId', 'FlightId', 'Notify'])
+    // Headed by what the cells hold rather than by the columns the API stores them in (#151).
+    expect(dataHeaders()).toEqual(['Traveler', 'Flight', 'Notify'])
   })
 
   it('comes back with the other hidden columns, in the order the API sends them', async () => {
