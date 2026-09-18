@@ -131,6 +131,21 @@ const lastDataRequest = () => [...sent].reverse().find(r => r.url.startsWith('/a
 const search = (router: ReturnType<typeof renderAt>) => new URLSearchParams(router.state.location.search)
 const headers = () => screen.getAllByRole('columnheader').map(h => h.textContent?.replace(/[↑↓]/g, '').trim()).filter(Boolean)
 
+/** How many placeholder cells each placeholder row is holding open, row by row. */
+const placeholderRows = () =>
+  [...document.querySelectorAll('[data-skeleton-row]')].map(row => row.querySelectorAll('[data-skeleton-cell]').length)
+
+/** The data browser with its rows held back, so the page can be looked at mid-load. */
+function gateTheRows() {
+  let release: () => void = () => {}
+  const arrived = new Promise<void>(resolve => { release = resolve })
+  ;({ sent } = installFakeApi(async req => {
+    if (req.url !== '/admin/data/tables') await arrived
+    return dataApi(req)
+  }))
+  return { deliver: async () => { await act(async () => { release(); await arrived }) } }
+}
+
 describe('DataBrowserPage', () => {
   beforeEach(() => {
     ;({ sent } = installFakeApi(dataApi))
@@ -435,5 +450,34 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByText('Scheduled')).toBeInTheDocument()
     expect(lastDataRequest()).toEqual(expect.objectContaining({ url: '/admin/data/flight-statuses', params: { Page: 1, PageSize: 50 } }))
     expect(router.state.location.search).toBe('')
+  })
+
+  it('holds the grid open with placeholder rows while a table loads', async () => {
+    const { deliver } = gateTheRows()
+
+    renderAt('/data/airports')
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading rows…')
+    // As wide as the table the API published: Iata, Name, IsVerified — settled once
+    // /admin/data/tables has answered, which it does while the rows are still on their way.
+    await waitFor(() => {
+      const placeholders = placeholderRows()
+      expect(placeholders.length).toBeGreaterThan(0)
+      expect(placeholders.every(cells => cells === 3)).toBe(true)
+    })
+
+    await deliver()
+
+    expect(await screen.findByText('Istanbul')).toBeInTheDocument()
+    expect(placeholderRows()).toEqual([])
+  })
+
+  it('still holds the grid open for a table whose columns the API does not publish', async () => {
+    gateTheRows()
+
+    renderAt('/data/flight-statuses')
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading rows…')
+    expect(placeholderRows().length).toBeGreaterThan(0)
   })
 })

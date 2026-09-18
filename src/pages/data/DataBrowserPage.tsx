@@ -5,6 +5,7 @@ import { type CellContext, type ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
+import { TableSkeleton } from '@/components/TableSkeleton'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,14 @@ import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
+
+/**
+ * The placeholder grid a table loads behind: about a screenful of rows, as wide as the columns the
+ * API published for the table, so the page keeps its shape instead of collapsing to a line of text
+ * and reading as broken. SKELETON_COLUMNS is the width for a table that publishes none.
+ */
+const SKELETON_ROWS = 8
+const SKELETON_COLUMNS = 5
 
 /**
  * What the flights grid's row colours mean. A list rather than a row of spans so the states are
@@ -526,7 +535,7 @@ export function DataBrowserPage() {
             // In place of the table: an empty grid would read as "no rows match".
             <ErrorAlert what="rows" error={rows.error} />
           ) : rows.isLoading ? (
-            <p className="text-sm text-gray-400">Loading rows…</p>
+            <TableSkeleton columns={selected?.columns?.length ?? SKELETON_COLUMNS} rows={SKELETON_ROWS} label="Loading rows…" />
           ) : (
             <div className="overflow-x-auto">
               <DataTable
