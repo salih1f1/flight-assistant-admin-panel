@@ -73,6 +73,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Import', to: '/import' },
       { label: 'Audit log', to: '/audit' },
       table('Verification Requests', 'verification-requests'),
+      // The rows behind the /health page. Listed because the raw grid is where a source's
+      // consecutive failures and verbatim last error can be read, which the page summarises.
+      table('Data Source Status', 'data-source-status'),
       { label: 'Tests', to: '/tests' },
       table('Seed Versions', 'seed-versions'),
     ],
