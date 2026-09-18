@@ -8,6 +8,7 @@ import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcDay, formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
 import { TrendColumns } from './TrendColumns'
+import { verifiedPercent } from './verifiedPercent'
 
 // GetAdminStatsQuery's periods, in the order the selector shows them.
 const PERIODS = [
@@ -107,6 +108,7 @@ function StatCard({ entity, fromUtc, bucket, periodWords }: {
   const { label, icon: Icon, color } = card
   const key = entity.key
   const newRows = entity.newInPeriod ?? 0
+  const share = verifiedPercent(entity.verified, entity.unverified)
   const headingId = `stat-card-${key}`
 
   return (
@@ -129,6 +131,9 @@ function StatCard({ entity, fromUtc, bucket, periodWords }: {
           {entity.verified != null && entity.unverified != null && (
             <p className="text-gray-500">
               <Link to={gridLink(key, 'IsVerified:true')} className={linkClass}>{`${count(entity.verified)} verified`}</Link>
+              {/* Outside the link: each link names the rows it opens, and a share is not a set of
+                  rows. Omitted, not zeroed, where there is no share to state — an empty table. */}
+              {share !== undefined && ` (${share}%)`}
               {' · '}
               <Link to={gridLink(key, 'IsVerified:false')} className={linkClass}>{`${count(entity.unverified)} unverified`}</Link>
             </p>

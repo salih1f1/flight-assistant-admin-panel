@@ -91,6 +91,36 @@ describe('Dashboard stats', () => {
     expect(within(airlines).getByRole('link', { name: '152 unverified' })).toHaveAttribute('href', gridLink('airlines', 'IsVerified:false'))
   })
 
+  it('states what share of each entity is verified, beside the count it describes', async () => {
+    renderAt('/')
+
+    for (const [name, share] of [['Airlines', '(78%)'], ['Airports', '(99%)'], ['Lounges', '(0%)'], ['Loyalty Programs', '(100%)']]) {
+      expect(within(await card(name)).getByText(share, { exact: false })).toBeInTheDocument()
+    }
+  })
+
+  /** The counts are links to the rows they count; the share is not a set of rows, so it sits
+   *  outside the link rather than changing what the link says it opens. */
+  it('leaves the share outside the link', async () => {
+    renderAt('/')
+
+    const airlines = await card('Airlines')
+    expect(within(airlines).getByRole('link', { name: '540 verified' })).toBeInTheDocument()
+    expect(within(airlines).queryByRole('link', { name: /%/ })).not.toBeInTheDocument()
+  })
+
+  it('states no share for a table with no rows, where there is none to state', async () => {
+    install(req => ({
+      ...stats(String(req.params?.period)),
+      entities: [{ key: 'lounges', dateColumn: 'CreatedUtc', total: 0, newInPeriod: 0, verified: 0, unverified: 0, series: zeros(7) }],
+    }))
+    renderAt('/')
+
+    const lounges = await card('Lounges')
+    expect(within(lounges).getByText('0 verified')).toBeInTheDocument()
+    expect(within(lounges).queryByText('%', { exact: false })).not.toBeInTheDocument()
+  })
+
   it('travelers and flights have no verified counts', async () => {
     renderAt('/')
 
