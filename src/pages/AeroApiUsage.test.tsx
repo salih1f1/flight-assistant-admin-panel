@@ -38,6 +38,9 @@ function installApi(usageAnswer: () => unknown) {
     if (req.method === 'GET' && req.url === '/admin/verification-needs-attention') {
       return [{ entityType: 'Airport', count: 0 }, { entityType: 'Airline', count: 0 }, { entityType: 'Country', count: 0 }]
     }
+    // The health section's inventory answers with a plain array, not a paged result, so it cannot
+    // fall through to the catch-all below.
+    if (req.method === 'GET' && req.url === '/admin/health/sources') return []
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))

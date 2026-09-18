@@ -69,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'System',
     icon: Settings,
     items: [
+      { label: 'System health', to: '/health' },
       { label: 'Import', to: '/import' },
       { label: 'Audit log', to: '/audit' },
       table('Verification Requests', 'verification-requests'),

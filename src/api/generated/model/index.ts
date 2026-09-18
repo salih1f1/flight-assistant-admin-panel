@@ -9,6 +9,7 @@ export * from './acceptVerificationSourceRequest';
 export * from './adminAuditAction';
 export * from './adminAuditDto';
 export * from './adminAuditDtoPagedResult';
+export * from './adminDataSourceDto';
 export * from './adminDeviceTokenDto';
 export * from './adminEntityStatsDto';
 export * from './adminFlightDetailDto';
