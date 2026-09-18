@@ -251,9 +251,12 @@ function RecentFailures({ failures }: { failures: AdminHealthVerificationFailure
 
 function Verification({ verification }: { verification: AdminHealthVerificationDto | undefined }) {
   if (verification && verification.enabled === false) {
+    // The window still applies: it is the flight-tracking trigger, not this job, that reads
+    // Verification:StaleAfterDays, so verified data keeps ageing while the job is off.
     return (
       <Panel title="Verification">
         <p className="text-gray-500">Disabled (Verification:Enabled is false)</p>
+        <StaleWindow days={verification.staleAfterDays} />
       </Panel>
     )
   }
@@ -292,8 +295,19 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
       <RecentFailures failures={verification?.recentFailures} />
       {verification?.lastError && <p className="text-xs text-red-600">{verification.lastError}</p>}
       {verification?.nextRunDueUtc && <p className="text-xs text-gray-500">{`Next run ${formatUtcMinute(verification.nextRunDueUtc)} UTC`}</p>}
+      <StaleWindow days={verification?.staleAfterDays} />
     </Panel>
   )
+}
+
+/**
+ * How long a verification stays good (backend #447) — the answer to "this row says Verified, but
+ * from when?", and the same window the row badge marks a stale row against. Omitted rather than
+ * guessed at when the field is missing, which is what an API predating it sends.
+ */
+function StaleWindow({ days }: { days: number | undefined }) {
+  if (days == null) return null
+  return <p className="text-xs text-gray-500">{`Verified data goes stale after ${plural(days, 'day')}`}</p>
 }
 
 /** A .NET TimeSpan as System.Text.Json writes it ("3.04:12:09.1234567", "00:07:30") to "3d 4h 12m". */

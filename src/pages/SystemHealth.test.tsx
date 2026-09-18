@@ -61,6 +61,7 @@ const makeHealth = () => ({
     nextRunDueUtc: '2026-09-14T03:15:00Z' as string | null,
     lastError: null as string | null,
     pendingCount: 5 as number | null,
+    staleAfterDays: 180,
     requestsPaused: 0,
     recentFailures: [] as { failedSource: string | null; entityType: string; count: number }[] | null,
   },
@@ -253,6 +254,28 @@ describe('Dashboard system health', () => {
     const verification = panel(section, 'Verification')
     expect(verification).toHaveTextContent('Not run since the API started')
     expect(verification).not.toHaveTextContent('requests processed')
+  })
+
+  it('says how long a verification stays good, so a verified-but-old row can be read as one', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(panel(section, 'Verification')).toHaveTextContent('Verified data goes stale after 180 days')
+  })
+
+  /** The window describes the data, not the cycle: the flight-tracking trigger reads
+   *  Verification:StaleAfterDays whether or not the job runs, so turning the job off must not make
+   *  the panel claim verified data never ages. */
+  it('still reports the stale window when the job is disabled', async () => {
+    health.verification = { ...health.verification, enabled: false }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(verification).toHaveTextContent('Disabled (Verification:Enabled is false)')
+    expect(verification).toHaveTextContent('Verified data goes stale after 180 days')
   })
 
   it('says when the verification job is disabled', async () => {

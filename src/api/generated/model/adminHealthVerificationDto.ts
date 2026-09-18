@@ -24,6 +24,7 @@ export interface AdminHealthVerificationDto {
   lastError?: string | null;
   /** @nullable */
   pendingCount?: number | null;
+  staleAfterDays?: number;
   requestsPaused?: number;
   /** @nullable */
   recentFailures?: AdminHealthVerificationFailureDto[] | null;
