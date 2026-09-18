@@ -51,7 +51,18 @@ export const recordKey = (table: string): string | undefined => {
   return key === undefined ? 'Id' : (key ?? undefined)
 }
 
-/** Records with a richer page of their own than the generic record page. */
+/**
+ * Records with a view that ADDS to the generic record page rather than replacing it, linked
+ * from it. Distinct from OWN_DETAIL_PAGES below, which redirects the record page away
+ * entirely: that is only safe when the richer page is a superset. An alliance's detail page
+ * is not — the raw columns and the verify toggle live only on the record page — so linking is
+ * the right relationship, and redirecting would strand verifying with no route to it.
+ */
+export const RELATED_VIEWS: Record<string, (id: string) => { to: string; label: string }> = {
+  alliances: id => ({ to: `/alliances/${id}`, label: 'Airlines in this alliance' }),
+}
+
+/** Records with a richer page of their own that REPLACES the generic record page. */
 export const OWN_DETAIL_PAGES: Record<string, (id: string) => string> = {
   travelers: id => `/travelers/${id}`,
   flights: id => `/flights/${id}`,

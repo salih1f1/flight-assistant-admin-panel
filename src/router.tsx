@@ -5,6 +5,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { TravelerDetailPage } from '@/pages/travelers/TravelerDetailPage'
 import { FlightDetailPage } from '@/pages/flights/FlightDetailPage'
 import { TrackFlightPage } from '@/pages/flights/TrackFlightPage'
+import { AllianceDetailPage } from '@/pages/alliances/AllianceDetailPage'
 import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
 import { AirportFormPage } from '@/pages/airports/AirportFormPage'
 import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
@@ -29,6 +30,8 @@ export const router = createBrowserRouter([
           { path: '/flights', element: <Navigate to="/data/flights" replace /> },
           { path: '/flights/track', element: <TrackFlightPage /> },
           { path: '/flights/:id', element: <FlightDetailPage /> },
+          { path: '/alliances', element: <Navigate to="/data/alliances" replace /> },
+          { path: '/alliances/:id', element: <AllianceDetailPage /> },
           { path: '/airlines', element: <Navigate to="/data/airlines" replace /> },
           { path: '/airlines/new', element: <AirlineFormPage /> },
           { path: '/airlines/:id/edit', element: <RedirectToRecord table="airlines" /> },

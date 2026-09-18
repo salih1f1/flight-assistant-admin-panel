@@ -389,6 +389,7 @@
           "Admin - Airports"
         ],
         "summary": "Create airport",
+        "description": "409 when CountryCode names a country that is not in the countries table.",
         "operationId": "AdminCreateAirport",
         "requestBody": {
           "content": {
@@ -410,6 +411,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -463,6 +474,7 @@
           "Admin - Airports"
         ],
         "summary": "Update airport",
+        "description": "409 when CountryCode names a country that is not in the countries table.",
         "operationId": "AdminUpdateAirport",
         "parameters": [
           {
@@ -501,6 +513,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -576,6 +598,49 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/alliances/{id}/detail": {
+      "get": {
+        "tags": [
+          "Admin - Alliances"
+        ],
+        "summary": "Get alliance detail",
+        "description": "Returns the alliance together with every airline whose AllianceCode is its Code, ordered by name. The list is not capped: it is bounded by how many airlines exist in the alliance rather than growing with usage, so there is no truncation flag. An alliance no airline belongs to is a 200 with an empty list, not a 404. Verification state is deliberately absent — it lives with the raw record at GET /admin/data/alliances.",
+        "operationId": "AdminGetAllianceDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllianceDetailAdminDto"
+                }
+              }
+            }
           },
           "404": {
             "description": "Not Found",
@@ -2222,6 +2287,7 @@
           "Admin - Lounges"
         ],
         "summary": "Create lounge",
+        "description": "409 when AirportId names an airport that does not exist.",
         "operationId": "AdminCreateLounge",
         "requestBody": {
           "content": {
@@ -2243,6 +2309,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2431,6 +2507,7 @@
           "Admin - Loyalty"
         ],
         "summary": "Create loyalty program",
+        "description": "409 when KindId or AirlineId names a row that does not exist.",
         "operationId": "AdminCreateLoyaltyProgram",
         "requestBody": {
           "content": {
@@ -2455,6 +2532,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2465,6 +2552,7 @@
           "Admin - Loyalty"
         ],
         "summary": "Update loyalty program",
+        "description": "409 when KindId or AirlineId names a row that does not exist.",
         "operationId": "AdminUpdateLoyaltyProgram",
         "parameters": [
           {
@@ -2503,6 +2591,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5590,6 +5688,57 @@
           },
           "name": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AllianceAirlineDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "iata": {
+            "type": "string",
+            "nullable": true
+          },
+          "icao": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "countryCode": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AllianceDetailAdminDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "airlines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllianceAirlineDto"
+            },
             "nullable": true
           }
         },
