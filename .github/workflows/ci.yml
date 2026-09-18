@@ -1,0 +1,47 @@
+name: CI
+
+# Every pull request, and every push to main — the second catches anything that reaches main
+# without a pull request, which is how the build stayed broken for a day (#135).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the running check's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # What the panel is developed on; npm's cache is keyed on package-lock.json.
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      # The three checks run even when an earlier one has failed, so one run reports everything
+      # that is wrong rather than handing them over one at a time. They are skipped only when the
+      # run was cancelled, or when there are no dependencies to check anything against.
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+
+      # tsc -b && vite build. vitest does not typecheck, so this is the only step that says
+      # whether the app compiles at all — the check this workflow exists for.
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+
+      - name: Test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test
