@@ -215,7 +215,10 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Alpha Airport')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    // Two rows, not one: at exactly one row the dialog drops the table for a field list — see
+    // VerifyOneRow.test.tsx. Every test here that reads that table selects two for that reason.
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const headers = within(dialog).getAllByRole('columnheader').map(h => h.textContent?.trim())
@@ -228,7 +231,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Germany')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row DE' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row BG' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const headers = within(dialog).getAllByRole('columnheader').map(h => h.textContent?.trim())
@@ -241,7 +245,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Star Alliance')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const headers = within(dialog).getAllByRole('columnheader').map(h => h.textContent?.trim())
@@ -269,7 +274,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Alpha Airport')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const dialogRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
@@ -301,7 +307,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Alpha Airport')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
     const dialog = await screen.findByRole('dialog')
     const dialogRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
     await user.click(within(dialogRow).getByRole('button', { name: 'Verify' }))
@@ -419,7 +426,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Alpha Airport')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const dialogRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
@@ -460,7 +468,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await screen.findByText('Alpha Airport')
 
     await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }))
-    await user.click(screen.getByRole('button', { name: 'Verify selected (1)' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
+    await user.click(screen.getByRole('button', { name: 'Verify selected (2)' }))
 
     const dialog = await screen.findByRole('dialog')
     const dialogRow = (await within(dialog).findByText('Alpha Airport')).closest('tr')!
