@@ -1,43 +1,76 @@
-import { useAdminGetHealth } from '@/api/generated/admin'
+import { Link } from 'react-router-dom'
+import { useAdminGetDataSources, useAdminGetHealth } from '@/api/generated/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiErrorMessage } from '@/lib/apiError'
-import { HealthReport } from '../health/HealthReport'
+import { Status } from '../health/HealthPrimitives'
+import { countsNeedingAttention } from './healthSummary'
 
 /**
- * Operator health from GET /admin/health. The endpoint always answers 200 and puts
- * the overall status in the body, so an unhealthy API still renders its report here;
- * only a failure to produce the report at all shows as an error.
+ * One line of system health, and a way to the page that explains it (#113).
  *
- * Refetching is cheap: none of the checks spend AeroAPI quota (the aeroapi check is
- * a HEAD to the base URL on its own client, outside the throttle).
+ * The dashboard answers "is anything wrong?" — the overall status from GET /admin/health plus how
+ * many outside sources are not currently fine. Everything that answers "wrong with what, and since
+ * when" lives on /health: repeating the full report here made the dashboard's other numbers scroll
+ * off the screen, and said nothing the page does not say better.
  */
 export function SystemHealthSection() {
-  const { data, isLoading, error } = useAdminGetHealth()
+  const health = useAdminGetHealth()
+  const sources = useAdminGetDataSources()
 
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-gray-900">System health</h2>
       <Card>
-        <CardContent className="space-y-6 pt-6">
-          {error ? (
-            <HealthError error={error} />
-          ) : isLoading || !data ? (
-            <p className="text-sm text-gray-400">Loading health…</p>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6 text-sm">
+          {health.error ? (
+            <HealthError error={health.error} />
+          ) : health.isLoading ? (
+            <p className="text-gray-400">Loading health…</p>
           ) : (
-            <HealthReport health={data} />
+            <p className="flex flex-wrap items-center gap-2">
+              <Status status={health.data?.status} />
+              <SourceSummary sources={sources.data} failed={Boolean(sources.error)} loading={sources.isLoading} />
+            </p>
           )}
+
+          <Link to="/health" className="underline decoration-gray-300 hover:decoration-gray-900">
+            System health detail
+          </Link>
         </CardContent>
       </Card>
     </section>
   )
 }
 
-function HealthError({ error }: { error: unknown }) {
-  const { title, detail } = apiErrorMessage(error)
+/**
+ * How many sources there are, and how many an operator should look at. The inventory failing to
+ * load is said plainly rather than left as a silent absence: "9 sources" with nothing after it
+ * would read as "all fine".
+ */
+function SourceSummary({ sources, failed, loading }: {
+  sources: ReturnType<typeof useAdminGetDataSources>['data']
+  failed: boolean
+  loading: boolean
+}) {
+  if (failed) return <span className="text-amber-600">· couldn't read the data sources</span>
+  if (loading || !sources) return null
+
+  const total = sources.length
+  const needingAttention = countsNeedingAttention(sources)
+
   return (
-    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <p>Could not load system health: {title}</p>
-      {detail && <p className="mt-1 text-xs text-red-600">{detail}</p>}
-    </div>
+    <span className="text-gray-500">
+      {`· ${total} ${total === 1 ? 'source' : 'sources'}`}
+      {needingAttention > 0 && (
+        <span className="text-amber-600">{` · ${needingAttention} ${needingAttention === 1 ? 'needs' : 'need'} attention`}</span>
+      )}
+    </span>
+  )
+}
+
+function HealthError({ error }: { error: unknown }) {
+  const { title } = apiErrorMessage(error)
+  return (
+    <p role="alert" className="text-red-700">{`Could not load system health: ${title}`}</p>
   )
 }

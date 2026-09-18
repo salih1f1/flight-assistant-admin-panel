@@ -18,22 +18,26 @@ export function SystemHealthPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">System health</h1>
-        <p className="text-sm text-gray-500">Live checks, and every outside source this application depends on.</p>
-      </div>
+      {/* The live checks and the process facts, in their own section: the data-source inventory
+          below reads a table instead, and the two must not look like one list. */}
+      <section className="space-y-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">System health</h1>
+          <p className="text-sm text-gray-500">Live checks, and every outside source this application depends on.</p>
+        </div>
 
-      <Card>
-        <CardContent className="space-y-6 pt-6">
-          {error ? (
-            <HealthError error={error} />
-          ) : isLoading || !data ? (
-            <p className="text-sm text-gray-400">Loading health…</p>
-          ) : (
-            <HealthReport health={data} />
-          )}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardContent className="space-y-6 pt-6">
+            {error ? (
+              <HealthError error={error} />
+            ) : isLoading || !data ? (
+              <p className="text-sm text-gray-400">Loading health…</p>
+            ) : (
+              <HealthReport health={data} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <DataSourcesSection />
     </div>

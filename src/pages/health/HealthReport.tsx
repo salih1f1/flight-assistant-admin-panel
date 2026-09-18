@@ -8,7 +8,8 @@ import type {
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
 import { formatWaited, PENDING_QUEUE_LINK } from '../dashboard/pendingVerifications'
-import { Panel, Status, statusColor } from './HealthPrimitives'
+import { Panel, Status } from './HealthPrimitives'
+import { toneFor } from './statusTone'
 
 /**
  * The operator health report from GET /admin/health: every check it ran, then the Migrations,
@@ -23,7 +24,7 @@ export function HealthReport({ health }: { health: AdminHealthDto }) {
 
   return (
     <>
-      <p className={cn('text-xl font-medium', statusColor[health.status ?? ''] ?? 'text-gray-500')}>
+      <p className={cn('text-xl font-medium', toneFor(health.status))}>
         {`Overall: ${health.status ?? 'Unknown'}`}
       </p>
 
