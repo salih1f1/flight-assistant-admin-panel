@@ -7,7 +7,7 @@ import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
 import { TableSkeleton } from '@/components/TableSkeleton'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
-import { AirlineName, AirportName } from '@/components/ReferenceNames'
+import { AirlineName, AirportName, LoungeName, LoungeProviderName } from '@/components/ReferenceNames'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -83,6 +83,8 @@ const FILTER_PREVIEWS: Record<string, (id: number) => ReactNode> = {
   AirportId: id => <AirportName id={id} />,
   DepartureAirportId: id => <AirportName id={id} />,
   ArrivalAirportId: id => <AirportName id={id} />,
+  LoungeId: id => <LoungeName id={id} />,
+  ProviderId: id => <LoungeProviderName id={id} />,
 }
 
 /** The column the Verified toggle owns: its buttons replace only this column's criterion. */
