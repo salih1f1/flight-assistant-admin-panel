@@ -49,13 +49,8 @@ export function AirlineName({ id }: { id: number | null | undefined }) {
   return <NameLink to={`/data/airlines/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
 }
 
-/**
- * "London Heathrow (LHR)", linking to the airport — or, `compact`, the code alone with the whole
- * of that a hover away. A grid column is too narrow for the long form, and an airport is the one
- * reference an admin already reads as a code; an airport with neither IATA nor ICAO keeps its
- * name, since a blank cell would say less than an id did.
- */
-export function AirportName({ id, compact }: { id: number | null | undefined; compact?: boolean }) {
+/** "London Heathrow (LHR)", linking to the airport. */
+export function AirportName({ id }: { id: number | null | undefined }) {
   const valid = isApiId(id)
   const { data, error } = useAdminGetAirportById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
   if (id == null) return <>—</>
@@ -63,11 +58,27 @@ export function AirportName({ id, compact }: { id: number | null | undefined; co
   if (!valid) return <NotFound label={`#${id}`} />
   if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
   if (!data) return <Pending label={`#${id}`} />
-  const code = data.iata ?? data.icao
-  const full = withCode(data.name, code)
+  return <NameLink to={`/data/airports/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
+}
+
+/**
+ * "LGW", the airport's full name on hover, linking to the airport: AirportName in the width a grid
+ * cell has. A route is read as three letters, and a column of "London Gatwick (LGW)" is mostly the
+ * part you already know — so the code carries the column and the name stays a hover away, spelled
+ * out in full wherever there is room for it (the record and detail pages keep AirportName).
+ */
+export function AirportCode({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, error } = useAdminGetAirportById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
+  if (id == null) return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
+  // An airport with neither code is shown by name: there is nothing shorter to call it.
   return (
-    <NameLink to={`/data/airports/${id}`} title={compact ? full : undefined}>
-      {compact ? (code ?? full) : full}
+    <NameLink to={`/data/airports/${id}`} title={data.name ?? undefined}>
+      {data.iata ?? data.icao ?? data.name ?? 'Unnamed'}
     </NameLink>
   )
 }

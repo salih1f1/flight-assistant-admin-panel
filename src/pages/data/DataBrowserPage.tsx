@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CellContext, type ColumnDef } from '@tanstack/react-table'
@@ -7,6 +7,7 @@ import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
 import { TableSkeleton } from '@/components/TableSkeleton'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
+import { AirlineName, AirportName } from '@/components/ReferenceNames'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,10 +17,10 @@ import {
 import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
-import { columnLabel, columnValue } from './columnValue'
+import { columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
-import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
+import { DELETERS, EDITABLE, LIST_COLUMNS, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
 import { SYNC_LEGEND, syncRowTone } from './syncRowTone'
@@ -70,6 +71,31 @@ const VERIFICATION_REQUESTS_TABLE = 'verification-requests'
 /** The column the verification icon is drawn in front of, on every table that has one. */
 const ICON_COLUMN = 'Name'
 
+/**
+ * What a column's header says, where the cells under it hold a record rather than the id the API
+ * stores. The header is also the sort control, and sorting still sends the raw column name — so
+ * "Airline ↑" orders by AirlineId, not alphabetically by name.
+ */
+const COLUMN_LABELS: Record<string, string> = {
+  AirlineId: 'Airline',
+  AirportId: 'Airport',
+  DepartureAirportId: 'From',
+  ArrivalAirportId: 'To',
+}
+
+/**
+ * What the filter's value box says an id stands for while it is being typed. The full name, not the
+ * bare IATA code the grid shows: there is nothing to scan here, only one id to confirm before
+ * applying it. Neither airports nor airlines can be looked up by code, so the box takes an id —
+ * this is what keeps that from being typing into the dark.
+ */
+const FILTER_PREVIEWS: Record<string, (id: number) => ReactNode> = {
+  AirlineId: id => <AirlineName id={id} />,
+  AirportId: id => <AirportName id={id} />,
+  DepartureAirportId: id => <AirportName id={id} />,
+  ArrivalAirportId: id => <AirportName id={id} />,
+}
+
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
   { label: 'Verified', filter: 'IsVerified:true' },
@@ -84,19 +110,6 @@ const HIDDEN_COLUMNS = new Set([
   'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
-
-/**
- * The columns a table's grid starts with, for tables wide enough that showing every column makes
- * the list unreadable — a lounge carries a location hint, opening hours, three flags and an
- * amenities list, all of which turn scanning a terminal's lounges into sideways scrolling.
- *
- * Everything left out joins the hidden set behind the same "Show N hidden columns" button the
- * bookkeeping columns use, and the record page still shows the lot. A table with no entry here
- * shows every column, which is what every table did before this existed.
- */
-const DEFAULT_COLUMNS: Record<string, readonly string[]> = {
-  lounges: ['AirportId', 'Name', 'Terminal'],
-}
 
 type Row = Record<string, unknown>
 
@@ -341,21 +354,22 @@ export function DataBrowserPage() {
   // joins them on a verifiable table: the verification column below already says what it means, in
   // less room than a column of its own, so the raw true/false is kept for the toggle rather than
   // shown twice. A table with no verifier has no such column and keeps IsVerified in place.
+  // A table with a list of its own (LIST_COLUMNS) hides everything outside it; every other table
+  // hides only its bookkeeping columns. The IsVerified and all-masked rules apply either way.
+  const listColumns = table ? lookup(LIST_COLUMNS, table) : undefined
   const bookkeepingNames = columnNames.filter(name =>
     HIDDEN_COLUMNS.has(name)
     || (name === 'IsVerified' && verifier !== undefined)
     || items.every(row => row[name] === MASKED))
-  // Then the columns this table's own list leaves off, if it has one. Both sets sit behind the one
-  // toggle, so an admin has a single way to see everything rather than two kinds of hidden.
-  const listed = table ? lookup(DEFAULT_COLUMNS, table) : undefined
-  const hiddenNames = listed
-    ? columnNames.filter(name => bookkeepingNames.includes(name) || !listed.includes(name))
+  const hiddenNames = listColumns
+    ? columnNames.filter(name => bookkeepingNames.includes(name) || !listColumns.includes(name))
     : bookkeepingNames
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
-  // Independent of both the "show all" toggle and the table's column list: verifying a lounge by
-  // hand is confirming the record, and the record is every field it has. A list that shows three
-  // columns is a choice about scanning a page, not about what an admin is agreeing to — so this
-  // drops only the bookkeeping columns, as it did before any table had a list.
+  // Independent of the "show all" toggle, and of the table's list: the Manually dialog's columns are
+  // the record, not the list. Verifying a lounge by hand is confirming every field it has, and a
+  // list showing three columns is a choice about scanning a page, not about what an admin is
+  // agreeing to — lounges have no CHECKED_COLUMNS entry to override this, so deriving it from
+  // hiddenNames would quietly narrow verifying to whatever LIST_COLUMNS happens to say.
   const defaultVisibleNames = columnNames.filter(name => !bookkeepingNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
 
@@ -392,9 +406,8 @@ export function DataBrowserPage() {
     id: name,
     accessorFn: row => row[name],
     header: () => (
-      // The label is what the column now says; the sort is still the column the API knows.
       <button type="button" onClick={() => toggleSort(name)} className="font-medium hover:text-gray-900">
-        {columnLabel(name)}
+        {lookup(COLUMN_LABELS, name) ?? name}
         {sort === name ? ' ↑' : sort === `-${name}` ? ' ↓' : ''}
       </button>
     ),
@@ -546,6 +559,9 @@ export function DataBrowserPage() {
             // What GET /admin/data/tables published about this table's columns (#451), so the value
             // control can match the column's kind. Undefined against an API that publishes none.
             published={tables.data?.find(t => t.slug === table)?.columns}
+            // The table's own list of what it is about, so the picker isn't longer than the useful
+            // part of it. "Show all columns" means everything in both places, so it passes none.
+            allowed={showAll ? undefined : listColumns}
             onApply={value => updateView({ filter: value })}
             onClear={() => updateView({ filter: undefined })}
           />
@@ -633,13 +649,15 @@ function VerificationIcon({ table, row }: { table: string; row: Row }) {
  * an instant — is shown through columnValue, which the record page shares, so a row reads the same
  * in the list as it does opened. Anything else is the API's own value, truncated to keep the grid
  * legible, with the whole of it in the title.
+ *
+ * Asked compactly, since this is a column and not a field: the few columns with a shorter true name
+ * take it (an airport is its IATA code here, its full name on the record page), and the rest read
+ * the same in both.
  */
 function Cell({ column, value, row }: { column: string; value: unknown; row: Row }) {
   if (value === MASKED) return <MaskedBadge />
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
-  // compact: a grid column is narrower than a record page's field, so a reference with a short
-  // form gets it here and keeps the long one in its title.
-  const better = columnValue(column, value, row, { compact: true })
+  const better = columnValue(column, value, row, true)
   if (better) return <span className="block max-w-xs truncate" title={better.title}>{better.node}</span>
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <span className="block max-w-xs truncate" title={text}>{text}</span>
@@ -659,9 +677,10 @@ const SELECT_CLASS = 'h-10 rounded-md border border-gray-200 bg-white px-3 text-
 // The only two values the API parses for a Bool column, offered rather than spelled out in a hint.
 const BOOL_VALUES = ['true', 'false']
 
-function FilterForm({ columns, published, filter, onApply, onClear }: {
+function FilterForm({ columns, published, allowed, filter, onApply, onClear }: {
   columns: string[]
   published: BrowsableColumnDto[] | null | undefined
+  allowed: string[] | undefined
   filter: string | undefined
   onApply: (filter: string) => void
   onClear: () => void
@@ -680,7 +699,7 @@ function FilterForm({ columns, published, filter, onApply, onClear }: {
   // default leads, the same as after the column picker changes.
   const [comparison, setComparison] = useState(appliedValue !== '' && !appliedValue.startsWith('>=') ? 'exact' : 'gte')
 
-  const options = filterColumns(published, columns, appliedColumn || undefined)
+  const options = filterColumns(published, columns, appliedColumn || undefined, allowed)
   const chosen = column || options[0]?.name || ''
   const chosenColumn = options.find(option => option.name === chosen)
   const control = filterControl(chosenColumn?.kind)
@@ -711,7 +730,9 @@ function FilterForm({ columns, published, filter, onApply, onClear }: {
         }}
         className={SELECT_CLASS}
       >
-        {options.map(option => <option key={option.name} value={option.name}>{option.name}</option>)}
+        {options.map(option => (
+          <option key={option.name} value={option.name}>{lookup(COLUMN_LABELS, option.name) ?? option.name}</option>
+        ))}
       </select>
 
       {control === 'date' && (
@@ -740,10 +761,35 @@ function FilterForm({ columns, published, filter, onApply, onClear }: {
         />
       )}
 
+      <ReferencePreview column={chosen} value={effective} />
+
       <Button type="submit" variant="outline" disabled={control === 'none'}>Apply filter</Button>
       {filter && <Button type="button" variant="ghost" onClick={onClear}>Clear filter</Button>}
     </form>
   )
+}
+
+/**
+ * `value` once it has stopped changing for `ms`. Every keystroke on the way to "2276" is itself an
+ * id — "2", "22", "227" — and the preview below resolves whatever it is handed, so without this
+ * each one would be a lookup of its own for a record nobody asked about.
+ */
+function useSettled(value: string, ms: number): string {
+  const [settled, setSettled] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms)
+    return () => clearTimeout(timer)
+  }, [value, ms])
+  return settled
+}
+
+/** What the id in the filter's value box names, for the columns that hold another record's id. */
+function ReferencePreview({ column, value }: { column: string; value: string }) {
+  const settled = useSettled(value, 400)
+  const preview = lookup(FILTER_PREVIEWS, column)
+  const id = Number(settled)
+  if (!preview || !/^\d+$/.test(settled) || id <= 0) return null
+  return <span className="text-sm text-gray-500">{preview(id)}</span>
 }
 
 function ErrorAlert({ what, error }: { what: string; error: unknown }) {

@@ -10,6 +10,7 @@ import type { AdminTravelerDetailDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { isTravelerId } from '@/lib/travelerId'
+import { AddMembershipDialog } from './AddMembershipDialog'
 
 // SensitiveProperties.RedactedPlaceholder: what the API sends in place of a sensitive value.
 const MASKED = '<redacted>'
@@ -147,7 +148,7 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
         )}
       </Section>
 
-      <Section id="traveler-loyalty-memberships" title="Loyalty memberships">
+      <Section id="traveler-loyalty-memberships" title="Loyalty memberships" action={<AddMembershipDialog travelerId={id} />}>
         {memberships.length === 0 ? (
           <Empty>No loyalty memberships.</Empty>
         ) : (
@@ -187,10 +188,13 @@ function Sensitive({ value, table, id, column }: { value: string | null | undefi
   return <>{value ?? '—'}</>
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function Section({ id, title, action, children }: { id: string; title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="space-y-3">
-      <h2 id={id} className="text-lg font-semibold text-gray-900">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id={id} className="text-lg font-semibold text-gray-900">{title}</h2>
+        {action}
+      </div>
       <Card>
         <CardContent className="space-y-3 pt-6">{children}</CardContent>
       </Card>

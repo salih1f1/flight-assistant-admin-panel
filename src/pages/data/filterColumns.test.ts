@@ -35,6 +35,30 @@ describe('filterColumns', () => {
     expect(filterColumns(published, ['Id'], 'Status')).toEqual(published)
   })
 
+  /** A table whose grid names the few columns worth filtering it by: the rest — every timestamp,
+   *  every id — only make the picker longer than the useful part of it. */
+  it("keeps only the columns a table's own list allows, in published order", () => {
+    expect(filterColumns(published, [], undefined, ['RequestedUtc'])).toEqual([
+      { name: 'RequestedUtc', kind: 'Date', values: null },
+    ])
+    expect(filterColumns(undefined, ['Id', 'FlightNumber', 'CreatedUtc'], undefined, ['FlightNumber'])).toEqual([
+      { name: 'FlightNumber' },
+    ])
+  })
+
+  /** A shared link may filter on a column the list leaves out. The form must still show it, or it
+   *  would silently claim to be filtering on something else — and with the kind the API published
+   *  for it, so an off-list Enum still gets its picker rather than a text box. */
+  it('offers the applied column even when the list leaves it out', () => {
+    expect(filterColumns(published, [], 'Status', ['RequestedUtc'])).toEqual(published)
+    expect(filterColumns(undefined, ['Id'], 'CreatedUtc', ['Id'])).toEqual([{ name: 'CreatedUtc' }, { name: 'Id' }])
+  })
+
+  /** Most tables have no list of their own, and "all columns shown" passes none. */
+  it('offers every column when there is no list', () => {
+    expect(filterColumns(published, [], undefined, undefined)).toEqual(published)
+  })
+
   it('drops a published entry with no name, which nothing could filter on', () => {
     expect(filterColumns([{ name: null, kind: 'Text', values: null }, ...published], [], undefined)).toEqual(published)
   })

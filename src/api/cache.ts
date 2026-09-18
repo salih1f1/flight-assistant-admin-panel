@@ -43,6 +43,10 @@ export const invalidateLoyaltyPrograms = (queryClient: QueryClient) =>
 export const invalidateTrackedFlights = (queryClient: QueryClient, travelerId: string) =>
   invalidate(queryClient, getAdminGetTravelerDetailQueryKey(travelerId), getAdminGetAllFlightsQueryKey(), rawTable('flights'), rawTable('traveler-flights'))
 
+/** After adding a loyalty membership for a traveler: their detail page, and the memberships table. */
+export const invalidateLoyaltyMemberships = (queryClient: QueryClient, travelerId: string) =>
+  invalidate(queryClient, getAdminGetTravelerDetailQueryKey(travelerId), rawTable('traveler-loyalty-memberships'))
+
 /**
  * Every raw table, on every page. For a write whose effects reach other tables: deleting a
  * traveler removes their device tokens and tracked flights, and a sync records status events.

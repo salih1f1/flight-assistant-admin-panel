@@ -6,6 +6,7 @@
  */
 
 export * from './acceptVerificationSourceRequest';
+export * from './addMembershipRequest';
 export * from './adminAuditAction';
 export * from './adminAuditDto';
 export * from './adminAuditDtoPagedResult';

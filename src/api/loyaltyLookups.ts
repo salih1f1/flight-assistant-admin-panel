@@ -59,3 +59,25 @@ export function useLoyaltyProgramKinds() {
     queryFn: ({ signal }) => listLoyaltyProgramKinds(signal),
   })
 }
+
+/**
+ * Every loyalty program, with its tiers — what a program/tier picker needs, and the
+ * only way to get it: the list endpoint is paged, so this walks it at the largest
+ * page size the API allows. Filed under the generated list key, like
+ * {@link loyaltyProgramQueryKey}, so invalidateLoyaltyPrograms refreshes it too.
+ */
+export async function listLoyaltyPrograms(signal?: AbortSignal): Promise<LoyaltyProgramDto[]> {
+  const programs: LoyaltyProgramDto[] = []
+  for (let page = 1; ; page++) {
+    const result = await adminGetLoyaltyPrograms({ Page: page, PageSize: MAX_PAGE_SIZE }, undefined, signal)
+    programs.push(...(result.items ?? []))
+    if (page * MAX_PAGE_SIZE >= (result.total ?? 0)) return programs
+  }
+}
+
+export function useLoyaltyPrograms() {
+  return useQuery({
+    queryKey: [...getAdminGetLoyaltyProgramsQueryKey(), 'all'],
+    queryFn: ({ signal }) => listLoyaltyPrograms(signal),
+  })
+}

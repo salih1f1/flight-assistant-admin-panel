@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import {
-  AirlineName, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
+  AirlineName, AirportCode, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
 } from '@/components/ReferenceNames'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup } from './records'
@@ -24,13 +24,11 @@ const asId = (value: unknown) => (typeof value === 'number' ? value : null)
  * record's name and linked to it. A table's own key column is deliberately absent: `Id` is the
  * value an admin copies, filters on and pastes into a bug report, so it stays as it is.
  */
-const REFERENCES: Record<string, (value: unknown, row: Row, compact: boolean) => ReactNode> = {
+const REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
   AirlineId: value => <AirlineName id={asId(value)} />,
-  // An airport is the one reference with a short form everyone reads, so a grid gets the code and
-  // a record page the whole name. See AirportName.
-  AirportId: (value, _row, compact) => <AirportName id={asId(value)} compact={compact} />,
-  DepartureAirportId: (value, _row, compact) => <AirportName id={asId(value)} compact={compact} />,
-  ArrivalAirportId: (value, _row, compact) => <AirportName id={asId(value)} compact={compact} />,
+  AirportId: value => <AirportName id={asId(value)} />,
+  DepartureAirportId: value => <AirportName id={asId(value)} />,
+  ArrivalAirportId: value => <AirportName id={asId(value)} />,
   ProgramId: value => <LoyaltyProgramName id={asId(value)} />,
   // The only place the API names a tier is inside its program, so this one reads its row's sibling
   // column rather than its own value alone.
@@ -40,19 +38,15 @@ const REFERENCES: Record<string, (value: unknown, row: Row, compact: boolean) =>
 }
 
 /**
- * What a column is called on screen, where the API's name is about how the value is stored rather
- * than what it now says. A column resolved to a name holds no id, so heading it `AirportId`
- * contradicts the `LHR` underneath it. Only the header changes: sorting, filtering and CSV export
- * all keep sending the API's own column name.
+ * How a column reads where a name would not fit: an airport becomes the three letters a route is
+ * made of, with the full name on hover. Only the grid asks for this — the record page has room to
+ * spell everything out, and shows the same columns through REFERENCES above.
  */
-const COLUMN_LABELS: Record<string, string> = {
-  AirlineId: 'Airline',
-  AirportId: 'Airport',
-  ProgramId: 'Program',
+const COMPACT_REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
+  AirportId: value => <AirportCode id={asId(value)} />,
+  DepartureAirportId: value => <AirportCode id={asId(value)} />,
+  ArrivalAirportId: value => <AirportCode id={asId(value)} />,
 }
-
-/** The heading for a column, which is the API's name for it unless the panel has a better one. */
-export const columnLabel = (column: string) => lookup(COLUMN_LABELS, column) ?? column
 
 // An ISO instant, which is the only thing these columns ever hold. Checked rather than handed to
 // Date.parse, which reads '16' as a year and would turn a stray number into a timestamp.
@@ -66,17 +60,17 @@ const isTimestampColumn = (column: string) => column.endsWith('Utc') || column.e
  * a referenced record by name, an instant to the minute in UTC. The full value rides along as
  * `title`, so a timestamp's seconds are a hover away and nothing the API sent is lost.
  *
- * `compact` is the grid asking for the short form of a reference that has one, a column's width
- * rather than a page's. Every reference that shortens keeps the long form in its own `title`.
+ * `compact` is for a caller with a column's width rather than a field's — the grid — and changes
+ * only the columns that have a shorter true name; everything else reads the same either way.
  */
 export function columnValue(
   column: string,
   value: unknown,
   row: Row,
-  { compact = false }: { compact?: boolean } = {},
+  compact = false,
 ): { node: ReactNode; title?: string } | undefined {
-  const reference = lookup(REFERENCES, column)
-  if (reference) return { node: reference(value, row, compact) }
+  const reference = (compact ? lookup(COMPACT_REFERENCES, column) : undefined) ?? lookup(REFERENCES, column)
+  if (reference) return { node: reference(value, row) }
   if (isTimestampColumn(column) && typeof value === 'string' && ISO_INSTANT.test(value)) {
     return { node: `${formatUtcMinute(value)} UTC`, title: value }
   }
