@@ -91,6 +91,20 @@ async function openDialog(user: ReturnType<typeof userEvent.setup>) {
 const optionLabels = (select: HTMLElement) =>
   within(select).getAllByRole('option').map(o => o.textContent)
 
+const programField = (dialog: HTMLElement) => within(dialog).getByRole('combobox', { name: /Program/ })
+
+/** Opens the program dropdown and returns its panel — the tier select has options of its own. */
+async function openPrograms(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
+  await user.click(programField(dialog))
+  return within(dialog).getByRole('listbox')
+}
+
+/** Picks a program the way an admin does: open the dropdown, click the one you want. */
+async function chooseProgram(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, label: string) {
+  const panel = await openPrograms(user, dialog)
+  await user.click(within(panel).getByRole('option', { name: label }))
+}
+
 describe('Adding a loyalty membership to a traveler', () => {
   beforeEach(() => {
     detail = makeDetail()
@@ -104,22 +118,45 @@ describe('Adding a loyalty membership to a traveler', () => {
 
     const dialog = await openDialog(user)
 
-    expect(optionLabels(within(dialog).getByRole('combobox', { name: /Program/ })))
-      .toEqual(['Choose a program…', 'Executive Club (EXEC_CLUB)', 'Miles & More (MILES)', 'Priority Pass (PP)'])
+    const panel = await openPrograms(user, dialog)
+    expect(within(panel).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['Executive Club (EXEC_CLUB)', 'Miles & More (MILES)', 'Priority Pass (PP)'])
   })
 
-  it('narrows the programs to what was typed, by name or by code', async () => {
+  it('narrows the programs to what was typed in the dropdown itself, by name or by code', async () => {
     const user = userEvent.setup()
     renderPage()
     const dialog = await openDialog(user)
-    const program = within(dialog).getByRole('combobox', { name: /Program/ })
+    await openPrograms(user, dialog)
+    const filter = within(dialog).getByRole('textbox', { name: 'Filter programs' })
+    const shown = () => within(within(dialog).getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
 
-    await user.type(within(dialog).getByRole('textbox', { name: 'Filter programs' }), 'miles')
-    expect(optionLabels(program)).toEqual(['Choose a program…', 'Miles & More (MILES)'])
+    await user.type(filter, 'miles')
+    expect(shown()).toEqual(['Miles & More (MILES)'])
 
-    await user.clear(within(dialog).getByRole('textbox', { name: 'Filter programs' }))
-    await user.type(within(dialog).getByRole('textbox', { name: 'Filter programs' }), 'exec_')
-    expect(optionLabels(program)).toEqual(['Choose a program…', 'Executive Club (EXEC_CLUB)'])
+    await user.clear(filter)
+    await user.type(filter, 'exec_')
+    expect(shown()).toEqual(['Executive Club (EXEC_CLUB)'])
+
+    // The filter lives in the dropdown now, not as a field of the form above it.
+    await user.keyboard('{Escape}')
+    expect(within(dialog).queryByRole('textbox', { name: 'Filter programs' })).not.toBeInTheDocument()
+    // Escape shut the dropdown, not the dialog behind it.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('picks the typed-for program with Enter, without submitting the half-filled form', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const dialog = await openDialog(user)
+
+    await openPrograms(user, dialog)
+    await user.type(within(dialog).getByRole('textbox', { name: 'Filter programs' }), 'pp')
+    await user.keyboard('{Enter}')
+
+    expect(programField(dialog)).toHaveTextContent('Priority Pass (PP)')
+    expect(sent.filter(r => r.method === 'POST')).toHaveLength(0)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it("offers only the chosen program's tiers, lowest rank first", async () => {
@@ -129,7 +166,7 @@ describe('Adding a loyalty membership to a traveler', () => {
 
     expect(within(dialog).getByRole('combobox', { name: /Tier/ })).toBeDisabled()
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
 
     const tier = within(dialog).getByRole('combobox', { name: /Tier/ })
     expect(tier).not.toBeDisabled()
@@ -141,9 +178,9 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
     await user.selectOptions(within(dialog).getByRole('combobox', { name: /Tier/ }), '2')
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '4')
+    await chooseProgram(user, dialog, 'Miles & More (MILES)')
 
     const tier = within(dialog).getByRole('combobox', { name: /Tier/ })
     expect(optionLabels(tier)).toEqual(['No tier', 'Senator (SEN)'])
@@ -166,7 +203,7 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '5')
+    await chooseProgram(user, dialog, 'Priority Pass (PP)')
 
     expect(within(dialog).getByRole('combobox', { name: /Tier/ })).toBeDisabled()
     expect(dialog).toHaveTextContent('Priority Pass has no tiers.')
@@ -177,7 +214,7 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
     await user.selectOptions(within(dialog).getByRole('combobox', { name: /Tier/ }), '2')
     await user.type(within(dialog).getByRole('textbox', { name: /Account number/ }), 'BA-12345678')
     await user.click(within(dialog).getByRole('button', { name: 'Add membership' }))
@@ -199,7 +236,7 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
     await user.type(within(dialog).getByRole('textbox', { name: /Account number/ }), 'BA-999')
     // Points expiry went with the column it was written to (#154); tier expiry is the only date left.
     expect(within(dialog).queryByLabelText(/Points expiry/)).not.toBeInTheDocument()
@@ -234,7 +271,7 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
     await user.type(within(dialog).getByRole('textbox', { name: /Account number/ }), 'BA-12345678')
     await user.click(within(dialog).getByRole('button', { name: 'Add membership' }))
 
@@ -249,13 +286,13 @@ describe('Adding a loyalty membership to a traveler', () => {
     renderPage()
     const dialog = await openDialog(user)
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
+    await chooseProgram(user, dialog, 'Executive Club (EXEC_CLUB)')
     await user.type(within(dialog).getByRole('textbox', { name: /Account number/ }), 'BA-12345678')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     const reopened = await openDialog(user)
-    expect(within(reopened).getByRole('combobox', { name: /Program/ })).toHaveValue('')
+    expect(programField(reopened)).toHaveTextContent('Choose a program…')
     expect(within(reopened).getByRole('textbox', { name: /Account number/ })).toHaveValue('')
   })
 })

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAdminAddMembershipForTraveler } from '@/api/generated/admin'
@@ -48,9 +49,6 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
   const addMutation = useAdminAddMembershipForTraveler()
   const [failure, setFailure] = useState<ReturnType<typeof apiErrorMessage>>()
 
-  // What was typed into the filter, which narrows the program list but is not itself a field.
-  const [filter, setFilter] = useState('')
-
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: EMPTY,
@@ -65,7 +63,11 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
   // once the program changes — dropped rather than posted against a program it isn't part of.
   useEffect(() => { setValue('tierId', '') }, [programId, setValue])
 
-  const shown = filterPrograms(programs, filter)
+  const programOptions: ComboboxOption[] = (programs ?? []).map(p => ({
+    value: String(p.id),
+    label: programLabel(p),
+    keywords: p.code ?? '',
+  }))
 
   const onSubmit = (data: FormData) => {
     setFailure(undefined)
@@ -95,7 +97,6 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
     setOpen(next)
     if (next) {
       reset(EMPTY)
-      setFilter('')
       setFailure(undefined)
     }
   }
@@ -111,24 +112,23 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="membership-filter">Filter programs</Label>
-            <Input
-              id="membership-filter"
-              value={filter}
-              onChange={event => setFilter(event.target.value)}
-              placeholder="e.g. exec, miles, PP"
-            />
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="membership-program">Program <span className="text-red-500">*</span></Label>
-            <select id="membership-program" {...register('programId')} disabled={!programs} className={SELECT_CLASS}>
-              <option value="">{programsLoading ? 'Loading programs…' : 'Choose a program…'}</option>
-              {shown.map(p => <option key={p.id} value={p.id}>{programLabel(p)}</option>)}
-            </select>
+            {/* The search sits inside the dropdown: 25 programs are too many to scroll, and a code
+                like EXEC_CLUB or PP is in the middle of the label, where a native select's own
+                type-ahead — which only matches the start — never reaches it. */}
+            <Combobox
+              id="membership-program"
+              value={String(watch('programId') ?? '')}
+              onChange={next => setValue('programId', next, { shouldValidate: true })}
+              options={programOptions}
+              placeholder="Choose a program…"
+              searchLabel="Filter programs"
+              searchPlaceholder="e.g. exec, miles, PP"
+              emptyMessage={programsLoading ? 'Loading programs…' : 'Could not load loyalty programs.'}
+              disabled={!programs}
+            />
             {errors.programId && <p className="text-xs text-red-500">{errors.programId.message}</p>}
             {programsFailed && <p className="text-xs text-red-500">Could not load loyalty programs.</p>}
-            {programs && shown.length === 0 && <p className="text-xs text-gray-500">No program matches "{filter}".</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -167,14 +167,6 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
       </DialogContent>
     </Dialog>
   )
-}
-
-/** The programs whose name or code contains what was typed, ignoring case; everything when nothing was. */
-function filterPrograms(programs: LoyaltyProgramDto[] | undefined, filter: string) {
-  const needle = filter.trim().toLowerCase()
-  if (!programs) return []
-  if (!needle) return programs
-  return programs.filter(p => `${p.name ?? ''} ${p.code ?? ''}`.toLowerCase().includes(needle))
 }
 
 // Matches the native selects on the reference-data forms (LoyaltyProgramFormPage).
