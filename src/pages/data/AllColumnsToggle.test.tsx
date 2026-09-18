@@ -79,7 +79,7 @@ function renderAt(entry: string) {
 /**
  * The header a column is shown under: a column holding another record's id is labelled by what it
  * holds, since the cells under it hold that record. Listed by hand, like TABLES above, so a change
- * to DataBrowserPage's COLUMN_LABELS has to agree with this.
+ * to columnValue's COLUMN_LABELS has to agree with this.
  */
 const HEADERS: Record<string, string> = {
   AirlineId: 'Airline',
@@ -90,6 +90,8 @@ const HEADERS: Record<string, string> = {
   AllianceCode: 'Alliance',
   TravelerId: 'Traveler',
   FlightId: 'Flight',
+  LoungeId: 'Lounge',
+  ProviderId: 'Provider',
 }
 
 const headersFor = (columns: string[]) => columns.map(name => HEADERS[name] ?? name)
