@@ -83,3 +83,11 @@ function staleNote(row: Row, source: string | undefined, { staleAfterDays, now =
   const by = source ? ` by ${source}` : ''
   return `Verified ${formatUtcMinute(verifiedAt)} UTC${by} — older than the ${staleAfterDays}-day window`
 }
+
+/**
+ * Whether a row carries an unresolved verification issue — the 'Needs attention' state above.
+ * Exported because three places have to agree on it: the grid's Verify column and its checkbox,
+ * which both refuse such a row so a difference can't be signed off without being read, and the
+ * record page's verification panel, which is where it can be.
+ */
+export const needsAttention = (row: Row): boolean => verificationState(row).issue !== undefined

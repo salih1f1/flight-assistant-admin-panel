@@ -22,6 +22,7 @@ import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
 import { SYNC_LEGEND, syncRowTone } from './syncRowTone'
 import { VerificationStatusBadge } from './VerificationStatus'
+import { needsAttention } from './verificationState'
 import { CHECKED_COLUMNS } from './verificationChecks'
 import { VerifyDialog } from './VerifyDialog'
 import { cn } from '@/lib/utils'
@@ -116,11 +117,18 @@ function SelectRowCell({ row }: CellContext<Row, unknown>) {
   // A row with no value in the key column has nothing a selection could refer back to.
   if (keyValue === null || keyValue === undefined) return null
   const key = String(keyValue)
+  // The Verify dialog's manual mode signs a row off without showing what a check found, so a
+  // flagged row must not be able to reach it — see the Verify column below. Rendered unchecked as
+  // well as disabled: `selectedKeys` still holds the key of a row that was ticked before a refetch
+  // brought its issue back, and useRowSelection has already stopped counting it.
+  const flagged = needsAttention(row.original)
   return (
     <input
       type="checkbox"
       aria-label={`Select row ${key}`}
-      checked={selection.selectedKeys.has(key)}
+      checked={!flagged && selection.selectedKeys.has(key)}
+      disabled={flagged}
+      title={flagged ? 'Open this row to see what the check found' : undefined}
       onChange={() => selection.toggleRow(key)}
     />
   )
@@ -152,8 +160,13 @@ function useRowSelection(items: Row[], keyColumn: string | undefined, viewKey: s
     }
   }
 
-  const selectableItems = items.filter(row => row[keyColumn] !== null && row[keyColumn] !== undefined)
-  const selectedRows = items.filter(row => selectedKeys.has(String(row[keyColumn])))
+  // Needs a key to refer back to, and no unresolved verification issue: a flagged row is decided on
+  // its record page, so neither "select all" nor a stored key from before it was flagged may hand
+  // one to the Verify dialog.
+  const selectable = (row: Row) =>
+    row[keyColumn] !== null && row[keyColumn] !== undefined && !needsAttention(row)
+  const selectableItems = items.filter(selectable)
+  const selectedRows = items.filter(row => selectable(row) && selectedKeys.has(String(row[keyColumn])))
   const allSelected = selectableItems.length > 0 && selectableItems.every(row => selectedKeys.has(String(row[keyColumn])))
   const someSelected = !allSelected && selectableItems.some(row => selectedKeys.has(String(row[keyColumn])))
 
@@ -365,6 +378,17 @@ export function DataBrowserPage() {
         const keyValue = keyColumn ? row.original[keyColumn] : undefined
         if (keyValue === null || keyValue === undefined) return null
         const key = String(keyValue)
+        // A flagged row's local values and its sources' disagree. Verifying it here would sign that
+        // difference off without anyone having read it, so the grid only points at the record page,
+        // which shows what the check found and the ways to resolve it (take the source's values,
+        // keep ours, edit, check again). A table with no single-key record page gets neither
+        // button — there is nowhere to send the admin, and one-click verify is still wrong.
+        if (needsAttention(row.original)) {
+          const openTo = recordPath(table, row.original)
+          return openTo
+            ? <Link to={openTo} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Review</Link>
+            : null
+        }
         const verified = row.original.IsVerified === true
         return (
           <Button
