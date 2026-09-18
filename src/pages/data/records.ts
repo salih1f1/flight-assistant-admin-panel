@@ -41,6 +41,9 @@ export const VERIFIERS: Record<string, (key: string, body: { isVerified: boolean
 // Tables keyed by something other than a single Id column (their EF configurations' HasKey).
 const KEY_COLUMNS: Record<string, string | null> = {
   countries: 'Code',
+  // One row per data source, keyed by the catalog key the /health page and the probe URL use.
+  'data-source-status': 'Key',
+  // One row per data source, keyed by the catalog key the /health page and the probe URL use.
   'lounge-provider-links': null,
   'seed-versions': null,
 }
