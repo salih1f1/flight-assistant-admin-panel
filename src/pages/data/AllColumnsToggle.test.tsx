@@ -37,7 +37,7 @@ const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
   { slug: 'loyalty-tiers', columns: ['Id', 'ProgramId', 'Code', 'Name', 'Rank', 'AllianceCode', 'AllianceTierCode'], hidden: ['Id'] },
   { slug: 'traveler-loyalty-memberships', columns: ['Id', 'TravelerId', 'ProgramId', 'TierId', 'AccountNumber', 'TierExpiryDate', 'CreatedUtc', 'UpdatedUtc'], hidden: ['Id', 'AccountNumber', 'CreatedUtc'] },
   { slug: 'airlines', columns: ['Id', 'Iata', 'Icao', 'Name', 'CountryCode', 'AllianceCode', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['Id', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
-  { slug: 'airports', columns: ['Id', 'Iata', 'Icao', 'Name', 'City', 'CountryCode', 'Latitude', 'Longitude', 'ElevationFt', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['Id', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
+  { slug: 'airports', columns: ['Id', 'Iata', 'Icao', 'Name', 'City', 'CountryCode', 'Latitude', 'Longitude', 'ElevationFt', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['Id', 'Latitude', 'Longitude', 'ElevationFt', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
   { slug: 'alliances', columns: ['Id', 'Code', 'Name', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['Id', 'SourceType', 'FirstSeenAt', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
   // A third table with a list of its own: the three memberships start hidden alongside the
   // bookkeeping columns, since a country is found by its code, its name and its region (#160).
@@ -88,6 +88,8 @@ const HEADERS: Record<string, string> = {
   ArrivalAirportId: 'To',
   KindId: 'Kind',
   AllianceCode: 'Alliance',
+  TravelerId: 'Traveler',
+  FlightId: 'Flight',
 }
 
 const headersFor = (columns: string[]) => columns.map(name => HEADERS[name] ?? name)
