@@ -4,6 +4,7 @@
  * FlightAssistant API
  * OpenAPI spec version: v1
  */
+import type { BrowsableColumnDto } from './browsableColumnDto';
 
 export interface BrowsableTableDto {
   /** @nullable */
@@ -11,4 +12,6 @@ export interface BrowsableTableDto {
   /** @nullable */
   displayName?: string | null;
   rowCount?: number;
+  /** @nullable */
+  columns?: BrowsableColumnDto[] | null;
 }

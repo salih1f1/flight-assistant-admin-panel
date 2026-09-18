@@ -281,6 +281,7 @@ export function useAdminGetAllAirlines<TData = Awaited<ReturnType<typeof adminGe
 
 
 /**
+ * 409 when AllianceCode names an alliance that is not in the alliances table.
  * @summary Create airline
  */
 export const adminCreateAirline = (
@@ -302,7 +303,7 @@ export const adminCreateAirline = (
 
 export const getAdminCreateAirlineMutationKey = () => ['adminCreateAirline'] as const;
 
-export const getAdminCreateAirlineMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
+export const getAdminCreateAirlineMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirline>>, TError,AdminCreateAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirline>>, TError,AdminCreateAirlineMutationVariables, TContext> => {
 
@@ -331,13 +332,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type AdminCreateAirlineMutationResult = NonNullable<Awaited<ReturnType<typeof adminCreateAirline>>>
     export type AdminCreateAirlineMutationBody = BodyType<CreateAirlineRequest>
-    export type AdminCreateAirlineMutationError = ErrorType<HttpValidationProblemDetails>
+    export type AdminCreateAirlineMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
     export type AdminCreateAirlineMutationVariables = {data: BodyType<CreateAirlineRequest>}
 
     /**
  * @summary Create airline
  */
-export const useAdminCreateAirline = <TError = ErrorType<HttpValidationProblemDetails>,
+export const useAdminCreateAirline = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateAirline>>, TError,AdminCreateAirlineMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof adminCreateAirline>>,
@@ -442,6 +443,7 @@ export function useAdminGetAirlineById<TData = Awaited<ReturnType<typeof adminGe
 
 
 /**
+ * 409 when AllianceCode names an alliance that is not in the alliances table.
  * @summary Update airline
  */
 export const adminUpdateAirline = (
