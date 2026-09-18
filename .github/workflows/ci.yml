@@ -1,0 +1,52 @@
+# Verification-only workflow: the checks a panel pull request has to pass. Shaped after the
+# backend's ci.yml, which has run this way since #295.
+#
+# It exists because nothing here ran tsc before it: `vitest` does not typecheck, so all 563 tests
+# stayed green over a build that had not compiled since #113 (see #135).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to a PR branch makes the in-flight run obsolete. Don't spend runners finishing it.
+# Never cancel a run on main — that one is the record.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # ci, not install: it installs exactly what package-lock.json pins and fails if the two
+      # files disagree, so a run can't pass against dependencies main has never seen.
+      - name: Install
+        run: npm ci
+
+      # The three checks run whatever the ones before them did (`!cancelled()`), so one run
+      # reports every problem rather than one problem per push. Each still fails the job.
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Lint
+        if: '!cancelled()'
+        run: npm run lint
+
+      - name: Test
+        if: '!cancelled()'
+        run: npm test
