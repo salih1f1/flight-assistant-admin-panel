@@ -3104,7 +3104,7 @@ export const getAdminGetHealthQueryKey = () => {
     }
 
 
-export const getAdminGetHealthQueryOptions = <TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<ProblemDetails>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+export const getAdminGetHealthQueryOptions = <TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -3123,10 +3123,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type AdminGetHealthQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetHealth>>>
-export type AdminGetHealthQueryError = ErrorType<ProblemDetails>
+export type AdminGetHealthQueryError = ErrorType<unknown>
 
 
-export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof adminGetHealth>>,
@@ -3136,7 +3136,7 @@ export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHeal
       >, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof adminGetHealth>>,
@@ -3146,7 +3146,7 @@ export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHeal
       >, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -3154,7 +3154,7 @@ export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHeal
  * @summary Operator health detail
  */
 
-export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHealth>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetHealth>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -5584,7 +5584,7 @@ export const useAdminTrackFlightForTraveler = <TError = ErrorType<HttpValidation
     }
 
 /**
- * Links a loyalty program membership to this traveler, exactly as POST /loyalty/memberships does for the signed-in traveler. Body fields: ProgramId (from GET /admin/loyalty/programs), AccountNumber, TierId (optional, from that program's tier list), TierExpiryDate (optional, YYYY-MM-DD, today or later), PointsExpiryDate (same). An unknown traveler is a 404 and writes nothing. A ProgramId we don't have, or a TierId belonging to another program, is a 409 and writes nothing. Adding a membership the traveler already has is not refused: the same program can be added twice, as it can through POST /loyalty/memberships.
+ * Links a loyalty program membership to this traveler, exactly as POST /loyalty/memberships does for the signed-in traveler. Body fields: ProgramId (from GET /admin/loyalty/programs), AccountNumber, TierId (optional, from that program's tier list), TierExpiryDate (optional, YYYY-MM-DD, today or later). An unknown traveler is a 404 and writes nothing. A ProgramId we don't have, or a TierId belonging to another program, is a 409 and writes nothing. Adding a membership the traveler already has is not refused: the same program can be added twice, as it can through POST /loyalty/memberships.
  * @summary Add a loyalty membership for a traveler
  */
 export const adminAddMembershipForTraveler = (

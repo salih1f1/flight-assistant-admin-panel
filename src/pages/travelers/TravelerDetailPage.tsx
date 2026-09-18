@@ -159,7 +159,6 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
                 <TableHead>Account number</TableHead>
                 <TableHead>Tier</TableHead>
                 <TableHead>Tier expiry</TableHead>
-                <TableHead>Points expiry</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -171,7 +170,6 @@ function TravelerDetail({ traveler }: { traveler: AdminTravelerDetailDto }) {
                   </TableCell>
                   <TableCell><LoyaltyTierName programId={membership.programId} tierId={membership.tierId} /></TableCell>
                   <TableCell>{membership.tierExpiryDate ?? '—'}</TableCell>
-                  <TableCell>{membership.pointsExpiryDate ?? '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
