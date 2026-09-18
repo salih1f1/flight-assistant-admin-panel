@@ -99,12 +99,13 @@ describe('The flights grid, as a list', () => {
   })
 
   // Lounges used to be this control, until they got a list of their own; lounge providers are a
-  // table that still has none, so the fallback rule is what shapes their grid.
-  it('leaves a table with no list of its own showing everything it has', async () => {
+  // table that still has none, so the fallback rule is what shapes their grid: everything the API
+  // sends except the bookkeeping columns, Id among them since #153.
+  it('leaves a table with no list of its own showing everything but its bookkeeping', async () => {
     renderAt('/data/lounge-providers')
     await screen.findByRole('table')
 
-    expect(dataHeaders()).toEqual(['Id', 'Code', 'Name'])
+    expect(dataHeaders()).toEqual(['Code', 'Name'])
   })
 
   it('offers only the columns worth filtering a flight by', async () => {
