@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAdminCreateAirline, useAdminGetAirlineById, useAdminUpdateAirline } from '@/api/generated/admin'
+import {
+  useAdminCreateAirline, useAdminGetAirlineById, useAdminGetAllAlliances, useAdminUpdateAirline,
+} from '@/api/generated/admin'
 import { invalidateAirlines } from '@/api/cache'
 
 const schema = z.object({
@@ -42,14 +44,24 @@ export function AirlineForm({ id, onDone }: { id?: number; onDone: () => void })
   const isEdit = id !== undefined
   const queryClient = useQueryClient()
   const { data: existing } = useAdminGetAirlineById(id ?? 0, { query: { enabled: isEdit } })
+  const { data: alliances, isError: alliancesFailed } = useAdminGetAllAlliances()
   const createMutation = useAdminCreateAirline({ mutation: { onSuccess: () => invalidateAirlines(queryClient) } })
   const updateMutation = useAdminUpdateAirline({
     mutation: { onSuccess: (_, variables) => invalidateAirlines(queryClient, variables.id) },
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  const chosen = watch('allianceCode')
+  // The select needs an option for whatever the airline already holds, or it has nothing to show
+  // that value with and falls back to "No alliance" — and saving any other field would then
+  // silently clear the airline's alliance. That applies while the list is still loading and when
+  // it failed, not only to a code the API genuinely dropped.
+  const missingOption = chosen && !alliances?.some(a => a.code === chosen) ? chosen : undefined
+  // Only a list that actually arrived is evidence a code is unlisted; a loading or failed one is not.
+  const unlisted = alliances ? missingOption : undefined
 
   useEffect(() => {
     // The spec marks every field nullable, so even name and countryCode are defaulted.
@@ -99,7 +111,23 @@ export function AirlineForm({ id, onDone }: { id?: number; onDone: () => void })
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="allianceCode">Alliance</Label>
-              <Input id="allianceCode" {...register('allianceCode')} placeholder="STAR / OW / ST" />
+              <select
+                id="allianceCode"
+                {...register('allianceCode')}
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                <option value="">No alliance</option>
+                {missingOption && <option value={missingOption}>{missingOption}</option>}
+                {alliances?.map(a => (
+                  <option key={a.code} value={a.code ?? ''}>{a.name} ({a.code})</option>
+                ))}
+              </select>
+              {alliancesFailed && <p className="text-xs text-red-500">Could not load alliances.</p>}
+              {unlisted && (
+                <p className="text-xs text-amber-600">
+                  "{unlisted}" isn't in the alliances list. Saving keeps it; pick another to replace it.
+                </p>
+              )}
             </div>
           </div>
           <div className="flex gap-3 pt-2">
