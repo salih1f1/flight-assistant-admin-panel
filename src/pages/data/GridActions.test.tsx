@@ -30,9 +30,12 @@ const makeRows = (): Record<string, Row[]> => ({
     { Id: 7, Iata: 'TK', Name: 'Turkish Airlines', CountryCode: 'TR' },
     { Id: 8, Iata: 'BA', Name: 'British Airways', CountryCode: 'GB' },
   ],
+  // SyncMode is what a sync changes and what the flights list shows, so it is what proves the grid
+  // refreshed. The times it also changes are outside the list (LIST_COLUMNS) and are on the record
+  // and detail pages.
   flights: [
-    { Id: 1, FlightNumber: 'FA001', ActualDepartureUtc: null },
-    { Id: 2, FlightNumber: 'FA002', ActualDepartureUtc: null },
+    { Id: 1, FlightNumber: 'FA001', SyncMode: 'Schedule', ActualDepartureUtc: null },
+    { Id: 2, FlightNumber: 'FA002', SyncMode: 'Schedule', ActualDepartureUtc: null },
   ],
   travelers: [{ Id: TRAVELER_ID, DisplayName: 'Ann Example' }],
   'device-tokens': [{ Id: TOKEN_ID, TravelerId: TRAVELER_ID, Platform: 'ios' }],
@@ -55,8 +58,9 @@ function api(req: SentRequest) {
   if (req.method === 'DELETE' && (m = req.url.match(/^\/admin\/travelers\/([^/]+)$/))) return drop('travelers', m[1])
   if (req.method === 'POST' && (m = req.url.match(/^\/admin\/flights\/(\d+)\/sync$/))) {
     const id = Number(m[1])
-    // Syncing pulls the latest status from the provider; here the flight has departed.
-    rows.flights = rows.flights.map(f => (f.Id === id ? { ...f, ActualDepartureUtc: '2026-09-13T10:05:00Z' } : f))
+    // Syncing pulls the latest status from the provider; here the flight has departed, and moves
+    // onto the fast poll the result below reports.
+    rows.flights = rows.flights.map(f => (f.Id === id ? { ...f, SyncMode: 'Live', ActualDepartureUtc: '2026-09-13T10:05:00Z' } : f))
     // Shaped like AdminFlightSyncResultDto, which replaced the untyped { updated } in backend #443.
     return { outcome: 'NoDataYet', lastSyncedUtc: '2026-09-13T10:05:00Z', nextSyncDueUtc: '2026-09-13T10:15:00Z', syncMode: 'Live', scheduleMissingSinceUtc: null }
   }
@@ -176,10 +180,11 @@ describe('DataBrowserPage row actions', () => {
 
     await user.click(within(await rowOf('FA002')).getByRole('button', { name: 'Sync status' }))
 
-    // Shown as the grid shows every instant, to the minute in UTC; the raw value is in the title.
-    await waitFor(() => expect(screen.getByText('FA002').closest('tr')).toHaveTextContent('2026-09-13 10:05 UTC'))
+    // SyncMode, not the times the sync also changed: those are outside the flights list now, and
+    // this is about the grid showing the sync's effect without a reload.
+    await waitFor(() => expect(screen.getByText('FA002').closest('tr')).toHaveTextContent('Live'))
     expect(writes()).toEqual([expect.objectContaining({ method: 'POST', url: '/admin/flights/2/sync' })])
-    expect(screen.getByText('FA001').closest('tr')).not.toHaveTextContent('2026-09-13 10:05 UTC')
+    expect(screen.getByText('FA001').closest('tr')).not.toHaveTextContent('Live')
   })
 
   it("shows the API's reason when a sync fails", async () => {

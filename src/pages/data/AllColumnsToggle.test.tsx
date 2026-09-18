@@ -20,7 +20,9 @@ vi.mock('@/api/client', () => ({
 const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
   { slug: 'travelers', columns: ['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'], hidden: ['Email'] },
   { slug: 'device-tokens', columns: ['Id', 'TravelerId', 'Platform', 'Token', 'LastSeenUtc'], hidden: ['Token'] },
-  { slug: 'flights', columns: ['Id', 'AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'ScheduledDepartureUtc', 'ScheduledArrivalUtc', 'EstimatedDepartureUtc', 'EstimatedArrivalUtc', 'ActualDepartureUtc', 'ActualArrivalUtc', 'EquipmentAircraftIcao', 'CreatedUtc', 'UpdatedUtc'], hidden: [] },
+  // The one table with a list of its own (LIST_COLUMNS): everything outside it starts hidden,
+  // rather than only the bookkeeping and masked columns the other tables hide.
+  { slug: 'flights', columns: ['Id', 'AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'ScheduledDepartureUtc', 'ScheduledArrivalUtc', 'EstimatedDepartureUtc', 'EstimatedArrivalUtc', 'ActualDepartureUtc', 'ActualArrivalUtc', 'EquipmentAircraftIcao', 'SyncMode', 'CreatedUtc', 'UpdatedUtc'], hidden: ['Id', 'ScheduledDepartureUtc', 'ScheduledArrivalUtc', 'EstimatedDepartureUtc', 'EstimatedArrivalUtc', 'ActualDepartureUtc', 'ActualArrivalUtc', 'EquipmentAircraftIcao', 'CreatedUtc', 'UpdatedUtc'] },
   { slug: 'traveler-flights', columns: ['Id', 'TravelerId', 'FlightId', 'Notify', 'CreatedUtc'], hidden: [] },
   { slug: 'flight-statuses', columns: ['Id', 'Code', 'Name', 'Description'], hidden: [] },
   { slug: 'flight-status-events', columns: ['Id', 'FlightId', 'StatusId', 'EffectiveAtUtc', 'RecordedAtUtc', 'Source', 'ExternalId', 'Gate', 'Terminal', 'BaggageClaim', 'Remarks', 'RawPayloadJson', 'DedupHash'], hidden: ['RawPayloadJson', 'DedupHash'] },
@@ -69,6 +71,20 @@ function renderAt(entry: string) {
   return router
 }
 
+/**
+ * The header a column is shown under: a column holding another record's id is labelled by what it
+ * holds, since the cells under it hold that record. Listed by hand, like TABLES above, so a change
+ * to DataBrowserPage's COLUMN_LABELS has to agree with this.
+ */
+const HEADERS: Record<string, string> = {
+  AirlineId: 'Airline',
+  AirportId: 'Airport',
+  DepartureAirportId: 'From',
+  ArrivalAirportId: 'To',
+}
+
+const headersFor = (columns: string[]) => columns.map(name => HEADERS[name] ?? name)
+
 /** The grid's data column headers, leaving out the verify and actions columns. */
 const dataHeaders = () => within(screen.getByRole('table'))
   .getAllByRole('columnheader')
@@ -91,25 +107,25 @@ describe('Hidden columns toggle', () => {
     const router = renderAt(`/data/${slug}`)
     await screen.findByRole('table')
     const shown = columns.filter(name => !hidden.includes(name))
-    expect(await screen.findByRole('columnheader', { name: shown[0] })).toBeInTheDocument()
-    expect(dataHeaders()).toEqual(shown)
+    expect(await screen.findByRole('columnheader', { name: headersFor(shown)[0] })).toBeInTheDocument()
+    expect(dataHeaders()).toEqual(headersFor(shown))
 
     await user.click(screen.getByRole('button', { name: `Show ${hidden.length} hidden ${columnsWord(hidden.length)}` }))
 
-    expect(dataHeaders()).toEqual(columns)
+    expect(dataHeaders()).toEqual(headersFor(columns))
     expect(new URLSearchParams(router.state.location.search).get('columns')).toBe('all')
 
     await user.click(screen.getByRole('button', { name: `Hide ${hidden.length} ${columnsWord(hidden.length)}` }))
 
-    expect(dataHeaders()).toEqual(shown)
+    expect(dataHeaders()).toEqual(headersFor(shown))
     expect(new URLSearchParams(router.state.location.search).get('columns')).toBeNull()
   })
 
   it.each(withoutHidden)('$slug: has nothing hidden, so offers no toggle', async ({ slug, columns }) => {
     renderAt(`/data/${slug}`)
-    expect(await screen.findByRole('columnheader', { name: columns[0] })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: headersFor(columns)[0] })).toBeInTheDocument()
 
-    expect(dataHeaders()).toEqual(columns)
+    expect(dataHeaders()).toEqual(headersFor(columns))
     expect(screen.queryByRole('button', { name: /hidden column|^Hide \d+ column|All columns/ })).not.toBeInTheDocument()
   })
 

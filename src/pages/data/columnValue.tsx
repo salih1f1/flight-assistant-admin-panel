@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import {
-  AirlineName, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
+  AirlineName, AirportCode, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
 } from '@/components/ReferenceNames'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup } from './records'
@@ -37,6 +37,17 @@ const REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
   FlightId: value => <FlightName id={asId(value)} />,
 }
 
+/**
+ * How a column reads where a name would not fit: an airport becomes the three letters a route is
+ * made of, with the full name on hover. Only the grid asks for this — the record page has room to
+ * spell everything out, and shows the same columns through REFERENCES above.
+ */
+const COMPACT_REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
+  AirportId: value => <AirportCode id={asId(value)} />,
+  DepartureAirportId: value => <AirportCode id={asId(value)} />,
+  ArrivalAirportId: value => <AirportCode id={asId(value)} />,
+}
+
 // An ISO instant, which is the only thing these columns ever hold. Checked rather than handed to
 // Date.parse, which reads '16' as a year and would turn a stray number into a timestamp.
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
@@ -48,9 +59,17 @@ const isTimestampColumn = (column: string) => column.endsWith('Utc') || column.e
  * How one column of a raw row is worth showing, or undefined when the raw value already is:
  * a referenced record by name, an instant to the minute in UTC. The full value rides along as
  * `title`, so a timestamp's seconds are a hover away and nothing the API sent is lost.
+ *
+ * `compact` is for a caller with a column's width rather than a field's — the grid — and changes
+ * only the columns that have a shorter true name; everything else reads the same either way.
  */
-export function columnValue(column: string, value: unknown, row: Row): { node: ReactNode; title?: string } | undefined {
-  const reference = lookup(REFERENCES, column)
+export function columnValue(
+  column: string,
+  value: unknown,
+  row: Row,
+  compact = false,
+): { node: ReactNode; title?: string } | undefined {
+  const reference = (compact ? lookup(COMPACT_REFERENCES, column) : undefined) ?? lookup(REFERENCES, column)
   if (reference) return { node: reference(value, row) }
   if (isTimestampColumn(column) && typeof value === 'string' && ISO_INSTANT.test(value)) {
     return { node: `${formatUtcMinute(value)} UTC`, title: value }

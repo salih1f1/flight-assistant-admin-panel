@@ -148,8 +148,10 @@ describe('references in the raw grid', () => {
     expect(within(row).getByText(ANN)).toBeInTheDocument()
   })
 
+  // With all columns shown: RetiredAt is outside the flights list (LIST_COLUMNS), and the claim
+  // here is about any timestamp column, not about which of them a flight's list happens to show.
   it('leaves a timestamp column alone when its value is not an instant', async () => {
-    renderAt('/data/flights')
+    renderAt('/data/flights?columns=all')
     await screen.findByRole('link', { name: 'British Airways (BA)' })
 
     expect(screen.getByText('2026')).toBeInTheDocument()
@@ -160,7 +162,9 @@ describe('references in the raw grid', () => {
     renderAt('/data/flights')
 
     expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toBeInTheDocument()
+    // An airport is its code in a grid cell and its full name on the record page, which is the one
+    // column that reads differently in the two views — see columnValue's COMPACT_REFERENCES.
+    expect(await screen.findByRole('link', { name: 'LHR' })).toBeInTheDocument()
   })
 })
 
