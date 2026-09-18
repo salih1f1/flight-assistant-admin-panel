@@ -17,6 +17,8 @@ type ComboboxProps = {
   options: ComboboxOption[]
   /** Shown on the field while nothing is chosen. */
   placeholder?: string
+  /** Names the field where no visible <Label> does — a picker standing on its own in a toolbar. */
+  ariaLabel?: string
   /** Names the search box inside the panel — what this list is filtered by. */
   searchLabel?: string
   searchPlaceholder?: string
@@ -37,6 +39,7 @@ export function Combobox({
   onChange,
   options,
   placeholder = 'Choose…',
+  ariaLabel,
   searchLabel = 'Search',
   searchPlaceholder,
   emptyMessage,
@@ -127,6 +130,7 @@ export function Combobox({
         type="button"
         id={id}
         role="combobox"
+        aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listId}
@@ -145,7 +149,9 @@ export function Combobox({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+        // At least as wide as the field, but free to grow to the longest option: a narrow picker
+        // in a toolbar row would otherwise truncate names a native select sized itself around.
+        <div className="absolute z-50 mt-1 w-max min-w-full max-w-96 rounded-md border border-gray-200 bg-white shadow-lg">
           <div className="border-b border-gray-100 p-2">
             <input
               ref={inputRef}

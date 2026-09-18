@@ -6,6 +6,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { DataBrowserPage, DataBrowserRoute } from './DataBrowserPage'
 
+/**
+ * Picks a filter column by the name the API knows it as, which is what these tests hold: the
+ * picker shows a friendlier label, so the raw name is typed into its search and matched there.
+ */
+async function chooseFilterColumn(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  await user.type(screen.getByRole('textbox', { name: 'Search columns' }), name)
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option')
+  if (shown.length !== 1) throw new Error(`"${name}" matched ${shown.length} columns, not one`)
+  await user.click(shown[0])
+}
+
+/** What the filter picker is offering right now, read from its open panel. */
+async function filterColumnOptions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
+  await user.keyboard('{Escape}')
+  return shown
+}
+
+
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
 }))
@@ -220,12 +241,26 @@ describe('DataBrowserPage', () => {
    * offering it here could ever produce.
    */
   it('offers only the columns the table is showing', async () => {
+    const user = userEvent.setup()
     renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    const options = await filterColumnOptions(user)
     expect(options).toEqual(headers())
     expect(options).not.toContain('Email')
+  })
+
+  it('narrows the column list to what is typed into the picker', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+    await user.type(screen.getByRole('textbox', { name: 'Search columns' }), 'name')
+
+    const shown = within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
+    expect(shown).toContain('DisplayName')
+    expect(shown).not.toContain('CreatedUtc')
   })
 
   it('offers the hidden columns too, once they are shown', async () => {
@@ -235,7 +270,7 @@ describe('DataBrowserPage', () => {
 
     await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
 
-    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    const options = await filterColumnOptions(user)
     expect(options).toContain('Email')
   })
 
@@ -249,12 +284,12 @@ describe('DataBrowserPage', () => {
     renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), 'nothingmatchesthis')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
     await screen.findByText('Page 1 of 1 · 0 total')
 
-    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    const options = await filterColumnOptions(user)
     expect(options).toContain('DisplayName')
     expect(options).not.toContain('Email')
   })
@@ -267,10 +302,11 @@ describe('DataBrowserPage', () => {
    * is usable at all.
    */
   it('still offers a usable picker on a cold link that matches nothing', async () => {
+    const user = userEvent.setup()
     renderAt('/data/travelers?filter=DisplayName%3Anothingmatchesthis')
     await screen.findByText('Page 1 of 1 · 0 total')
 
-    const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
+    const options = await filterColumnOptions(user)
     expect(options).toContain('DisplayName')
     expect(options).toContain('UpdatedUtc')
     // The fallback knows a bookkeeping column when it sees one, masked or not (#152, #153).
@@ -348,7 +384,7 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '042')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
@@ -368,12 +404,12 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '04')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
     await screen.findByText('DisplayName: 04')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '2')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
@@ -411,7 +447,7 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers?filter=DisplayName%3A042')
     await screen.findByText('Traveler 042')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '042')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
@@ -440,7 +476,7 @@ describe('DataBrowserPage', () => {
     renderAt('/data/verification-requests')
     await screen.findByText('IST')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'Status')
+    await chooseFilterColumn(user, 'Status')
 
     const value = screen.getByLabelText('Filter value')
     expect(value.tagName).toBe('SELECT')
@@ -458,7 +494,7 @@ describe('DataBrowserPage', () => {
     renderAt('/data/verification-requests')
     await screen.findByText('IST')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'RequestedUtc')
+    await chooseFilterColumn(user, 'RequestedUtc')
     // An exact match on a timestamp almost never matches, so the useful default leads.
     expect((screen.getByLabelText('Filter value') as HTMLInputElement).type).toBe('date')
     expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('gte')
@@ -470,7 +506,7 @@ describe('DataBrowserPage', () => {
     // A second criterion, asked for exactly: the form adds, so the first one stays applied and the
     // comparison resets to the default with the value it was added with.
     await user.click(screen.getByRole('button', { name: 'Remove filter RequestedUtc: on or after 2026-09-18' }))
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'RequestedUtc')
+    await chooseFilterColumn(user, 'RequestedUtc')
     await user.selectOptions(screen.getByLabelText('Date comparison'), 'exact')
     await user.type(screen.getByLabelText('Filter value'), '2026-09-18')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
@@ -508,7 +544,7 @@ describe('DataBrowserPage', () => {
     // less room, and the Verified toggle filters on it. So it reaches the picker the same way it
     // reaches the grid: by showing the hidden columns (#149).
     await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'IsVerified')
+    await chooseFilterColumn(user, 'IsVerified')
 
     const value = screen.getByLabelText('Filter value')
     expect(within(value).getAllByRole('option').map(o => o.textContent)).toEqual(['true', 'false'])
@@ -524,18 +560,35 @@ describe('DataBrowserPage', () => {
     renderAt('/data/verification-requests')
     await screen.findByText('IST')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'SourceValuesJson')
+    await chooseFilterColumn(user, 'SourceValuesJson')
 
     expect(screen.queryByLabelText('Filter value')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add filter' })).toBeDisabled()
     expect(screen.getByText("This column can't be filtered.")).toBeInTheDocument()
   })
 
-  it('takes the column list from the published columns, not the rows on screen', async () => {
+  /**
+   * A value belongs to the column it was typed for. Carried into the next column it would be
+   * applied as a filter nobody asked for — a date sitting in a text box, ready for Add filter.
+   */
+  it('drops the value typed for the last column when the column changes', async () => {
+    const user = userEvent.setup()
     renderAt('/data/verification-requests')
     await screen.findByText('IST')
 
-    expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
+    await chooseFilterColumn(user, 'RequestedUtc')
+    await user.type(screen.getByLabelText('Filter value'), '2026-01-01')
+    await chooseFilterColumn(user, 'EntityKey')
+
+    expect(screen.getByLabelText('Filter value')).toHaveValue('')
+  })
+
+  it('takes the column list from the published columns, not the rows on screen', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/verification-requests')
+    await screen.findByText('IST')
+
+    expect(await filterColumnOptions(user))
       .toEqual(['EntityKey', 'Status', 'RequestedUtc', 'SourceValuesJson'])
   })
 
@@ -546,10 +599,10 @@ describe('DataBrowserPage', () => {
     renderAt('/data/flight-statuses')
     await screen.findByText('Scheduled')
 
-    expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
+    expect(await filterColumnOptions(user))
       .toEqual(['Code', 'Name', 'Description'])
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'Code')
+    await chooseFilterColumn(user, 'Code')
     const value = screen.getByLabelText('Filter value')
     expect(value.tagName).toBe('INPUT')
     expect((value as HTMLInputElement).type).toBe('text')
@@ -560,7 +613,7 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await chooseFilterColumn(user, 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '04')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
     // Contains "04": Traveler 004, 040-049 and 104.

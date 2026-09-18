@@ -7,6 +7,19 @@ import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test
 import { getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { DataBrowserPage } from './DataBrowserPage'
 
+/**
+ * Picks a filter column by the name the API knows it as, which is what these tests hold: the
+ * picker shows a friendlier label, so the raw name is typed into its search and matched there.
+ */
+async function chooseFilterColumn(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  await user.type(screen.getByRole('textbox', { name: 'Search columns' }), name)
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option')
+  if (shown.length !== 1) throw new Error(`"${name}" matched ${shown.length} columns, not one`)
+  await user.click(shown[0])
+}
+
+
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
 }))
@@ -372,7 +385,7 @@ describe('DataBrowserPage verify', () => {
     // The picker offers what the grid shows, so a bookkeeping column is reached the same way the
     // grid reaches it (#149). What this test is about is the value that goes out: the raw one.
     await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'VerificationSource')
+    await chooseFilterColumn(user, 'VerificationSource')
     await user.type(screen.getByLabelText('Filter value'), 'manual')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
