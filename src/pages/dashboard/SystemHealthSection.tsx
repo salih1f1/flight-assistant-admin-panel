@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAdminGetDataSources, useAdminGetHealth } from '@/api/generated/admin'
+import type { AdminDataSourceDto } from '@/api/generated/model'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiErrorMessage } from '@/lib/apiError'
 import { Status } from '../health/HealthPrimitives'
@@ -48,7 +49,10 @@ export function SystemHealthSection() {
  * would read as "all fine".
  */
 function SourceSummary({ sources, failed, loading }: {
-  sources: ReturnType<typeof useAdminGetDataSources>['data']
+  // The DTO the endpoint returns, not `ReturnType<typeof useAdminGetDataSources>['data']`: that hook
+  // is generic over TData and overloaded, so ReturnType resolves the last overload with TData left
+  // uninstantiated, and the prop silently lands as `{}` — which is what broke the build (#135).
+  sources: AdminDataSourceDto[] | undefined
   failed: boolean
   loading: boolean
 }) {
