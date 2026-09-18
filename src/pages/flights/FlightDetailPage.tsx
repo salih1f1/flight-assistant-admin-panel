@@ -11,7 +11,7 @@ import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
-import { isNextSyncOverdue, SYNC_MODE_TONES, syncResultMessage } from './syncOutcome'
+import { isFirstSyncQueued, isNextSyncOverdue, SYNC_MODE_TONES, syncResultMessage } from './syncOutcome'
 
 // GetAdminFlightDetailQueryHandler.MaxStatusHistory.
 const MAX_STATUS_HISTORY = 50
@@ -153,7 +153,9 @@ function SyncSection({ flight }: { flight: AdminFlightDetailDto }) {
   })
 
   const mode = flight.syncMode
-  const overdue = isNextSyncOverdue(flight.nextSyncDueUtc, Date.now())
+  const now = Date.now()
+  const overdue = isNextSyncOverdue(flight.nextSyncDueUtc, now)
+  const queued = isFirstSyncQueued(flight.lastSyncedUtc, flight.nextSyncDueUtc, now)
 
   return (
     <Section id="flight-sync" title="Sync">
@@ -179,6 +181,11 @@ function SyncSection({ flight }: { flight: AdminFlightDetailDto }) {
       {overdue && (
         <p className="text-sm text-amber-700">
           Next sync overdue — the background sync may not be running.
+        </p>
+      )}
+      {queued && (
+        <p className="text-sm text-gray-500">
+          First sync queued — it runs on the background sync's next pass.
         </p>
       )}
       {flight.scheduleMissingSinceUtc && (

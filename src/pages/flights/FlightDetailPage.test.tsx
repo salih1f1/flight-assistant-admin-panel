@@ -228,6 +228,38 @@ describe('FlightDetailPage', () => {
     expect(syncSection()).not.toHaveTextContent('overdue')
   })
 
+  // Tracking a flight plans it and makes it due at once (backend TrackFlightCommandHandler), so
+  // until the loop's next pass the page holds a blank last sync and a next sync just gone by —
+  // which reads as "nothing was ever attempted" when the opposite is true.
+  it('says the first sync is queued rather than showing two blanks', async () => {
+    vi.setSystemTime(new Date('2026-09-20T09:51:30Z'))
+    detail = { ...detail, lastSyncedUtc: null, nextSyncDueUtc: '2026-09-20T09:51:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).toHaveTextContent('First sync queued')
+  })
+
+  it('leaves the queued line off a flight that has synced before', async () => {
+    vi.setSystemTime(new Date('2026-09-20T09:51:30Z'))
+    detail = { ...detail, lastSyncedUtc: '2026-09-20T09:41:00Z', nextSyncDueUtc: '2026-09-20T09:51:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).not.toHaveTextContent('queued')
+  })
+
+  // Both lines explain the same silence, and they explain it differently. Only one can be shown.
+  it('drops the queued line for the overdue warning once the sync is late', async () => {
+    vi.setSystemTime(new Date('2026-09-20T10:00:00Z'))
+    detail = { ...detail, lastSyncedUtc: null, nextSyncDueUtc: '2026-09-20T09:51:00Z' }
+    renderAt(String(FLIGHT_ID))
+    await screen.findByRole('heading', { name: 'BA117 · 2026-09-20' })
+
+    expect(syncSection()).toHaveTextContent('Next sync overdue')
+    expect(syncSection()).not.toHaveTextContent('queued')
+  })
+
   it('warns when the flight has gone missing from the schedule', async () => {
     detail = { ...detail, scheduleMissingSinceUtc: '2026-09-18T06:00:00Z' }
     renderAt(String(FLIGHT_ID))
