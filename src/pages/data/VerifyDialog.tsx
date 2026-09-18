@@ -185,9 +185,16 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
 
         {/* Only the three tables an outside source can check get a choice at all; the other five
             keep the plain Manually list they've always had. Follows the Verified filter group's own
-            pressed-button pattern immediately below in the DOM. */}
+            pressed-button pattern immediately below in the DOM.
+
+            shrink-0 because this is the one child of the capped flex column below that may shrink:
+            flexbox refuses to squash a flex item below its content only while the item's overflow is
+            visible, and overflow-hidden here (it clips the pressed button's background to the rounded
+            border) gives that protection up. Without it this toggle alone absorbs everything the
+            max-h-[90vh] cap has to take back — 34px flat down to 7px at 40 selected rows, slicing the
+            labels in half — while the header, Verify all shown and the footer keep their height. */}
         {entityType && (
-          <div role="group" aria-label="Verify how" className="inline-flex w-fit overflow-hidden rounded-md border border-gray-200">
+          <div role="group" aria-label="Verify how" className="inline-flex w-fit shrink-0 overflow-hidden rounded-md border border-gray-200">
             {(['manual', 'sources'] as const).map(option => (
               <button
                 key={option}
