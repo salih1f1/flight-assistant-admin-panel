@@ -357,14 +357,20 @@ export function DataBrowserPage() {
   // A table with a list of its own (LIST_COLUMNS) hides everything outside it; every other table
   // hides only its bookkeeping columns. The IsVerified and all-masked rules apply either way.
   const listColumns = table ? lookup(LIST_COLUMNS, table) : undefined
-  const hiddenNames = columnNames.filter(name =>
-    (listColumns ? !listColumns.includes(name) : HIDDEN_COLUMNS.has(name))
+  const bookkeepingNames = columnNames.filter(name =>
+    HIDDEN_COLUMNS.has(name)
     || (name === 'IsVerified' && verifier !== undefined)
     || items.every(row => row[name] === MASKED))
+  const hiddenNames = listColumns
+    ? columnNames.filter(name => bookkeepingNames.includes(name) || !listColumns.includes(name))
+    : bookkeepingNames
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
-  // Independent of the "show all" toggle: the Manually dialog's default columns are the grid's
-  // normal view, not whatever the admin currently has expanded.
-  const defaultVisibleNames = columnNames.filter(name => !hiddenNames.includes(name))
+  // Independent of the "show all" toggle, and of the table's list: the Manually dialog's columns are
+  // the record, not the list. Verifying a lounge by hand is confirming every field it has, and a
+  // list showing three columns is a choice about scanning a page, not about what an admin is
+  // agreeing to — lounges have no CHECKED_COLUMNS entry to override this, so deriving it from
+  // hiddenNames would quietly narrow verifying to whatever LIST_COLUMNS happens to say.
+  const defaultVisibleNames = columnNames.filter(name => !bookkeepingNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
 
   // A row's verification state belongs beside the name that identifies it, not at the far end of a

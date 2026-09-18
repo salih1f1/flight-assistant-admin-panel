@@ -90,9 +90,14 @@ export function recordPath(table: string, row: Record<string, unknown>): string 
  * Flights: the route and the day it flies. SyncMode is on the list deliberately — syncRowTone.ts
  * says the row tint is never the only signal precisely because that column is on screen beside it,
  * and the colour legend above the grid is read against it.
+ *
+ * Lounges: which airport, which lounge, which terminal — the three things that tell one lounge at
+ * an airport from another. The location hint, the opening hours, the three flags and the amenities
+ * are what you read once you have found it, not what you find it by.
  */
 export const LIST_COLUMNS: Record<string, string[]> = {
   flights: ['AirlineId', 'FlightNumber', 'DepartureAirportId', 'ArrivalAirportId', 'ServiceDateUtc', 'SyncMode'],
+  lounges: ['AirportId', 'Name', 'Terminal'],
 }
 
 /** Tables the API can create and update: the noun for one record, and the page that creates one. */

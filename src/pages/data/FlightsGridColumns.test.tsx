@@ -29,7 +29,7 @@ const FLIGHT_COLUMNS = [
   column('CreatedUtc', 'Date'),
 ]
 
-const LOUNGE_COLUMNS = [column('Id', 'Number'), column('AirportId', 'Number'), column('Name', 'Text')]
+const PROVIDER_COLUMNS = [column('Id', 'Number'), column('Code', 'Text'), column('Name', 'Text')]
 
 const FLIGHT = {
   Id: 16, AirlineId: 242, FlightNumber: 'LS988', DepartureAirportId: 2276, ArrivalAirportId: 4593,
@@ -39,7 +39,7 @@ const FLIGHT = {
   CreatedUtc: '2026-09-01T00:00:00Z',
 }
 
-const LOUNGE = { Id: 3, AirportId: 2276, Name: 'No1 Lounge' }
+const PROVIDER = { Id: 3, Code: 'PP', Name: 'Priority Pass' }
 
 const JET2 = { id: 242, iata: 'LS', icao: 'EXS', name: 'Jet2', countryCode: 'GB' }
 const GATWICK = { id: 2276, iata: 'LGW', icao: 'EGKK', name: 'London Gatwick', city: 'London', countryCode: 'GB' }
@@ -53,11 +53,11 @@ function install() {
     if (req.url === '/admin/data/tables') {
       return [
         { slug: 'flights', displayName: 'Flights', rowCount: 1, columns: FLIGHT_COLUMNS },
-        { slug: 'lounges', displayName: 'Lounges', rowCount: 1, columns: LOUNGE_COLUMNS },
+        { slug: 'lounge-providers', displayName: 'Lounge Providers', rowCount: 1, columns: PROVIDER_COLUMNS },
       ]
     }
     if (req.url === '/admin/data/flights') return pagedResult([FLIGHT], req.params)
-    if (req.url === '/admin/data/lounges') return pagedResult([LOUNGE], req.params)
+    if (req.url === '/admin/data/lounge-providers') return pagedResult([PROVIDER], req.params)
     if (req.url === '/admin/airlines/242') return JET2
     if (req.url === '/admin/airports/2276') return GATWICK
     if (req.url === '/admin/airports/4593') return SCHIPHOL
@@ -98,11 +98,13 @@ describe('The flights grid, as a list', () => {
     expect(dataHeaders()).toEqual(['Airline', 'FlightNumber', 'From', 'To', 'ServiceDateUtc', 'SyncMode'])
   })
 
+  // Lounges used to be this control, until they got a list of their own; lounge providers are a
+  // table that still has none, so the fallback rule is what shapes their grid.
   it('leaves a table with no list of its own showing everything it has', async () => {
-    renderAt('/data/lounges')
+    renderAt('/data/lounge-providers')
     await screen.findByRole('table')
 
-    expect(dataHeaders()).toEqual(['Id', 'Airport', 'Name'])
+    expect(dataHeaders()).toEqual(['Id', 'Code', 'Name'])
   })
 
   it('offers only the columns worth filtering a flight by', async () => {
