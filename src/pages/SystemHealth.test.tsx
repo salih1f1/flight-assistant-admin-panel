@@ -69,10 +69,13 @@ const makeHealth = () => ({
 
 let health: ReturnType<typeof makeHealth>
 let sent: SentRequest[]
+/** The oldest Pending row, as GET /admin/data/verification-requests sends it. */
+let oldestPending: Record<string, unknown>[]
 
 function installApi(healthAnswer: () => unknown) {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/health') return healthAnswer()
+    if (req.method === 'GET' && req.url === '/admin/data/verification-requests') return pagedResult(oldestPending, req.params)
     if (req.method === 'GET' && req.url === '/admin/usage/aeroapi') throw httpError(503)
     // Dashboard also renders the needs-attention card; its response isn't paged like the rest.
     if (req.method === 'GET' && req.url === '/admin/verification-needs-attention') {
@@ -87,9 +90,14 @@ const healthSection = async () => (await screen.findByRole('heading', { name: 'S
 const panel = (section: HTMLElement, title: string) => within(section).getByRole('heading', { name: title }).closest('div')!
 const fact = (section: HTMLElement, label: string) => within(section).getByText(label, { selector: 'dt' }).nextElementSibling
 
+// Far enough past the minute boundary that the wait still floors to 3h 12m however long the
+// render takes, which a flat 3h 12m offset would not survive.
+const WAITED_3H_12M = () => new Date(Date.now() - (3 * 60 + 12) * 60_000 - 30_000).toISOString()
+
 describe('Dashboard system health', () => {
   beforeEach(() => {
     health = makeHealth()
+    oldestPending = [{ Id: 41, EntityType: 'Airport', EntityKey: 'IST', Status: 'Pending', RequestedUtc: WAITED_3H_12M() }]
     installApi(() => health)
   })
 
@@ -287,6 +295,75 @@ describe('Dashboard system health', () => {
     const verification = panel(section, 'Verification')
     expect(verification).toHaveTextContent('Disabled (Verification:Enabled is false)')
     expect(verification).not.toHaveTextContent('pending')
+  })
+
+  it('links the pending count to the queue, filtered to what is waiting', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(within(panel(section, 'Verification')).getByRole('link', { name: '5 pending' }))
+      .toHaveAttribute('href', '/data/verification-requests?filter=Status%3APending')
+  })
+
+  it('says how long the oldest waiting request has waited', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(await within(panel(section, 'Verification')).findByText('Oldest waiting 3h 12m')).toBeInTheDocument()
+  })
+
+  /** One row, oldest first: the count itself comes from the health report, so the queue read exists
+   *  only to date the oldest request — pulling a page of rows to find it would be a dashboard
+   *  downloading the whole queue. */
+  it('asks the queue for the oldest pending request only', async () => {
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+    await within(panel(section, 'Verification')).findByText('Oldest waiting 3h 12m')
+
+    expect(sent.filter(r => r.url === '/admin/data/verification-requests')).toEqual([{
+      method: 'GET',
+      url: '/admin/data/verification-requests',
+      params: { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: 'Status:Pending' },
+      data: undefined,
+      responseType: undefined,
+    }])
+  })
+
+  it('leaves a zero count unlinked and does not read the queue at all', async () => {
+    health.verification = { ...health.verification, pendingCount: 0 }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    const verification = panel(section, 'Verification')
+    expect(within(verification).getByText('0 pending')).toBeInTheDocument()
+    expect(within(verification).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(verification).queryByText('Oldest waiting', { exact: false })).not.toBeInTheDocument()
+    expect(sent.filter(r => r.url === '/admin/data/verification-requests')).toEqual([])
+  })
+
+  /** A count that couldn't be read is not a count of zero, but it is no reason to date a queue the
+   *  same failing database would not answer for either. */
+  it('reads no queue when the pending count itself could not be read', async () => {
+    health.verification = { ...health.verification, pendingCount: null }
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+    await within(panel(section, 'Verification')).findByText("Can't tell how many are pending")
+
+    expect(sent.filter(r => r.url === '/admin/data/verification-requests')).toEqual([])
+  })
+
+  it('says nothing about a wait when the queue read comes back empty', async () => {
+    oldestPending = []
+    renderWithProviders(<Dashboard />)
+    const section = await healthSection()
+    await within(section).findByText('Overall: Degraded')
+
+    expect(within(panel(section, 'Verification')).queryByText('Oldest waiting', { exact: false })).not.toBeInTheDocument()
   })
 
   it("says the pending count can't be told, rather than 0, when it's null", async () => {
