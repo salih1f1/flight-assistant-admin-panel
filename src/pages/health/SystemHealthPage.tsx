@@ -1,6 +1,7 @@
 import { useAdminGetHealth } from '@/api/generated/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiErrorMessage } from '@/lib/apiError'
+import { DataSourcesSection } from './DataSourcesSection'
 import { HealthReport } from './HealthReport'
 
 /**
@@ -33,6 +34,8 @@ export function SystemHealthPage() {
           )}
         </CardContent>
       </Card>
+
+      <DataSourcesSection />
     </div>
   )
 }
