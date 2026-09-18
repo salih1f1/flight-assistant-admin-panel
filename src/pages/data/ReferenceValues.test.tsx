@@ -13,6 +13,7 @@ vi.mock('@/api/client', () => ({
 const TABLES = [
   { slug: 'traveler-flights', displayName: 'Traveler Flights', rowCount: 2 },
   { slug: 'flights', displayName: 'Flights', rowCount: 1 },
+  { slug: 'lounges', displayName: 'Lounges', rowCount: 1 },
 ]
 
 type Row = Record<string, unknown>
@@ -33,6 +34,9 @@ const ROWS: Record<string, Row[]> = {
   // back midnight on New Year's Day, so the column is matched on the ISO shape, not on whether
   // Date.parse can make something of it — this row is what says so.
   flights: [{ Id: 16, FlightNumber: 'BA117', AirlineId: 7, DepartureAirportId: 11, RetiredAt: '2026' }],
+  // A raw table whose record page is the generic one, so the same reference can be read in both
+  // views: the grid shortens an airport to its code, the record page does not.
+  lounges: [{ Id: 1, AirportId: 11, Name: 'Galleries Club', Terminal: 'T3' }],
 }
 
 const TRAVELERS: Record<string, unknown> = {
@@ -160,7 +164,13 @@ describe('references in the raw grid', () => {
     renderAt('/data/flights')
 
     expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'LHR' })).toBeInTheDocument()
+  })
+
+  it('names an airport by its code, keeping the whole name a hover away', async () => {
+    renderAt('/data/flights')
+
+    expect(await screen.findByRole('link', { name: 'LHR' })).toHaveAttribute('title', 'London Heathrow (LHR)')
   })
 })
 
@@ -170,6 +180,12 @@ describe('references on the record page', () => {
 
     expect(await screen.findByRole('link', { name: 'Ann Example' })).toHaveAttribute('href', `/travelers/${ANN}`)
     expect(await screen.findByRole('link', { name: 'BA117 · 2026-09-20' })).toHaveAttribute('href', '/flights/16')
+  })
+
+  it('names an airport in full, since a page has the room a grid column does not', async () => {
+    renderAt('/data/lounges/1')
+
+    expect(await screen.findByRole('link', { name: 'London Heathrow (LHR)' })).toHaveAttribute('href', '/data/airports/11')
   })
 
   it('formats the timestamps the record carries', async () => {

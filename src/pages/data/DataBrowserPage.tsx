@@ -16,7 +16,7 @@ import {
 import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
-import { columnValue } from './columnValue'
+import { columnLabel, columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
@@ -84,6 +84,19 @@ const HIDDEN_COLUMNS = new Set([
   'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
+
+/**
+ * The columns a table's grid starts with, for tables wide enough that showing every column makes
+ * the list unreadable — a lounge carries a location hint, opening hours, three flags and an
+ * amenities list, all of which turn scanning a terminal's lounges into sideways scrolling.
+ *
+ * Everything left out joins the hidden set behind the same "Show N hidden columns" button the
+ * bookkeeping columns use, and the record page still shows the lot. A table with no entry here
+ * shows every column, which is what every table did before this existed.
+ */
+const DEFAULT_COLUMNS: Record<string, readonly string[]> = {
+  lounges: ['AirportId', 'Name', 'Terminal'],
+}
 
 type Row = Record<string, unknown>
 
@@ -328,14 +341,22 @@ export function DataBrowserPage() {
   // joins them on a verifiable table: the verification column below already says what it means, in
   // less room than a column of its own, so the raw true/false is kept for the toggle rather than
   // shown twice. A table with no verifier has no such column and keeps IsVerified in place.
-  const hiddenNames = columnNames.filter(name =>
+  const bookkeepingNames = columnNames.filter(name =>
     HIDDEN_COLUMNS.has(name)
     || (name === 'IsVerified' && verifier !== undefined)
     || items.every(row => row[name] === MASKED))
+  // Then the columns this table's own list leaves off, if it has one. Both sets sit behind the one
+  // toggle, so an admin has a single way to see everything rather than two kinds of hidden.
+  const listed = table ? lookup(DEFAULT_COLUMNS, table) : undefined
+  const hiddenNames = listed
+    ? columnNames.filter(name => bookkeepingNames.includes(name) || !listed.includes(name))
+    : bookkeepingNames
   const visibleNames = showAll ? columnNames : columnNames.filter(name => !hiddenNames.includes(name))
-  // Independent of the "show all" toggle: the Manually dialog's default columns are the grid's
-  // normal view, not whatever the admin currently has expanded.
-  const defaultVisibleNames = columnNames.filter(name => !hiddenNames.includes(name))
+  // Independent of both the "show all" toggle and the table's column list: verifying a lounge by
+  // hand is confirming the record, and the record is every field it has. A list that shows three
+  // columns is a choice about scanning a page, not about what an admin is agreeing to — so this
+  // drops only the bookkeeping columns, as it did before any table had a list.
+  const defaultVisibleNames = columnNames.filter(name => !bookkeepingNames.includes(name))
   const selected = tables.data?.find(t => t.slug === table)
 
   // A row's verification state belongs beside the name that identifies it, not at the far end of a
@@ -371,8 +392,9 @@ export function DataBrowserPage() {
     id: name,
     accessorFn: row => row[name],
     header: () => (
+      // The label is what the column now says; the sort is still the column the API knows.
       <button type="button" onClick={() => toggleSort(name)} className="font-medium hover:text-gray-900">
-        {name}
+        {columnLabel(name)}
         {sort === name ? ' ↑' : sort === `-${name}` ? ' ↓' : ''}
       </button>
     ),
@@ -615,7 +637,9 @@ function VerificationIcon({ table, row }: { table: string; row: Row }) {
 function Cell({ column, value, row }: { column: string; value: unknown; row: Row }) {
   if (value === MASKED) return <MaskedBadge />
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
-  const better = columnValue(column, value, row)
+  // compact: a grid column is narrower than a record page's field, so a reference with a short
+  // form gets it here and keeps the long one in its title.
+  const better = columnValue(column, value, row, { compact: true })
   if (better) return <span className="block max-w-xs truncate" title={better.title}>{better.node}</span>
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <span className="block max-w-xs truncate" title={text}>{text}</span>

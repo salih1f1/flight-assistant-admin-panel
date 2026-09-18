@@ -12,10 +12,10 @@ vi.mock('@/api/client', () => ({
 
 /**
  * Every table the API browses, with its columns in BrowsableTables order, and the columns the grid
- * starts without: bookkeeping columns, the ones SensitiveProperties masks on every row, and — on
- * the 8 verifiable tables — IsVerified, which the grid's verification column says in an icon's
- * width instead. Listed by hand, not derived from DataBrowserPage's list, so a change there has to
- * agree with this.
+ * starts without: bookkeeping columns, the ones SensitiveProperties masks on every row, IsVerified
+ * on the 8 verifiable tables (the grid's verification column says it in an icon's width instead),
+ * and anything left off by a table's own DEFAULT_COLUMNS list. Listed by hand, not derived from
+ * DataBrowserPage's lists, so a change there has to agree with this.
  */
 const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
   { slug: 'travelers', columns: ['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'], hidden: ['Email'] },
@@ -24,7 +24,9 @@ const TABLES: { slug: string; columns: string[]; hidden: string[] }[] = [
   { slug: 'traveler-flights', columns: ['Id', 'TravelerId', 'FlightId', 'Notify', 'CreatedUtc'], hidden: [] },
   { slug: 'flight-statuses', columns: ['Id', 'Code', 'Name', 'Description'], hidden: [] },
   { slug: 'flight-status-events', columns: ['Id', 'FlightId', 'StatusId', 'EffectiveAtUtc', 'RecordedAtUtc', 'Source', 'ExternalId', 'Gate', 'Terminal', 'BaggageClaim', 'Remarks', 'RawPayloadJson', 'DedupHash'], hidden: ['RawPayloadJson', 'DedupHash'] },
-  { slug: 'lounges', columns: ['Id', 'AirportId', 'Name', 'Terminal', 'LocationHint', 'Hours', 'IsAirside', 'IsDomesticOnly', 'IsInternationalOnly', 'Amenities', 'CreatedUtc', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
+  // The one table with a DEFAULT_COLUMNS list of its own: everything but the airport, the name and
+  // the terminal starts behind the toggle.
+  { slug: 'lounges', columns: ['Id', 'AirportId', 'Name', 'Terminal', 'LocationHint', 'Hours', 'IsAirside', 'IsDomesticOnly', 'IsInternationalOnly', 'Amenities', 'CreatedUtc', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['Id', 'LocationHint', 'Hours', 'IsAirside', 'IsDomesticOnly', 'IsInternationalOnly', 'Amenities', 'CreatedUtc', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
   { slug: 'lounge-providers', columns: ['Id', 'Code', 'Name', 'Kind', 'Description', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
   { slug: 'lounge-provider-links', columns: ['LoungeId', 'ProviderId', 'Role', 'Notes', 'MinAllianceTierCode'], hidden: ['Notes'] },
   { slug: 'loyalty-programs', columns: ['Id', 'Code', 'Name', 'KindId', 'AirlineId', 'AllianceCode', 'CreatedUtc', 'IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'], hidden: ['IsVerified', 'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue'] },
@@ -77,6 +79,15 @@ const dataHeaders = () => within(screen.getByRole('table'))
 
 const columnsWord = (n: number) => `column${n === 1 ? '' : 's'}`
 
+/**
+ * The columns headed by what they now say rather than by the API's name for them, because the
+ * grid resolves them to a record instead of an id. Written out here rather than imported from
+ * columnValue.tsx, so renaming a header has to be agreed to in both places.
+ */
+const LABELS: Record<string, string> = { AirlineId: 'Airline', AirportId: 'Airport', ProgramId: 'Program' }
+
+const headed = (columns: string[]) => columns.map(name => LABELS[name] ?? name)
+
 describe('Hidden columns toggle', () => {
   beforeEach(() => {
     empty = false
@@ -91,25 +102,25 @@ describe('Hidden columns toggle', () => {
     const router = renderAt(`/data/${slug}`)
     await screen.findByRole('table')
     const shown = columns.filter(name => !hidden.includes(name))
-    expect(await screen.findByRole('columnheader', { name: shown[0] })).toBeInTheDocument()
-    expect(dataHeaders()).toEqual(shown)
+    expect(await screen.findByRole('columnheader', { name: headed(shown)[0] })).toBeInTheDocument()
+    expect(dataHeaders()).toEqual(headed(shown))
 
     await user.click(screen.getByRole('button', { name: `Show ${hidden.length} hidden ${columnsWord(hidden.length)}` }))
 
-    expect(dataHeaders()).toEqual(columns)
+    expect(dataHeaders()).toEqual(headed(columns))
     expect(new URLSearchParams(router.state.location.search).get('columns')).toBe('all')
 
     await user.click(screen.getByRole('button', { name: `Hide ${hidden.length} ${columnsWord(hidden.length)}` }))
 
-    expect(dataHeaders()).toEqual(shown)
+    expect(dataHeaders()).toEqual(headed(shown))
     expect(new URLSearchParams(router.state.location.search).get('columns')).toBeNull()
   })
 
   it.each(withoutHidden)('$slug: has nothing hidden, so offers no toggle', async ({ slug, columns }) => {
     renderAt(`/data/${slug}`)
-    expect(await screen.findByRole('columnheader', { name: columns[0] })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: headed(columns)[0] })).toBeInTheDocument()
 
-    expect(dataHeaders()).toEqual(columns)
+    expect(dataHeaders()).toEqual(headed(columns))
     expect(screen.queryByRole('button', { name: /hidden column|^Hide \d+ column|All columns/ })).not.toBeInTheDocument()
   })
 
