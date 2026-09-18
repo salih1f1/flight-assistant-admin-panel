@@ -1,6 +1,8 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useAdminGetDataSources } from '@/api/generated/admin'
+import { getAdminGetDataSourcesQueryKey, useAdminGetDataSources, useAdminProbeDataSource } from '@/api/generated/admin'
 import type { AdminDataSourceDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
@@ -80,6 +82,7 @@ function SourcesTable({ sources }: { sources: AdminDataSourceDto[] }) {
           <TableHead>Last OK</TableHead>
           <TableHead>Last checked</TableHead>
           <TableHead>What is checked</TableHead>
+          <TableHead><span className="sr-only">Check now</span></TableHead>
         </TableRow>
       </TableHeader>
       {kinds.map(kind => (
@@ -87,7 +90,7 @@ function SourcesTable({ sources }: { sources: AdminDataSourceDto[] }) {
         // sighted reader sees it, rather than meeting a flat list of nine unrelated rows.
         <TableBody key={kind} aria-label={KIND_LABELS[kind] ?? kind}>
           <TableRow className="bg-gray-50 hover:bg-gray-50">
-            <TableCell colSpan={5} className="py-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+            <TableCell colSpan={6} className="py-1 text-xs font-medium uppercase tracking-wide text-gray-500">
               {KIND_LABELS[kind] ?? kind}
             </TableCell>
           </TableRow>
@@ -146,8 +149,73 @@ function SourceRow({ source }: { source: AdminDataSourceDto }) {
       </TableCell>
 
       <TableCell className="text-sm text-gray-700">{source.whatIsChecked}</TableCell>
+
+      <TableCell className="align-top text-right"><CheckNow source={source} /></TableCell>
     </TableRow>
   )
+}
+
+/**
+ * The one control on this page that starts outbound traffic, so it says so before it does: a source
+ * whose probe is not free carries a ProbeCostNote, and the button shows that note and waits for a
+ * second press rather than spending on the first.
+ */
+function CheckNow({ source }: { source: AdminDataSourceDto }) {
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState(false)
+  const key = source.key
+
+  const probe = useAdminProbeDataSource({
+    mutation: {
+      // The response is the refreshed row, but the list is what the table renders — refetching it
+      // keeps one source of truth instead of patching a single row into a cached list.
+      onSuccess: () => {
+        setConfirming(false)
+        void queryClient.invalidateQueries({ queryKey: getAdminGetDataSourcesQueryKey() })
+      },
+    },
+  })
+
+  // A source the catalog says cannot be checked gets no button at all, rather than one that
+  // explains itself only after being pressed.
+  if (!source.canProbe || !key) return null
+
+  const send = () => probe.mutate({ key })
+
+  return (
+    <div className="space-y-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={probe.isPending}
+        onClick={() => (source.probeCostNote && !confirming ? setConfirming(true) : send())}
+      >
+        {confirming ? 'Check anyway' : 'Check now'}
+      </Button>
+
+      {confirming && source.probeCostNote && (
+        <p className="max-w-xs text-left text-xs text-amber-600">{source.probeCostNote}</p>
+      )}
+
+      {Boolean(probe.error) && <ProbeError error={probe.error} />}
+    </div>
+  )
+}
+
+/**
+ * Why a check did not happen — never a claim about the source. A 429 is this panel's own rate limit
+ * (one probe per source per 30 seconds); reporting it as a fault would be a new version of the very
+ * bug this page exists to fix.
+ */
+function ProbeError({ error }: { error: unknown }) {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status
+  if (status === 429) {
+    return <p className="max-w-xs text-left text-xs text-gray-500">Checked too recently — try again in a moment.</p>
+  }
+
+  const { title } = apiErrorMessage(error)
+  return <p role="alert" className="max-w-xs text-left text-xs text-red-600">{`Couldn't check this source: ${title}`}</p>
 }
 
 /** A UTC minute, or an em dash — never "now" or a guess — for a moment that has not happened yet. */
