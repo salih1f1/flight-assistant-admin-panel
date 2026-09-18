@@ -65,8 +65,11 @@ let airportVerifyAnswer: (req: SentRequest) => unknown
 
 /** GET /admin/data/{table}: applies the one `column:value` filter the way the real API does. */
 function readTable<T extends Record<string, unknown>>(rows: T[], req: SentRequest) {
-  const filter = req.params?.filter as string | undefined
-  const out = filter ? rows.filter(row => String(row[filter.split(':')[0]]) === filter.slice(filter.indexOf(':') + 1)) : rows
+  // The API takes `filter` repeated, ANDed; a list of one is the single filter it always took.
+  const filters = (req.params?.filter ?? []) as string[]
+  const out = filters.reduce(
+    (kept, filter) => kept.filter(row => String(row[filter.split(':')[0]]) === filter.slice(filter.indexOf(':') + 1)),
+    rows)
   return pagedResult(out, req.params)
 }
 

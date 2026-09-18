@@ -66,8 +66,7 @@ function api(req: SentRequest) {
   const table = req.url.match(/^\/admin\/data\/([a-z-]+)$/)?.[1]
   if (req.method === 'GET' && table && ROWS[table]) {
     let rows = ROWS[table]()
-    const filter = req.params?.filter as string | undefined
-    if (filter) {
+    for (const filter of (req.params?.filter ?? []) as string[]) {
       const [column, ...rest] = filter.split(':')
       const value = rest.join(':')
       rows = rows.filter(r => typeof r[column] === 'string'
@@ -151,7 +150,7 @@ describe('RecordPage', () => {
     renderAt('/data/airlines/7')
 
     expect(await heading('Turkish Airlines')).toBeInTheDocument()
-    expect(dataRequests('airlines').map(r => r.params?.filter)).toEqual(['Id:7'])
+    expect(dataRequests('airlines').map(r => r.params?.filter)).toEqual([['Id:7']])
     expect(field('Iata')).toHaveTextContent('TK')
     expect(field('IsVerified')).toHaveTextContent('Yes')
     expect(field('VerifiedBy')).toHaveTextContent('admin-oid')
@@ -168,7 +167,7 @@ describe('RecordPage', () => {
     renderAt('/data/countries/DE')
 
     expect(await heading('Germany')).toBeInTheDocument()
-    expect(dataRequests('countries').map(r => r.params?.filter)).toEqual(['Code:DE'])
+    expect(dataRequests('countries').map(r => r.params?.filter)).toEqual([['Code:DE']])
     expect(screen.queryByText('Not a country')).not.toBeInTheDocument()
   })
 

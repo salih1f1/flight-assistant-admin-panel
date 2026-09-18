@@ -259,13 +259,15 @@ export function DataBrowserPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page')) || 1)
   const sort = searchParams.get('sort') ?? undefined
-  const filter = searchParams.get('filter') ?? undefined
+  const filters = searchParams.getAll('filter')
   const showAll = searchParams.get('columns') === 'all'
 
   const tables = useAdminListBrowsableTables()
   const rows = useAdminGetBrowsableTableData(
     table ?? '',
-    { Page: page, PageSize: PAGE_SIZE, sort, filter },
+    // No criteria means no `filter` parameter at all, rather than an empty one: an unfiltered
+    // request should look exactly as it always did, on the wire and in the query key.
+    { Page: page, PageSize: PAGE_SIZE, sort, filter: filters.length > 0 ? filters : undefined },
     {
       query: {
         enabled: !!table,
@@ -325,19 +327,25 @@ export function DataBrowserPage() {
   }
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
-  const updateView = useCallback((changes: { page?: number; sort?: string; filter?: string }) => {
+  const updateView = useCallback((changes: { page?: number; sort?: string; filters?: string[] }) => {
     const next = new URLSearchParams(searchParams)
     // page comes only from `changes`, so leaving it out resets to page 1.
-    const values = {
-      page: changes.page,
-      sort: searchParams.get('sort') ?? undefined,
-      filter: searchParams.get('filter') ?? undefined,
-      ...changes,
+    const sort = 'sort' in changes ? changes.sort : searchParams.get('sort') ?? undefined
+
+    if (changes.page === undefined || changes.page === 1) next.delete('page')
+    else next.set('page', String(changes.page))
+
+    if (sort === undefined || sort === '') next.delete('sort')
+    else next.set('sort', sort)
+
+    // One `filter` entry per criterion: the API takes the parameter repeated rather than as a
+    // separated list, so a value may contain any character at all — including the commas and
+    // colons that are ordinary in a name or a timestamp (#146).
+    if (changes.filters) {
+      next.delete('filter')
+      for (const filter of changes.filters) next.append('filter', filter)
     }
-    for (const [key, value] of Object.entries(values)) {
-      if (value === undefined || value === '' || (key === 'page' && value === 1)) next.delete(key)
-      else next.set(key, String(value))
-    }
+
     setSearchParams(next)
   }, [searchParams, setSearchParams])
 
@@ -372,7 +380,7 @@ export function DataBrowserPage() {
   // if one ever doesn't, the verify column below keeps the icon rather than the state vanishing.
   const iconColumn = verifier && visibleNames.includes(ICON_COLUMN) ? ICON_COLUMN : undefined
 
-  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filter ?? ''}`
+  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filters.join('|')}`
   const selection = useRowSelection(items, keyColumn, viewKey)
   const selectedRows = selection.selectedRows
 
@@ -521,9 +529,9 @@ export function DataBrowserPage() {
                   <button
                     key={option.label}
                     type="button"
-                    aria-pressed={filter === option.filter}
-                    onClick={() => updateView({ filter: option.filter })}
-                    className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                    aria-pressed={filters[0] === option.filter && filters.length <= 1}
+                    onClick={() => updateView({ filters: option.filter ? [option.filter] : [] })}
+                    className={cn('px-3 py-1.5 text-sm', filters[0] === option.filter && filters.length <= 1 ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
                   >
                     {option.label}
                   </button>
@@ -546,18 +554,18 @@ export function DataBrowserPage() {
           <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
           <FilterForm
             // Remount when the applied filter or table changes, so the inputs show what's applied.
-            key={`${table}|${filter ?? ''}`}
+            key={`${table}|${filters.join('|')}`}
             // Every column, hidden or not: filtering on one doesn't need it on screen.
             columns={columnNames}
-            filter={filter}
+            filter={filters[0]}
             // What GET /admin/data/tables published about this table's columns (#451), so the value
             // control can match the column's kind. Undefined against an API that publishes none.
             published={tables.data?.find(t => t.slug === table)?.columns}
             // The table's own list of what it is about, so the picker isn't longer than the useful
             // part of it. "Show all columns" means everything in both places, so it passes none.
             allowed={showAll ? undefined : listColumns}
-            onApply={value => updateView({ filter: value })}
-            onClear={() => updateView({ filter: undefined })}
+            onApply={value => updateView({ filters: [value] })}
+            onClear={() => updateView({ filters: [] })}
           />
           {remove.error && remove.variables?.table === table && (
             <ActionError

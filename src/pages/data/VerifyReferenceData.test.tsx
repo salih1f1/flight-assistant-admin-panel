@@ -54,13 +54,15 @@ function install() {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/data/tables') return TABLES
     if (req.method === 'GET' && req.url === '/admin/data/airlines') {
-      const filter = req.params?.filter as string | undefined
-      const rows = filter?.startsWith('IsVerified:') ? airlines.filter(a => String(a.IsVerified) === filter.slice('IsVerified:'.length)) : airlines
+      const filters = (req.params?.filter ?? []) as string[]
+      const verified = filters.find(f => f.startsWith('IsVerified:'))
+      const rows = verified ? airlines.filter(a => String(a.IsVerified) === verified.slice('IsVerified:'.length)) : airlines
       return pagedResult(rows, req.params)
     }
     if (req.method === 'GET' && req.url === '/admin/data/countries') {
-      const filter = req.params?.filter as string | undefined
-      const rows = filter?.startsWith('IsVerified:') ? countries.filter(c => String(c.IsVerified) === filter.slice('IsVerified:'.length)) : countries
+      const filters = (req.params?.filter ?? []) as string[]
+      const verified = filters.find(f => f.startsWith('IsVerified:'))
+      const rows = verified ? countries.filter(c => String(c.IsVerified) === verified.slice('IsVerified:'.length)) : countries
       return pagedResult(rows, req.params)
     }
     // flight-statuses is not verifiable, but carries an IsVerified-shaped field to prove the grid
@@ -318,6 +320,6 @@ describe('DataBrowserPage verify', () => {
     await user.type(screen.getByLabelText('Filter value'), 'manual')
     await user.click(screen.getByRole('button', { name: 'Apply filter' }))
 
-    await waitFor(() => expect(sent.some(r => r.params?.filter === 'VerificationSource:manual')).toBe(true))
+    await waitFor(() => expect(sent.some(r => String(r.params?.filter) === 'VerificationSource:manual')).toBe(true))
   })
 })

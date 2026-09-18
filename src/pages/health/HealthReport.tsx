@@ -272,7 +272,7 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
 function OldestWaiting() {
   const { data } = useAdminGetBrowsableTableData(
     'verification-requests',
-    { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: 'Status:Pending' },
+    { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: ['Status:Pending'] },
   )
   const oldest = (data?.items ?? [])[0] as Record<string, unknown> | undefined
   const waited = formatWaited(oldest?.RequestedUtc, Date.now())

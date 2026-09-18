@@ -324,7 +324,7 @@ describe('System health page', () => {
     expect(sent.filter(r => r.url === '/admin/data/verification-requests')).toEqual([{
       method: 'GET',
       url: '/admin/data/verification-requests',
-      params: { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: 'Status:Pending' },
+      params: { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: ['Status:Pending'] },
       data: undefined,
       responseType: undefined,
     }])

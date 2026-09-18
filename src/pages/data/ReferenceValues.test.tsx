@@ -52,8 +52,7 @@ function api(req: SentRequest) {
   const table = req.url.match(/^\/admin\/data\/([a-z-]+)$/)?.[1]
   if (table && ROWS[table]) {
     let rows = ROWS[table]
-    const filter = req.params?.filter as string | undefined
-    if (filter) {
+    for (const filter of (req.params?.filter ?? []) as string[]) {
       const [column, ...rest] = filter.split(':')
       const value = rest.join(':')
       rows = rows.filter(r => (typeof r[column] === 'string'

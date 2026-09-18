@@ -36,9 +36,11 @@ function install() {
     if (req.url === '/admin/data/tables') return TABLES
     const table = req.url.match(/^\/admin\/data\/([a-z-]+)$/)?.[1]
     if (table && ROWS[table]) {
-      const filter = req.params?.filter as string | undefined
-      const [column, ...rest] = filter?.split(':') ?? []
-      const rows = filter ? ROWS[table].filter(r => String(r[column]) === rest.join(':')) : ROWS[table]
+      const filters = (req.params?.filter ?? []) as string[]
+      const rows = filters.reduce((kept, filter) => {
+        const [column, ...rest] = filter.split(':')
+        return kept.filter(r => String(r[column]) === rest.join(':'))
+      }, ROWS[table])
       return pagedResult(rows, req.params)
     }
     if (req.url === '/admin/airlines/242') return JET2

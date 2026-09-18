@@ -101,8 +101,8 @@ function dataApi(req: SentRequest) {
     rows.sort((a, b) => String(a[column]).localeCompare(String(b[column])))
     if (sort.startsWith('-')) rows.reverse()
   }
-  const filter = req.params?.filter as string | undefined
-  if (filter) {
+  // `filter` arrives repeated and the criteria AND, exactly as the API applies them (#146).
+  for (const filter of (req.params?.filter ?? []) as string[]) {
     const [column, ...rest] = filter.split(':')
     const value = rest.join(':')
     if (column === 'Email') throw validationFailed('filter', "Column 'Email' is sensitive and cannot be filtered on.")
@@ -299,7 +299,7 @@ describe('DataBrowserPage', () => {
 
     expect(await screen.findByText('Page 1 of 1 · 1 total')).toBeInTheDocument()
     expect(screen.getByText('Traveler 042')).toBeInTheDocument()
-    expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'DisplayName:042' })
+    expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['DisplayName:042'] })
     expect(search(router).get('filter')).toBe('DisplayName:042')
 
     await user.click(screen.getByRole('button', { name: 'Clear filter' }))
@@ -325,7 +325,7 @@ describe('DataBrowserPage', () => {
     await user.selectOptions(value, 'Error')
     await user.click(screen.getByRole('button', { name: 'Apply filter' }))
 
-    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'Status:Error' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['Status:Error'] }))
   })
 
   it('filters a date column on or after a date by default, and exactly when asked', async () => {
@@ -340,11 +340,11 @@ describe('DataBrowserPage', () => {
 
     await user.type(screen.getByLabelText('Filter value'), '2026-09-18')
     await user.click(screen.getByRole('button', { name: 'Apply filter' }))
-    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'RequestedUtc:>=2026-09-18' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['RequestedUtc:>=2026-09-18'] }))
 
     await user.selectOptions(screen.getByLabelText('Date comparison'), 'exact')
     await user.click(screen.getByRole('button', { name: 'Apply filter' }))
-    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'RequestedUtc:2026-09-18' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['RequestedUtc:2026-09-18'] }))
   })
 
   /** The default has to hold on arrival, not only after the column picker is touched: a date column
@@ -377,7 +377,7 @@ describe('DataBrowserPage', () => {
     await user.selectOptions(value, 'false')
     await user.click(screen.getByRole('button', { name: 'Apply filter' }))
 
-    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'IsVerified:false' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['IsVerified:false'] }))
   })
 
   it('cannot filter a column the API says it cannot, and says so', async () => {
@@ -429,7 +429,7 @@ describe('DataBrowserPage', () => {
 
     await user.click(screen.getByRole('button', { name: /^DisplayName/ }))
 
-    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, sort: 'DisplayName', filter: 'DisplayName:04' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, sort: 'DisplayName', filter: ['DisplayName:04'] }))
     expect(search(router).get('filter')).toBe('DisplayName:04')
     expect(search(router).get('sort')).toBe('DisplayName')
   })
@@ -438,7 +438,7 @@ describe('DataBrowserPage', () => {
     renderAt('/data/travelers?page=2&sort=-DisplayName&filter=DisplayName:Traveler')
 
     expect(await screen.findByText('Traveler 070')).toBeInTheDocument()
-    expect(lastDataRequest()?.params).toEqual({ Page: 2, PageSize: 50, sort: '-DisplayName', filter: 'DisplayName:Traveler' })
+    expect(lastDataRequest()?.params).toEqual({ Page: 2, PageSize: 50, sort: '-DisplayName', filter: ['DisplayName:Traveler'] })
   })
 
   it("shows the API's reason when it rejects a sort", async () => {
