@@ -176,9 +176,10 @@ describe('DataBrowserPage row actions', () => {
 
     await user.click(within(await rowOf('FA002')).getByRole('button', { name: 'Sync status' }))
 
-    await waitFor(() => expect(screen.getByText('FA002').closest('tr')).toHaveTextContent('2026-09-13T10:05:00Z'))
+    // Shown as the grid shows every instant, to the minute in UTC; the raw value is in the title.
+    await waitFor(() => expect(screen.getByText('FA002').closest('tr')).toHaveTextContent('2026-09-13 10:05 UTC'))
     expect(writes()).toEqual([expect.objectContaining({ method: 'POST', url: '/admin/flights/2/sync' })])
-    expect(screen.getByText('FA001').closest('tr')).not.toHaveTextContent('2026-09-13T10:05:00Z')
+    expect(screen.getByText('FA001').closest('tr')).not.toHaveTextContent('2026-09-13 10:05 UTC')
   })
 
   it("shows the API's reason when a sync fails", async () => {

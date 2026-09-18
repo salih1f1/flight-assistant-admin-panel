@@ -1,0 +1,59 @@
+import type { ReactNode } from 'react'
+import {
+  AirlineName, AirportName, FlightName, LoyaltyProgramName, LoyaltyTierName, TravelerName,
+} from '@/components/ReferenceNames'
+import { formatUtcMinute } from '@/lib/formatUtc'
+import { lookup } from './records'
+
+/*
+ * What a raw table's value means, for the two views that show raw rows: the grid and the record
+ * page. Rows arrive as the API stores them — a column holding another record's key is a bare id,
+ * and a timestamp is an ISO string down to the microsecond — so a row of a join table like
+ * traveler-flights is a wall of guids that says nothing about the traveler or the flight it joins.
+ *
+ * Both callers keep their own handling of null, masked and long values; this only answers
+ * "is there a better way to show this column?", and returns undefined when there isn't.
+ */
+
+type Row = Record<string, unknown>
+
+const asId = (value: unknown) => (typeof value === 'number' ? value : null)
+
+/**
+ * Columns holding another record's key, by the name every table gives them, shown as that
+ * record's name and linked to it. A table's own key column is deliberately absent: `Id` is the
+ * value an admin copies, filters on and pastes into a bug report, so it stays as it is.
+ */
+const REFERENCES: Record<string, (value: unknown, row: Row) => ReactNode> = {
+  AirlineId: value => <AirlineName id={asId(value)} />,
+  AirportId: value => <AirportName id={asId(value)} />,
+  DepartureAirportId: value => <AirportName id={asId(value)} />,
+  ArrivalAirportId: value => <AirportName id={asId(value)} />,
+  ProgramId: value => <LoyaltyProgramName id={asId(value)} />,
+  // The only place the API names a tier is inside its program, so this one reads its row's sibling
+  // column rather than its own value alone.
+  TierId: (value, row) => <LoyaltyTierName programId={asId(row.ProgramId)} tierId={asId(value)} />,
+  TravelerId: value => <TravelerName id={typeof value === 'string' ? value : null} />,
+  FlightId: value => <FlightName id={asId(value)} />,
+}
+
+// An ISO instant, which is the only thing these columns ever hold. Checked rather than handed to
+// Date.parse, which reads '16' as a year and would turn a stray number into a timestamp.
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
+
+/** Whether a column holds an instant: the API names every one of them …Utc or …At. */
+const isTimestampColumn = (column: string) => column.endsWith('Utc') || column.endsWith('At')
+
+/**
+ * How one column of a raw row is worth showing, or undefined when the raw value already is:
+ * a referenced record by name, an instant to the minute in UTC. The full value rides along as
+ * `title`, so a timestamp's seconds are a hover away and nothing the API sent is lost.
+ */
+export function columnValue(column: string, value: unknown, row: Row): { node: ReactNode; title?: string } | undefined {
+  const reference = lookup(REFERENCES, column)
+  if (reference) return { node: reference(value, row) }
+  if (isTimestampColumn(column) && typeof value === 'string' && ISO_INSTANT.test(value)) {
+    return { node: `${formatUtcMinute(value)} UTC`, title: value }
+  }
+  return undefined
+}

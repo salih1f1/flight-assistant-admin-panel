@@ -1,18 +1,19 @@
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { AirlineName, AirportName, LoyaltyProgramName } from '@/components/ReferenceNames'
 import { RevealableValue } from '@/components/RevealableValue'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
+import { shortId } from '@/lib/travelerId'
 import { cn } from '@/lib/utils'
 import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
 import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
+import { columnValue } from './columnValue'
 import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, RELATED_VIEWS, VERIFIERS } from './records'
 import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
 import { VerificationPanel } from './VerificationPanel'
@@ -23,15 +24,6 @@ const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void
   airports: AirportForm,
   lounges: LoungeForm,
   'loyalty-programs': LoyaltyProgramForm,
-}
-
-/** Columns holding another record's id, shown by that record's name. */
-const REFERENCES: Record<string, (id: number) => ReactNode> = {
-  AirlineId: id => <AirlineName id={id} />,
-  AirportId: id => <AirportName id={id} />,
-  DepartureAirportId: id => <AirportName id={id} />,
-  ArrivalAirportId: id => <AirportName id={id} />,
-  ProgramId: id => <LoyaltyProgramName id={id} />,
 }
 
 /**
@@ -107,7 +99,7 @@ function Record({ table, id }: { table: string; id: string }) {
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${id}`)}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{String(row.Name ?? row.DisplayName ?? row.Code ?? `${displayName} #${shortId(id)}`)}</h1>
               <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -165,7 +157,7 @@ function Record({ table, id }: { table: string; id: string }) {
                     <div key={column} className="min-w-0">
                       <dt className="text-xs font-medium text-gray-500">{column}</dt>
                       <dd className="mt-1 break-words text-gray-900">
-                        <FieldValue table={table} id={id} column={column} value={value} />
+                        <FieldValue table={table} id={id} column={column} value={value} row={row} />
                       </dd>
                     </div>
                   ))}
@@ -179,11 +171,14 @@ function Record({ table, id }: { table: string; id: string }) {
   )
 }
 
-function FieldValue({ table, id, column, value }: { table: string; id: string; column: string; value: unknown }) {
+function FieldValue({ table, id, column, value, row }: {
+  table: string; id: string; column: string; value: unknown; row: Record<string, unknown>
+}) {
   if (value === MASKED) return <RevealableValue key={`${table}|${id}|${column}`} table={table} id={id} column={column} />
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
-  const reference = lookup(REFERENCES, column)
-  if (reference && typeof value === 'number') return <>{reference(value)}</>
+  // A referenced record by name, or an instant to the minute: the same rendering the grid uses.
+  const better = columnValue(column, value, row)
+  if (better) return <span title={better.title}>{better.node}</span>
   if (typeof value === 'boolean') return <>{value ? 'Yes' : 'No'}</>
   if (typeof value === 'object') return <code className="text-xs">{JSON.stringify(value)}</code>
   return <>{String(value)}</>
