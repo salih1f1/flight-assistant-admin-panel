@@ -109,8 +109,18 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
 /**
  * Bookkeeping columns, hidden until shown: who and where a record came from, and raw
  * payloads. The record page always shows them.
+ *
+ * `Id` is one of them (#153). A row is identified in a list by its code and its name; the id is
+ * how the API stores it, and on a guid-keyed table it is the widest column on screen saying the
+ * least. Every table given a list of its own reached that conclusion separately — flights (#132)
+ * and lounges (#136) both leave it out of LIST_COLUMNS — so it is kept once, here, for the tables
+ * that have no list. Nothing reads it off the grid: the checkbox, Verify and the row's link take
+ * it from the row data via recordKey, revealing a masked value reads row.original.Id, and the
+ * Verify dialog prepends the key column itself. Foreign keys (AirportId, TravelerId) are not
+ * bookkeeping — they name a relationship, and render as the record they point at (#129, #132).
  */
 const HIDDEN_COLUMNS = new Set([
+  'Id',
   'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])

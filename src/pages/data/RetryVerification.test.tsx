@@ -66,6 +66,11 @@ function renderAt(entry: string) {
   return router
 }
 
+/**
+ * A row, found by the entity it checked: the request's own Id is no longer on the grid (#153),
+ * and EntityType is what tells these three rows apart on screen. The id itself is still asserted
+ * where it matters — the retry URL and the failure message below both carry it.
+ */
 const rowOf = async (text: string) => (await screen.findByText(text)).closest('tr')!
 const writes = () => sent.filter(r => r.method !== 'GET')
 
@@ -79,29 +84,29 @@ describe('Retry on the verification-requests grid', () => {
   it('offers Retry only on the row whose Status is Error', async () => {
     renderAt('/data/verification-requests')
 
-    expect(within(await rowOf('101')).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
-    expect(within(await rowOf('102')).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
-    expect(within(await rowOf('103')).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(within(await rowOf('Airport')).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(within(await rowOf('Airline')).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(within(await rowOf('Country')).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
   })
 
   it("sends the request's own id, not the entity key, and shows queued/skipped after refetching", async () => {
     const user = userEvent.setup()
     renderAt('/data/verification-requests')
 
-    await user.click(within(await rowOf('101')).getByRole('button', { name: 'Retry' }))
+    await user.click(within(await rowOf('Airport')).getByRole('button', { name: 'Retry' }))
 
     expect(writes()).toEqual([expect.objectContaining({ method: 'POST', url: '/admin/verification-requests/101/retry' })])
     expect(await screen.findByRole('status')).toHaveTextContent('Queued 2 · skipped 1')
     // The grid refetched: row 101 no longer shows Error, and its Retry button is gone.
-    await waitFor(() => expect(within(screen.getByText('101').closest('tr')!).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument())
-    expect(screen.getByText('101').closest('tr')).toHaveTextContent('Pending')
+    await waitFor(() => expect(within(screen.getByText('Airport').closest('tr')!).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument())
+    expect(screen.getByText('Airport').closest('tr')).toHaveTextContent('Pending')
   })
 
   it('the success banner does not survive leaving this table and coming back', async () => {
     const user = userEvent.setup()
     const router = renderAt('/data/verification-requests')
 
-    await user.click(within(await rowOf('101')).getByRole('button', { name: 'Retry' }))
+    await user.click(within(await rowOf('Airport')).getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Queued 2 · skipped 1')
     const postsSoFar = writes().length
 
@@ -113,7 +118,7 @@ describe('Retry on the verification-requests grid', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
     await act(() => router.navigate('/data/verification-requests'))
-    await screen.findByText('101')
+    await screen.findByText('Airport')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     // Switching tables never re-sends the retry itself; only a click does.
     expect(writes()).toHaveLength(postsSoFar)
@@ -124,11 +129,11 @@ describe('Retry on the verification-requests grid', () => {
     failWith = () => { throw httpError(409, { title: 'The entity already has an open verification check.', status: 409 }) }
     renderAt('/data/verification-requests')
 
-    await user.click(within(await rowOf('101')).getByRole('button', { name: 'Retry' }))
+    await user.click(within(await rowOf('Airport')).getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not retry request 101: The entity already has an open verification check.')
     // A failed retry doesn't invalidate the grid, so the row is unchanged and still offers Retry.
-    expect(within(await rowOf('101')).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(within(await rowOf('Airport')).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('another table gets no Retry action at all', async () => {
