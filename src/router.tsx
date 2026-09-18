@@ -12,6 +12,7 @@ import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
 import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
 import { RecordPage, RedirectToRecord } from '@/pages/data/RecordPage'
+import { SystemHealthPage } from './pages/health/SystemHealthPage'
 import { ImportPage } from '@/pages/import/ImportPage'
 import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 import { TestsPage } from '@/pages/tests/TestsPage'
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
           { path: '/data', element: <Navigate to="/" replace /> },
           { path: '/data/:table', element: <DataBrowserPage /> },
           { path: '/data/:table/:id', element: <RecordPage /> },
+          { path: '/health', element: <SystemHealthPage /> },
           { path: '/import', element: <ImportPage /> },
           { path: '/audit', element: <AuditLogPage /> },
           { path: '/tests', element: <TestsPage /> },

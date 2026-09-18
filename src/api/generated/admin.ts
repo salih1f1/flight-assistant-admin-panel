@@ -26,6 +26,7 @@ import type {
 import type {
   AcceptVerificationSourceRequest,
   AdminAuditDtoPagedResult,
+  AdminDataSourceDto,
   AdminFlightDetailDto,
   AdminFlightDto,
   AdminFlightDtoPagedResult,
@@ -3169,6 +3170,167 @@ export function useAdminGetHealth<TData = Awaited<ReturnType<typeof adminGetHeal
 
 
 
+
+/**
+ * One row per catalogued dependency: its current status, when it was last seen working, when it was last observed at all, a sentence saying what that status is based on, and where to check it yourself. Reads a small table and runs no checks — unlike GET /admin/health, which runs every registered health check live. A source that has never been observed is reported as Unknown, never as healthy.
+ * @summary Every outside data source and its observed status
+ */
+export const adminGetDataSources = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminDataSourceDto[]>(
+      {url: `/admin/health/sources`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetDataSourcesQueryKey = () => {
+    return [
+    `/admin/health/sources`
+    ] as const;
+    }
+
+
+export const getAdminGetDataSourcesQueryOptions = <TData = Awaited<ReturnType<typeof adminGetDataSources>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetDataSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetDataSources>>> = ({ signal }) => adminGetDataSources(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetDataSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetDataSources>>>
+export type AdminGetDataSourcesQueryError = ErrorType<unknown>
+
+
+export function useAdminGetDataSources<TData = Awaited<ReturnType<typeof adminGetDataSources>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetDataSources>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetDataSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetDataSources<TData = Awaited<ReturnType<typeof adminGetDataSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetDataSources>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetDataSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetDataSources<TData = Awaited<ReturnType<typeof adminGetDataSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Every outside data source and its observed status
+ */
+
+export function useAdminGetDataSources<TData = Awaited<ReturnType<typeof adminGetDataSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetDataSources>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetDataSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Runs this source's check immediately and returns its refreshed row. Verifies credentials where that is free and reachability where it is not — each source's 'whatIsChecked' says which. Rate limited to one probe per source every 30 seconds, and audited. 400 when the source has no probe, 404 when the key is not catalogued.
+ * @summary Check one data source now
+ */
+export const adminProbeDataSource = (
+    key: string,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminDataSourceDto>(
+      {url: `/admin/health/sources/${key}/probe`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminProbeDataSourceMutationKey = () => ['adminProbeDataSource'] as const;
+
+export const getAdminProbeDataSourceMutationOptions = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminProbeDataSource>>, TError,AdminProbeDataSourceMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminProbeDataSource>>, TError,AdminProbeDataSourceMutationVariables, TContext> => {
+
+const mutationKey = getAdminProbeDataSourceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminProbeDataSource>>, AdminProbeDataSourceMutationVariables> = (props) => {
+          const {key} = props ?? {};
+
+          return  adminProbeDataSource(key,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminProbeDataSourceMutationResult = NonNullable<Awaited<ReturnType<typeof adminProbeDataSource>>>
+
+    export type AdminProbeDataSourceMutationError = ErrorType<ProblemDetails>
+    export type AdminProbeDataSourceMutationVariables = {key: string}
+
+    /**
+ * @summary Check one data source now
+ */
+export const useAdminProbeDataSource = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminProbeDataSource>>, TError,AdminProbeDataSourceMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminProbeDataSource>>,
+        TError,
+        AdminProbeDataSourceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminProbeDataSourceMutationOptions(options), queryClient);
+    }
 
 /**
  * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.
