@@ -43,14 +43,13 @@ let addAnswer: (req: SentRequest) => unknown
 
 /** What the API does with a posted membership by default: stores it, as the detail would then show it. */
 const defaultAdd = (req: SentRequest) => {
-  const body = req.data as { programId: number; accountNumber: string; tierId?: number | null; tierExpiryDate?: string | null; pointsExpiryDate?: string | null }
+  const body = req.data as { programId: number; accountNumber: string; tierId?: number | null; tierExpiryDate?: string | null }
   detail.loyaltyMemberships = [...detail.loyaltyMemberships, {
     id: 'c4e9a7b2-1d3f-4b5a-8c6e-9f0a2b4d6e03',
     programId: body.programId,
     accountNumber: body.accountNumber,
     tierId: body.tierId ?? null,
     tierExpiryDate: body.tierExpiryDate ?? null,
-    pointsExpiryDate: body.pointsExpiryDate ?? null,
   }]
   return { id: 'c4e9a7b2-1d3f-4b5a-8c6e-9f0a2b4d6e03' }
 }
@@ -195,13 +194,15 @@ describe('Adding a loyalty membership to a traveler', () => {
     expect(sent.filter(r => r.method === 'GET' && r.url === `/admin/travelers/${TRAVELER_ID}/detail`).length).toBeGreaterThan(1)
   })
 
-  it('sends the expiry dates when they are filled in, and leaves them out when they are not', async () => {
+  it('sends the tier expiry date when it is filled in, and leaves it out when it is not', async () => {
     const user = userEvent.setup()
     renderPage()
     const dialog = await openDialog(user)
 
     await user.selectOptions(within(dialog).getByRole('combobox', { name: /Program/ }), '3')
     await user.type(within(dialog).getByRole('textbox', { name: /Account number/ }), 'BA-999')
+    // Points expiry went with the column it was written to (#154); tier expiry is the only date left.
+    expect(within(dialog).queryByLabelText(/Points expiry/)).not.toBeInTheDocument()
     await user.type(within(dialog).getByLabelText(/Tier expiry/), '2027-03-31')
     await user.click(within(dialog).getByRole('button', { name: 'Add membership' }))
 

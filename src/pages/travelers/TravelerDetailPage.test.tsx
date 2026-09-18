@@ -26,7 +26,7 @@ const makeDetail = () => ({
   ],
   trackedFlightsTruncated: false,
   loyaltyMemberships: [
-    { id: MEMBERSHIP_ID, programId: 3, accountNumber: '<redacted>', tierId: 2 as number | null, tierExpiryDate: '2027-03-31' as string | null, pointsExpiryDate: null as string | null },
+    { id: MEMBERSHIP_ID, programId: 3, accountNumber: '<redacted>', tierId: 2 as number | null, tierExpiryDate: '2027-03-31' as string | null },
   ],
 })
 
@@ -148,7 +148,7 @@ describe('TravelerDetailPage', () => {
     const memberships = region('Loyalty memberships')
     const row = within(memberships).getAllByRole('row')[1]
     // The program and tier by name, not their ids.
-    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['Executive Club (EXEC_CLUB)', 'Masked', 'Gold', '2027-03-31', '—']))
+    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['Executive Club (EXEC_CLUB)', 'Masked', 'Gold', '2027-03-31']))
     expect(within(row).getByRole('link', { name: 'Executive Club (EXEC_CLUB)' })).toHaveAttribute('href', '/data/loyalty-programs/3')
 
     await reveal(user, memberships, 'AccountNumber')
@@ -175,7 +175,7 @@ describe('TravelerDetailPage', () => {
     await screen.findByRole('heading', { name: 'Ann Example' })
 
     const row = within(region('Loyalty memberships')).getAllByRole('row')[1]
-    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['#9, not found', 'Masked', '#5, not found', '2027-03-31', '—']))
+    await waitFor(() => expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(['#9, not found', 'Masked', '#5, not found', '2027-03-31']))
   })
 
   it('says when tracked flights were cut off, and links to all of them in the Data page', async () => {
