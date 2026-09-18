@@ -33,7 +33,6 @@ export const NAV_GROUPS: NavGroup[] = [
       table('Flights', 'flights', '/flights'),
       { label: 'Track a flight', to: '/flights/track' },
       table('Traveler Flights', 'traveler-flights'),
-      table('Flight Statuses', 'flight-statuses'),
       table('Flight Status Events', 'flight-status-events'),
     ],
   },
@@ -63,6 +62,8 @@ export const NAV_GROUPS: NavGroup[] = [
       table('Airports', 'airports', '/airports'),
       table('Alliances', 'alliances'),
       table('Countries', 'countries'),
+      // The lookup the status events point at (SCH/Scheduled and friends), not per-flight data.
+      table('Flight Statuses', 'flight-statuses'),
     ],
   },
   {

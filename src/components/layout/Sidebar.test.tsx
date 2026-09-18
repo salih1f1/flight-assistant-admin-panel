@@ -22,10 +22,10 @@ const current = () => within(menu()).getAllByRole('link').filter(l => l.getAttri
 // Audit log page covers. There is no separate Data entry, and a list opens the raw grid.
 const GROUPS: [string, [string, string][]][] = [
   ['Travelers', [['Travelers', '/data/travelers'], ['Device Tokens', '/data/device-tokens'], ['Loyalty Memberships', '/data/traveler-loyalty-memberships']]],
-  ['Flights', [['Flights', '/data/flights'], ['Track a flight', '/flights/track'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Statuses', '/data/flight-statuses'], ['Flight Status Events', '/data/flight-status-events']]],
+  ['Flights', [['Flights', '/data/flights'], ['Track a flight', '/flights/track'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Status Events', '/data/flight-status-events']]],
   ['Lounges', [['Lounges', '/data/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
   ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
-  ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries']]],
+  ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries'], ['Flight Statuses', '/data/flight-statuses']]],
   ['System', [['System health', '/health'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Data Source Status', '/data/data-source-status'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
 ]
 
@@ -49,7 +49,7 @@ describe('Sidebar', () => {
     renderAt('/data/flight-statuses')
 
     for (const [group] of GROUPS) {
-      expect(groupButton(group)).toHaveAttribute('aria-expanded', String(group === 'Flights'))
+      expect(groupButton(group)).toHaveAttribute('aria-expanded', String(group === 'Reference data'))
     }
     expect(within(menu()).queryByRole('list', { name: 'Travelers' })).not.toBeInTheDocument()
     expect(current()).toEqual(['Flight Statuses'])
