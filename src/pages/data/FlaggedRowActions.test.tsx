@@ -72,12 +72,12 @@ describe('a row that needs attention is decided on its record page, not in the g
     install()
   })
 
-  it('1. offers Review, not Verify, on the flagged row', async () => {
+  it('1. links the flagged row to its record page instead of offering Verify', async () => {
     renderGrid()
     const row = within(await rowOf('Bravo Airport'))
 
     expect(row.queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
-    expect(row.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/data/airports/2')
+    expect(row.getByRole('link', { name: 'Needs attention' })).toHaveAttribute('href', '/data/airports/2')
   })
 
   it('2. still offers Verify on the rows that are not flagged', async () => {
@@ -85,7 +85,7 @@ describe('a row that needs attention is decided on its record page, not in the g
     const row = within(await rowOf('Alpha Airport'))
 
     expect(row.getByRole('button', { name: 'Verify' })).toBeInTheDocument()
-    expect(row.queryByRole('link', { name: 'Review' })).not.toBeInTheDocument()
+    expect(row.queryByRole('link', { name: 'Needs attention' })).not.toBeInTheDocument()
   })
 
   it('3. disables the flagged row\'s checkbox, so it cannot be selected', async () => {
@@ -120,9 +120,15 @@ describe('a row that needs attention is decided on its record page, not in the g
     await user.click(screen.getByRole('checkbox', { name: 'Select row 3' }))
     expect(screen.getByRole('button', { name: 'Verify selected (2)' })).toBeInTheDocument()
 
-    // A check lands on Charlie while it sits selected; verifying Alpha refetches the table.
+    // A check lands on Charlie while it sits selected; verifying Alpha refetches the table. The row
+    // button opens the dialog on Alpha alone, so the verify itself happens in there — the selection
+    // behind it is untouched by that, which is the point of the assertions below.
     airports = airports.map(a => (a.Id === 3 ? { ...a, VerificationIssue: 'City differs from ourairports' } : a))
     await user.click(within(await rowOf('Alpha Airport')).getByRole('button', { name: 'Verify' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Verify' }))
+    // Closed before asserting: a modal dialog marks the grid behind it aria-hidden, so the toolbar
+    // button is not reachable by role while it is open.
+    await user.keyboard('{Escape}')
 
     // Alpha stays selected (and verified); Charlie drops out because it is now flagged.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Verify selected (1)' })).toBeInTheDocument())

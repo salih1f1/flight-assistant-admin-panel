@@ -132,13 +132,16 @@ function renderAt(entry: string, queryClient: QueryClient = new QueryClient({ de
 const rowOf = async (name: string) => (await screen.findByText(name)).closest('tr')!
 const verifies = () => sent.filter(r => r.method === 'PATCH')
 
-/** The IsVerified column's position among the grid's headers, so a cell can be picked out by index. */
-const isVerifiedColumnIndex = () => within(screen.getByRole('table'))
-  .getAllByRole('columnheader')
-  .findIndex(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim() === 'IsVerified')
-
-/** The IsVerified cell of one row, not the whole row: scopes a badge assertion to the column it renders in. */
-const isVerifiedCell = async (rowName: string) => within(await rowOf(rowName)).getAllByRole('cell')[isVerifiedColumnIndex()]
+/**
+ * Verifying one row, the way the grid now does it: its Verify button opens the dialog on that row
+ * alone, and the dialog's own Verify sends the PATCH. Escape closes it before any assertion about
+ * the grid — a modal dialog marks everything behind it aria-hidden, so the rows are not reachable
+ * by role (or unambiguous by text) while it is open.
+ */
+async function verifyFromGrid(user: ReturnType<typeof userEvent.setup>, rowName: string) {
+  await user.click(within(await rowOf(rowName)).getByRole('button', { name: 'Verify' }))
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Verify' }))
+}
 
 describe('DataBrowserPage verify', () => {
   beforeEach(() => {
@@ -149,10 +152,12 @@ describe('DataBrowserPage verify', () => {
     install()
   })
 
-  it("offers Verify on unverified rows and Unverify on verified ones", async () => {
+  // Unverifying belongs to the record page (VerificationPanel), which shows what the verification
+  // was before undoing it. The grid offers no way to do it — that is what this asserts.
+  it('offers Verify on unverified rows and no way to undo one that is verified', async () => {
     renderAt('/data/airlines?columns=all')
 
-    expect(within(await rowOf('Alpha Air')).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    expect(within(await rowOf('Alpha Air')).queryByRole('button', { name: /^(Verify|Unverify)$/ })).not.toBeInTheDocument()
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
     expect(screen.queryByText(/Verifying isn't available/)).not.toBeInTheDocument()
   })
@@ -161,11 +166,12 @@ describe('DataBrowserPage verify', () => {
     const user = userEvent.setup()
     renderAt('/data/airlines?columns=all')
 
-    await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
+    await verifyFromGrid(user, 'Beta Air')
+    await user.keyboard('{Escape}')
 
-    expect(await within(await rowOf('Beta Air')).findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(verifies()).toEqual([{ method: 'PATCH', url: '/admin/airlines/2/verify', params: undefined, data: { isVerified: true } }])
-    expect(await rowOf('Beta Air')).toHaveTextContent('admin-oid')
+    await waitFor(async () => expect(await rowOf('Beta Air')).toHaveTextContent('admin-oid'))
+    expect(within(await rowOf('Beta Air')).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
   })
 
   it("verifying a row from the grid also invalidates the dashboard card's needs-attention counts", async () => {
@@ -178,21 +184,9 @@ describe('DataBrowserPage verify', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     renderAt('/data/airlines?columns=all', queryClient)
 
-    await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
-    await within(await rowOf('Beta Air')).findByRole('button', { name: 'Unverify' })
+    await verifyFromGrid(user, 'Beta Air')
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
-  })
-
-  it('Unverify sends isVerified false and clears the verified details', async () => {
-    const user = userEvent.setup()
-    renderAt('/data/airlines?columns=all')
-
-    await user.click(within(await rowOf('Alpha Air')).getByRole('button', { name: 'Unverify' }))
-
-    expect(await within(await rowOf('Alpha Air')).findByRole('button', { name: 'Verify' })).toBeInTheDocument()
-    expect(verifies()).toEqual([expect.objectContaining({ url: '/admin/airlines/1/verify', data: { isVerified: false } })])
-    expect(await rowOf('Alpha Air')).not.toHaveTextContent('admin-oid')
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() }))
   })
 
   it('filters to unverified, verified or all rows, keeping the choice in the URL', async () => {
@@ -222,7 +216,8 @@ describe('DataBrowserPage verify', () => {
     const user = userEvent.setup()
     renderAt('/data/airlines?columns=all&filter=IsVerified:false')
 
-    await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
+    await verifyFromGrid(user, 'Beta Air')
+    await user.keyboard('{Escape}')
 
     await waitFor(() => expect(screen.queryByText('Beta Air')).not.toBeInTheDocument())
     expect(screen.getByText('Gamma Air')).toBeInTheDocument()
@@ -235,16 +230,18 @@ describe('DataBrowserPage verify', () => {
     const user = userEvent.setup()
     renderAt('/data/airlines?columns=all')
 
-    await user.click(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' }))
+    await verifyFromGrid(user, 'Beta Air')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't verify row 2: it no longer exists. Refresh to see the current rows.")
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(await dialog.findByText("Couldn't verify: it no longer exists")).toBeInTheDocument()
+    await user.keyboard('{Escape}')
     expect(within(await rowOf('Beta Air')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
   })
 
-  it('offers Verify on an unverified country and Unverify on a verified one, keyed by its code', async () => {
+  it('offers Verify on an unverified country and nothing on a verified one, keyed by its code', async () => {
     renderAt('/data/countries')
 
-    expect(within(await rowOf('Germany')).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    expect(within(await rowOf('Germany')).queryByRole('button', { name: /^(Verify|Unverify)$/ })).not.toBeInTheDocument()
     expect(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
     expect(screen.queryByText(/Verifying isn't available/)).not.toBeInTheDocument()
   })
@@ -253,32 +250,26 @@ describe('DataBrowserPage verify', () => {
     const user = userEvent.setup()
     renderAt('/data/countries')
 
-    await user.click(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' }))
+    await verifyFromGrid(user, 'Bulgaria')
+    await user.keyboard('{Escape}')
 
-    expect(await within(await rowOf('Bulgaria')).findByRole('button', { name: 'Unverify' })).toBeInTheDocument()
     expect(verifies()).toEqual([{ method: 'PATCH', url: '/admin/countries/BG/verify', params: undefined, data: { isVerified: true } }])
+    await waitFor(async () =>
+      expect(within(await rowOf('Bulgaria')).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument())
   })
 
-  it('Unverify on a country sends isVerified false to the code route', async () => {
-    const user = userEvent.setup()
-    renderAt('/data/countries')
-
-    await user.click(within(await rowOf('Germany')).getByRole('button', { name: 'Unverify' }))
-
-    expect(await within(await rowOf('Germany')).findByRole('button', { name: 'Verify' })).toBeInTheDocument()
-    expect(verifies()).toEqual([expect.objectContaining({ url: '/admin/countries/DE/verify', data: { isVerified: false } })])
-  })
-
-  it("names a country row by its code when the API can't find it, and changes nothing", async () => {
+  it("says a country row is gone when the API can't find it, and changes nothing", async () => {
     verifyCountryAnswer = () => {
       throw httpError(404)
     }
     const user = userEvent.setup()
     renderAt('/data/countries')
 
-    await user.click(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' }))
+    await verifyFromGrid(user, 'Bulgaria')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't verify row BG: it no longer exists. Refresh to see the current rows.")
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(await dialog.findByText("Couldn't verify: it no longer exists")).toBeInTheDocument()
+    await user.keyboard('{Escape}')
     expect(within(await rowOf('Bulgaria')).getByRole('button', { name: 'Verify' })).toBeInTheDocument()
   })
 
@@ -301,21 +292,21 @@ describe('DataBrowserPage verify', () => {
     expect(screen.queryByRole('button', { name: 'Unverified' })).not.toBeInTheDocument()
   })
 
-  it('shows a status badge for each verification state in the IsVerified cell', async () => {
+  it('names every verification state on the icon that stands in for the IsVerified column', async () => {
     renderAt('/data/airlines')
     await rowOf('Alpha Air')
 
-    expect(await isVerifiedCell('Alpha Air')).toHaveTextContent('Verified · manual')
-    expect(await isVerifiedCell('Beta Air')).toHaveTextContent('Unverified')
-    expect(await isVerifiedCell('Gamma Air')).toHaveTextContent('Needs attention')
+    expect(within(await rowOf('Alpha Air')).getByRole('img', { name: 'Verified · manual' })).toBeInTheDocument()
+    expect(within(await rowOf('Beta Air')).getByRole('img', { name: 'Unverified' })).toBeInTheDocument()
+    expect(within(await rowOf('Gamma Air')).getByRole('img', { name: 'Needs attention' })).toBeInTheDocument()
   })
 
-  it("renders a non-verifiable table's IsVerified-shaped column as plain text, never a badge", async () => {
+  it("renders a non-verifiable table's IsVerified-shaped column as plain text, never an icon", async () => {
     renderAt('/data/flight-statuses')
 
     const row = await rowOf('Scheduled')
     expect(within(row).getByText('true')).toBeInTheDocument()
-    expect(within(row).queryByText('Verified')).not.toBeInTheDocument()
+    expect(within(row).queryByRole('img', { name: /Verified/ })).not.toBeInTheDocument()
   })
 
   it('filters on VerificationSource, a hidden column, sending its raw value', async () => {

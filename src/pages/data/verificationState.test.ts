@@ -1,39 +1,58 @@
 import { describe, expect, it } from 'vitest'
-import { verificationState } from './verificationState'
+import { needsAttention, verificationState } from './verificationState'
 
 describe('verificationState', () => {
   it('is Verified, with the source appended, when IsVerified is true and VerificationSource is set', () => {
     expect(verificationState({ IsVerified: true, VerificationSource: 'manual' }))
-      .toEqual({ label: 'Verified · manual', tone: 'border-transparent bg-green-100 text-green-800' })
+      .toEqual({ kind: 'verified', label: 'Verified · manual', tone: 'border-transparent bg-green-100 text-green-800' })
   })
 
   it('is Verified, with no suffix, when IsVerified is true and VerificationSource is empty', () => {
     expect(verificationState({ IsVerified: true, VerificationSource: null }))
-      .toEqual({ label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
+      .toEqual({ kind: 'verified', label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
   })
 
   it('is Needs attention, carrying the issue text, when unverified with a VerificationIssue', () => {
     expect(verificationState({ IsVerified: false, VerificationIssue: 'AeroAPI: duplicate IATA code' }))
-      .toEqual({ label: 'Needs attention', tone: 'border-transparent bg-amber-100 text-amber-800', issue: 'AeroAPI: duplicate IATA code' })
+      .toEqual({ kind: 'attention', label: 'Needs attention', tone: 'border-transparent bg-amber-100 text-amber-800', issue: 'AeroAPI: duplicate IATA code' })
   })
 
   it('is Unverified when IsVerified is not true and there is no issue', () => {
-    expect(verificationState({ IsVerified: false })).toEqual({ label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
-    expect(verificationState({})).toEqual({ label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
+    expect(verificationState({ IsVerified: false })).toEqual({ kind: 'unverified', label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
+    expect(verificationState({})).toEqual({ kind: 'unverified', label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
   })
 
   it('treats a whitespace-only or empty VerificationSource as no source', () => {
     expect(verificationState({ IsVerified: true, VerificationSource: '   ' }))
-      .toEqual({ label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
+      .toEqual({ kind: 'verified', label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
     expect(verificationState({ IsVerified: true, VerificationSource: '' }))
-      .toEqual({ label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
+      .toEqual({ kind: 'verified', label: 'Verified', tone: 'border-transparent bg-green-100 text-green-800' })
   })
 
   it('treats a whitespace-only or empty VerificationIssue as no issue, falling back to Unverified', () => {
     expect(verificationState({ IsVerified: false, VerificationIssue: '   ' }))
-      .toEqual({ label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
+      .toEqual({ kind: 'unverified', label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
     expect(verificationState({ IsVerified: false, VerificationIssue: '' }))
-      .toEqual({ label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
+      .toEqual({ kind: 'unverified', label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' })
+  })
+
+  /** `kind` is what callers switch on — the grid picks its icon by it, and needsAttention below is
+   *  defined in terms of it — because `label` varies per row: it carries the source. */
+  it('gives each state its own kind, independent of the label the row happens to read', () => {
+    expect(verificationState({ IsVerified: true, VerificationSource: 'ourairports' }).kind).toBe('verified')
+    expect(verificationState({ IsVerified: true, VerificationSource: null }).kind).toBe('verified')
+    expect(verificationState({ IsVerified: false, VerificationIssue: 'x' }).kind).toBe('attention')
+    expect(verificationState({ IsVerified: false }).kind).toBe('unverified')
+    expect(verificationState({ IsVerified: true, VerifiedAt: '2019-01-01T00:00:00Z' }, { staleAfterDays: 180, now: NOW }).kind)
+      .toBe('stale')
+  })
+
+  it('needs attention only in the attention kind, never in a stale or plainly unverified row', () => {
+    expect(needsAttention({ IsVerified: false, VerificationIssue: 'x' })).toBe(true)
+    expect(needsAttention({ IsVerified: false })).toBe(false)
+    expect(needsAttention({ IsVerified: true, VerificationSource: 'manual' })).toBe(false)
+    // Stale is still verified: it must never be swept in with the rows a check found something wrong with.
+    expect(needsAttention({ IsVerified: true, VerifiedAt: '2019-01-01T00:00:00Z' })).toBe(false)
   })
 
   it('gives each state a distinct tone: green for Verified, amber for Needs attention, gray for Unverified', () => {
@@ -57,6 +76,7 @@ describe('verificationState', () => {
       { IsVerified: true, VerificationSource: 'ourairports', VerifiedAt: '2026-01-02T08:30:00Z' },
       { staleAfterDays: 180, now: NOW },
     )).toEqual({
+      kind: 'stale',
       label: 'Verified · stale',
       tone: STALE,
       staleNote: 'Verified 2026-01-02 08:30 UTC by ourairports — older than the 180-day window',
@@ -74,7 +94,7 @@ describe('verificationState', () => {
     expect(verificationState(
       { IsVerified: true, VerificationSource: 'manual', VerifiedAt: '2026-09-01T00:00:00Z' },
       { staleAfterDays: 180, now: NOW },
-    )).toEqual({ label: 'Verified · manual', tone: VERIFIED })
+    )).toEqual({ kind: 'verified', label: 'Verified · manual', tone: VERIFIED })
   })
 
   /** Matches FlightTrackedVerificationEventHandler.NeedsVerification, which queues a row only once

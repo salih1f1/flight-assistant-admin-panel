@@ -197,7 +197,12 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }))
     expect(screen.getByRole('button', { name: 'Verify selected (2)' })).toBeInTheDocument()
 
+    // The row's own Verify opens this same dialog on Alpha alone; the selection behind it is a
+    // separate thing, and what this asserts is that the row leaving the filtered view takes it out
+    // of that selection.
     await user.click(within(await rowOf('Alpha Airport')).getByRole('button', { name: 'Verify' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Verify' }))
+    await user.keyboard('{Escape}')
 
     await waitFor(() => expect(screen.queryByText('Alpha Airport')).not.toBeInTheDocument())
     expect(screen.getByText('Bravo Airport')).toBeInTheDocument()
@@ -279,8 +284,10 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
-    const gridRow = await rowOf('Alpha Airport')
-    expect(within(gridRow).getByRole('button', { name: 'Unverify' })).toBeInTheDocument()
+    await waitFor(async () =>
+      expect(within(await rowOf('Alpha Airport')).getByRole('img', { name: 'Verified · manual' })).toBeInTheDocument())
+    // Nothing to press on a verified row: undoing it is the record page's job.
+    expect(within(await rowOf('Alpha Airport')).queryByRole('button', { name: /^(Verify|Unverify)$/ })).not.toBeInTheDocument()
   })
 
   it("a per-row Verify also invalidates the dashboard card's needs-attention counts", async () => {

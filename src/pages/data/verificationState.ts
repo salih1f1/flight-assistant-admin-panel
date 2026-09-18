@@ -2,7 +2,15 @@ import { formatUtcMinute } from '@/lib/formatUtc'
 
 type Row = Record<string, unknown>
 
+/**
+ * Which of the four states a row is in. The label reads differently per row (it carries the
+ * source), so anything switching on the state — the grid's icon, `needsAttention` below — keys off
+ * this instead of matching on text.
+ */
+export type VerificationKind = 'verified' | 'stale' | 'attention' | 'unverified'
+
 export type VerificationState = {
+  kind: VerificationKind
   label: string
   /**
    * Tailwind classes for the tinted status pill, following the panel's existing status-pill
@@ -14,8 +22,8 @@ export type VerificationState = {
   issue?: string
   /**
    * Set only for 'Verified · stale': when the row was verified, by what, and the window it is past.
-   * Shown on hover and to assistive tech, like `issue` — kept a separate field because `issue` is
-   * also what VerificationPanel keys "does this row need attention?" off, and a stale row does not.
+   * Shown on hover and to assistive tech, like `issue` — kept a separate field because the two
+   * belong to different states, and a stale row must never read as one that needs attention.
    */
   staleNote?: string
 }
@@ -54,13 +62,13 @@ export function verificationState(row: Row, window: StaleWindow = {}): Verificat
     const stale = staleNote(row, source, window)
     // Amber, but lighter than 'Needs attention' below: nobody has re-checked this row lately, which
     // is not the same as a check having found something wrong with it.
-    if (stale) return { label: 'Verified · stale', tone: 'border-transparent bg-amber-50 text-amber-700', staleNote: stale }
-    return { label: source ? `Verified · ${source}` : 'Verified', tone: 'border-transparent bg-green-100 text-green-800' }
+    if (stale) return { kind: 'stale', label: 'Verified · stale', tone: 'border-transparent bg-amber-50 text-amber-700', staleNote: stale }
+    return { kind: 'verified', label: source ? `Verified · ${source}` : 'Verified', tone: 'border-transparent bg-green-100 text-green-800' }
   }
   const issue = text(row.VerificationIssue)
   // Amber, not red: an unverified row with a known issue is a warning to review, not a failure.
-  if (issue) return { label: 'Needs attention', tone: 'border-transparent bg-amber-100 text-amber-800', issue }
-  return { label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' }
+  if (issue) return { kind: 'attention', label: 'Needs attention', tone: 'border-transparent bg-amber-100 text-amber-800', issue }
+  return { kind: 'unverified', label: 'Unverified', tone: 'border-transparent bg-gray-100 text-gray-700' }
 }
 
 /**
@@ -90,4 +98,4 @@ function staleNote(row: Row, source: string | undefined, { staleAfterDays, now =
  * which both refuse such a row so a difference can't be signed off without being read, and the
  * record page's verification panel, which is where it can be.
  */
-export const needsAttention = (row: Row): boolean => verificationState(row).issue !== undefined
+export const needsAttention = (row: Row): boolean => verificationState(row).kind === 'attention'
