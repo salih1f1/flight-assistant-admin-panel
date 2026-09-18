@@ -107,6 +107,21 @@ describe('the grid says a row\'s verification state with one icon, and only offe
     expect(icon).toHaveAttribute('title', 'Verified 2019-01-01 08:30 UTC by ourairports — older than the 180-day window')
   })
 
+  /**
+   * Verified and stale share the tick, so the tone is the whole of what separates them on screen —
+   * the label behind it says which, but nobody reads a title to tell two rows apart in a list. A
+   * stale row reporting itself as plainly verified would look exactly right without this.
+   */
+  it('3b. tints a stale tick amber and a fresh one green, so the two are not the same mark', async () => {
+    renderAt('/data/airlines')
+    await rowOf('Alpha Air')
+
+    const stale = await within(await rowOf('Delta Air')).findByRole('img', { name: 'Verified · stale' })
+    const fresh = within(await rowOf('Alpha Air')).getByRole('img', { name: 'Verified · manual' })
+    expect(stale).toHaveClass('text-amber-600')
+    expect(fresh).toHaveClass('text-green-600')
+  })
+
   it('4. sends a flagged row to its record page, naming the issue on hover', async () => {
     renderAt('/data/airlines')
     const row = within(await rowOf('Gamma Air'))
