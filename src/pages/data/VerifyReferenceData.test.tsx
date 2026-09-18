@@ -318,7 +318,7 @@ describe('DataBrowserPage verify', () => {
 
     await user.selectOptions(screen.getByLabelText('Filter column'), 'VerificationSource')
     await user.type(screen.getByLabelText('Filter value'), 'manual')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
     await waitFor(() => expect(sent.some(r => String(r.params?.filter) === 'VerificationSource:manual')).toBe(true))
   })

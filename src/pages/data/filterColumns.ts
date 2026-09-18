@@ -15,9 +15,9 @@ export type FilterColumn = {
  * the form can offer a picker instead of a text box; inferred ones carry none, which is how the
  * filter behaved before kinds existed and is what an older API still gets.
  *
- * `applied` is the column the current filter names: it stays pickable even when neither source
- * mentions it — an empty page under a filter has no rows to name its own column, and a form
- * silently showing a different column than the URL filters on is worse than an extra option. That
+ * `applied` is the columns the current criteria name: each stays pickable even when neither source
+ * mentions it — an empty page under a filter has no rows to name its own column, and a column a
+ * shared link filters on that cannot be picked again once its chip is removed is a dead end. That
  * is also why it survives `allowed` below, keeping whatever the sources said about it.
  *
  * `allowed` is a table's own list of the columns worth filtering it by (LIST_COLUMNS), so a grid
@@ -27,7 +27,7 @@ export type FilterColumn = {
 export function filterColumns(
   published: BrowsableColumnDto[] | null | undefined,
   inferred: string[],
-  applied: string | undefined,
+  applied: string[],
   allowed?: string[],
 ): FilterColumn[] {
   const columns: FilterColumn[] = (published ?? [])
@@ -36,12 +36,11 @@ export function filterColumns(
 
   const offered = columns.length > 0 ? columns : inferred.map(name => ({ name }))
   const listed = allowed
-    ? offered.filter(column => allowed.includes(column.name) || column.name === applied)
+    ? offered.filter(column => allowed.includes(column.name) || applied.includes(column.name))
     : offered
 
-  return applied && !listed.some(column => column.name === applied)
-    ? [{ name: applied }, ...listed]
-    : listed
+  const missing = applied.filter(name => !listed.some(column => column.name === name))
+  return missing.length > 0 ? [...missing.map(name => ({ name })), ...listed] : listed
 }
 
 /** Which value control a column's kind calls for. */

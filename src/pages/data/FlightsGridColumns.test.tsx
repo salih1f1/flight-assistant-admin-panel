@@ -122,11 +122,16 @@ describe('The flights grid, as a list', () => {
   })
 
   /** A shared link may filter on a column the list leaves out; the form must not silently show another. */
+  /**
+   * The chip names the column a shared link filters on, and the picker keeps offering it even
+   * though the table's own list leaves it out — otherwise removing the chip would be a dead end,
+   * with no way to filter on that column again.
+   */
   it('keeps showing a column a shared link filters on, off the list or not', async () => {
     renderAt('/data/flights?filter=LastSyncedUtc:2026-09-29')
     await screen.findByRole('table')
 
-    expect(screen.getByLabelText<HTMLSelectElement>('Filter column').value).toBe('LastSyncedUtc')
+    expect(screen.getByText('LastSyncedUtc: 2026-09-29')).toBeInTheDocument()
     expect(filterOptions()).toContain('LastSyncedUtc')
   })
 
@@ -137,7 +142,7 @@ describe('The flights grid, as a list', () => {
 
     await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
     await user.type(screen.getByLabelText('Filter value'), '2276')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
     expect(new URLSearchParams(router.state.location.search).get('filter')).toBe('DepartureAirportId:2276')
   })

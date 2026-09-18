@@ -288,24 +288,94 @@ describe('DataBrowserPage', () => {
     expect(search(router).get('page')).toBeNull()
   })
 
-  it('filters on a column and value, then clears the filter', async () => {
+  it('adds a criterion, then removes it again', async () => {
     const user = userEvent.setup()
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
     await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '042')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
     expect(await screen.findByText('Page 1 of 1 · 1 total')).toBeInTheDocument()
     expect(screen.getByText('Traveler 042')).toBeInTheDocument()
     expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['DisplayName:042'] })
-    expect(search(router).get('filter')).toBe('DisplayName:042')
+    expect(search(router).getAll('filter')).toEqual(['DisplayName:042'])
 
-    await user.click(screen.getByRole('button', { name: 'Clear filter' }))
+    await user.click(screen.getByRole('button', { name: 'Remove filter DisplayName: 042' }))
 
     expect(await screen.findByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
-    expect(search(router).get('filter')).toBeNull()
+    expect(search(router).getAll('filter')).toEqual([])
+  })
+
+  it('adds a second criterion instead of replacing the first', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers')
+    await screen.findByText('Traveler 001')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await user.type(screen.getByLabelText('Filter value'), '04')
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
+    await screen.findByText('DisplayName: 04')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await user.type(screen.getByLabelText('Filter value'), '2')
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
+
+    await waitFor(() => expect(lastDataRequest()?.params)
+      .toEqual({ Page: 1, PageSize: 50, filter: ['DisplayName:04', 'DisplayName:2'] }))
+    expect(search(router).getAll('filter')).toEqual(['DisplayName:04', 'DisplayName:2'])
+    expect(await screen.findByText('Traveler 042')).toBeInTheDocument()
+  })
+
+  it('removes one criterion and leaves the others applied', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers?filter=DisplayName%3A04&filter=DisplayName%3A2')
+    await screen.findByText('Traveler 042')
+
+    await user.click(screen.getByRole('button', { name: 'Remove filter DisplayName: 2' }))
+
+    await waitFor(() => expect(search(router).getAll('filter')).toEqual(['DisplayName:04']))
+    expect(screen.getByText('DisplayName: 04')).toBeInTheDocument()
+    expect(screen.queryByText('DisplayName: 2')).not.toBeInTheDocument()
+  })
+
+  it('clears every criterion at once', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers?filter=DisplayName%3A04&filter=DisplayName%3A2')
+    await screen.findByText('Traveler 042')
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    expect(await screen.findByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
+    expect(search(router).getAll('filter')).toEqual([])
+  })
+
+  it('does not add a criterion that is already applied', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/travelers?filter=DisplayName%3A042')
+    await screen.findByText('Traveler 042')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
+    await user.type(screen.getByLabelText('Filter value'), '042')
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
+
+    expect(search(router).getAll('filter')).toEqual(['DisplayName:042'])
+    expect(screen.getAllByText('DisplayName: 042')).toHaveLength(1)
+  })
+
+  it('shows a date criterion the way its comparison picker words it', async () => {
+    renderAt('/data/admin-audit-log?filter=OccurredUtc%3A%3E%3D2026-09-18')
+    expect(await screen.findByText('OccurredUtc: on or after 2026-09-18')).toBeInTheDocument()
+  })
+
+  /** Every dashboard tile, the pending-queue link and the detail-page links build exactly this. */
+  it('still filters from a link carrying a single filter', async () => {
+    renderAt('/data/travelers?filter=DisplayName%3A042')
+
+    expect(await screen.findByText('Traveler 042')).toBeInTheDocument()
+    expect(screen.getByText('DisplayName: 042')).toBeInTheDocument()
+    expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['DisplayName:042'] })
   })
 
   // ── Filter controls from the published kinds (#94) ─────────────────────────
@@ -323,7 +393,7 @@ describe('DataBrowserPage', () => {
       .toEqual(['Pending', 'Running', 'Mismatch', 'Verified', 'Error'])
 
     await user.selectOptions(value, 'Error')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
     await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['Status:Error'] }))
   })
@@ -339,11 +409,16 @@ describe('DataBrowserPage', () => {
     expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('gte')
 
     await user.type(screen.getByLabelText('Filter value'), '2026-09-18')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
     await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['RequestedUtc:>=2026-09-18'] }))
 
+    // A second criterion, asked for exactly: the form adds, so the first one stays applied and the
+    // comparison resets to the default with the value it was added with.
+    await user.click(screen.getByRole('button', { name: 'Remove filter RequestedUtc: on or after 2026-09-18' }))
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'RequestedUtc')
     await user.selectOptions(screen.getByLabelText('Date comparison'), 'exact')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.type(screen.getByLabelText('Filter value'), '2026-09-18')
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
     await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['RequestedUtc:2026-09-18'] }))
   })
 
@@ -356,12 +431,17 @@ describe('DataBrowserPage', () => {
     expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('gte')
   })
 
-  it('keeps whichever comparison the applied filter carries', async () => {
+  /**
+   * An applied exact-date criterion must not read as "on or after": the chip says what is actually
+   * filtered on, and the two match very different sets of rows. The form itself no longer mirrors
+   * an applied criterion — it is the row that adds the next one.
+   */
+  it('shows an exact date criterion as the exact date', async () => {
     renderAt('/data/admin-audit-log?filter=OccurredUtc%3A2026-09-18')
     await screen.findByText('Update')
 
-    expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('exact')
-    expect((screen.getByLabelText('Filter value') as HTMLInputElement).value).toBe('2026-09-18')
+    expect(screen.getByText('OccurredUtc: 2026-09-18')).toBeInTheDocument()
+    expect(screen.queryByText('OccurredUtc: on or after 2026-09-18')).not.toBeInTheDocument()
   })
 
   it('offers true and false for a bool column', async () => {
@@ -375,7 +455,7 @@ describe('DataBrowserPage', () => {
     expect(within(value).getAllByRole('option').map(o => o.textContent)).toEqual(['true', 'false'])
 
     await user.selectOptions(value, 'false')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
     await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: ['IsVerified:false'] }))
   })
@@ -388,7 +468,7 @@ describe('DataBrowserPage', () => {
     await user.selectOptions(screen.getByLabelText('Filter column'), 'SourceValuesJson')
 
     expect(screen.queryByLabelText('Filter value')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Apply filter' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add filter' })).toBeDisabled()
     expect(screen.getByText("This column can't be filtered.")).toBeInTheDocument()
   })
 
@@ -423,7 +503,7 @@ describe('DataBrowserPage', () => {
 
     await user.selectOptions(screen.getByLabelText('Filter column'), 'DisplayName')
     await user.type(screen.getByLabelText('Filter value'), '04')
-    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await user.click(screen.getByRole('button', { name: 'Add filter' }))
     // Contains "04": Traveler 004, 040-049 and 104.
     await screen.findByText('Page 1 of 1 · 12 total')
 

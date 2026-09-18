@@ -8,7 +8,7 @@ describe('filterColumns', () => {
   ]
 
   it('takes the published columns, in their published order', () => {
-    expect(filterColumns(published, ['RequestedUtc', 'Status'], undefined)).toEqual([
+    expect(filterColumns(published, ['RequestedUtc', 'Status'], [])).toEqual([
       { name: 'Status', kind: 'Enum', values: ['Pending', 'Error'] },
       { name: 'RequestedUtc', kind: 'Date', values: null },
     ])
@@ -17,31 +17,31 @@ describe('filterColumns', () => {
   /** An API predating the metadata, or a listing still loading: the names the rows themselves
    *  carry, with no kind — which is how the filter behaved before kinds existed. */
   it('falls back to the inferred names, claiming no kind for them', () => {
-    expect(filterColumns(undefined, ['Id', 'DisplayName'], undefined)).toEqual([
+    expect(filterColumns(undefined, ['Id', 'DisplayName'], [])).toEqual([
       { name: 'Id' },
       { name: 'DisplayName' },
     ])
-    expect(filterColumns([], ['Id'], undefined)).toEqual([{ name: 'Id' }])
+    expect(filterColumns([], ['Id'], [])).toEqual([{ name: 'Id' }])
   })
 
   /** The applied column must stay pickable even when the current page has no rows to name it and
    *  no metadata arrived — otherwise the form silently shows a different column than the one the
    *  URL is filtering on. */
   it('offers the applied column when neither source names it', () => {
-    expect(filterColumns(undefined, ['Id'], 'DisplayName')).toEqual([
+    expect(filterColumns(undefined, ['Id'], ['DisplayName'])).toEqual([
       { name: 'DisplayName' },
       { name: 'Id' },
     ])
-    expect(filterColumns(published, ['Id'], 'Status')).toEqual(published)
+    expect(filterColumns(published, ['Id'], ['Status'])).toEqual(published)
   })
 
   /** A table whose grid names the few columns worth filtering it by: the rest — every timestamp,
    *  every id — only make the picker longer than the useful part of it. */
   it("keeps only the columns a table's own list allows, in published order", () => {
-    expect(filterColumns(published, [], undefined, ['RequestedUtc'])).toEqual([
+    expect(filterColumns(published, [], [], ['RequestedUtc'])).toEqual([
       { name: 'RequestedUtc', kind: 'Date', values: null },
     ])
-    expect(filterColumns(undefined, ['Id', 'FlightNumber', 'CreatedUtc'], undefined, ['FlightNumber'])).toEqual([
+    expect(filterColumns(undefined, ['Id', 'FlightNumber', 'CreatedUtc'], [], ['FlightNumber'])).toEqual([
       { name: 'FlightNumber' },
     ])
   })
@@ -50,17 +50,17 @@ describe('filterColumns', () => {
    *  would silently claim to be filtering on something else — and with the kind the API published
    *  for it, so an off-list Enum still gets its picker rather than a text box. */
   it('offers the applied column even when the list leaves it out', () => {
-    expect(filterColumns(published, [], 'Status', ['RequestedUtc'])).toEqual(published)
-    expect(filterColumns(undefined, ['Id'], 'CreatedUtc', ['Id'])).toEqual([{ name: 'CreatedUtc' }, { name: 'Id' }])
+    expect(filterColumns(published, [], ['Status'], ['RequestedUtc'])).toEqual(published)
+    expect(filterColumns(undefined, ['Id'], ['CreatedUtc'], ['Id'])).toEqual([{ name: 'CreatedUtc' }, { name: 'Id' }])
   })
 
   /** Most tables have no list of their own, and "all columns shown" passes none. */
   it('offers every column when there is no list', () => {
-    expect(filterColumns(published, [], undefined, undefined)).toEqual(published)
+    expect(filterColumns(published, [], [], undefined)).toEqual(published)
   })
 
   it('drops a published entry with no name, which nothing could filter on', () => {
-    expect(filterColumns([{ name: null, kind: 'Text', values: null }, ...published], [], undefined)).toEqual(published)
+    expect(filterColumns([{ name: null, kind: 'Text', values: null }, ...published], [], [])).toEqual(published)
   })
 })
 
