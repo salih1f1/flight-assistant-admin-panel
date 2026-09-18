@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { syncResultMessage } from './syncOutcome'
+import { isFirstSyncQueued, syncResultMessage } from './syncOutcome'
 
 const result = (over: Partial<Parameters<typeof syncResultMessage>[0]> = {}) => ({
   outcome: 'NoChange',
@@ -42,5 +42,36 @@ describe('syncResultMessage', () => {
 
   it('still says something when the outcome is missing entirely', () => {
     expect(syncResultMessage(result({ outcome: null })).length).toBeGreaterThan(0)
+  })
+})
+
+describe('isFirstSyncQueued', () => {
+  const NOW = Date.parse('2026-09-20T09:51:00Z')
+
+  it('is queued when the flight has never synced and its first sync is already due', () => {
+    expect(isFirstSyncQueued(null, '2026-09-20T09:51:00Z', NOW)).toBe(true)
+  })
+
+  // Tracking makes the flight due immediately, so the due time is a moment in the recent past.
+  it('is still queued a minute after the first sync came due', () => {
+    expect(isFirstSyncQueued(null, '2026-09-20T09:50:00Z', NOW)).toBe(true)
+  })
+
+  it('is not queued once the flight has synced at least once', () => {
+    expect(isFirstSyncQueued('2026-09-20T09:41:00Z', '2026-09-20T09:51:00Z', NOW)).toBe(false)
+  })
+
+  it('is not queued while the first sync is still in the future', () => {
+    expect(isFirstSyncQueued(null, '2026-09-20T09:52:00Z', NOW)).toBe(false)
+  })
+
+  // Past the overdue threshold "the background sync may not be running" is the truer statement,
+  // and two claims about the same silence would contradict each other.
+  it('stands down once the sync is overdue', () => {
+    expect(isFirstSyncQueued(null, '2026-09-20T09:40:00Z', NOW)).toBe(false)
+  })
+
+  it('is not queued when the flight has no sync plan at all', () => {
+    expect(isFirstSyncQueued(null, null, NOW)).toBe(false)
   })
 })

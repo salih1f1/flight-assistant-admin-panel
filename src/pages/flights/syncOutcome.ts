@@ -23,6 +23,25 @@ export const isNextSyncOverdue = (nextSyncDueUtc: string | null | undefined, now
   nextSyncDueUtc != null && now - new Date(nextSyncDueUtc).getTime() > OVERDUE_AFTER_MS
 
 /**
+ * Whether the flight is waiting for its first sync. Tracking a flight plans it and makes it due
+ * straight away, so the loop picks it up on its next pass — which leaves the page holding a blank
+ * last sync beside a next sync that has just gone by. Read literally that says nothing was ever
+ * attempted; what it means is that the first attempt is queued.
+ *
+ * Past {@link OVERDUE_AFTER_MS} it stands down: the same silence is then better explained by the
+ * background sync not running, and only one of the two explanations can be true.
+ */
+export const isFirstSyncQueued = (
+  lastSyncedUtc: string | null | undefined,
+  nextSyncDueUtc: string | null | undefined,
+  now: number,
+): boolean =>
+  lastSyncedUtc == null &&
+  nextSyncDueUtc != null &&
+  new Date(nextSyncDueUtc).getTime() <= now &&
+  !isNextSyncOverdue(nextSyncDueUtc, now)
+
+/**
  * What each FlightStatusSyncOutcome means, in the words spec §3.1 settled on. The backend sends
  * the outcome as its name rather than its number precisely so this map can key off it, and so an
  * outcome added later can't silently become a different one here.
