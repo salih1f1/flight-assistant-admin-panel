@@ -26,7 +26,7 @@ const GROUPS: [string, [string, string][]][] = [
   ['Lounges', [['Lounges', '/data/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
   ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
   ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries']]],
-  ['System', [['System health', '/health'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
+  ['System', [['System health', '/health'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Data Source Status', '/data/data-source-status'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
 ]
 
 describe('Sidebar', () => {
