@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
-import { useAdminGetAirlineById, useAdminGetAirportById, useAdminGetFlightById, useAdminGetTravelerById } from '@/api/generated/admin'
-import { useLoyaltyProgram } from '@/api/loyaltyLookups'
+import {
+  useAdminGetAirlineById, useAdminGetAirportById, useAdminGetAllAlliances, useAdminGetFlightById, useAdminGetTravelerById,
+} from '@/api/generated/admin'
+import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
 import { isTravelerId, shortId } from '@/lib/travelerId'
 
 /*
@@ -93,6 +95,38 @@ export function LoyaltyProgramName({ id }: { id: number | null | undefined }) {
   if (isSuccess && !data) return <NotFound label={`#${id}`} />
   if (!data) return <Pending label={`#${id}`} />
   return <NameLink to={`/data/loyalty-programs/${id}`}>{withCode(data.name, data.code)}</NameLink>
+}
+
+/**
+ * "Airline programme", linking to the kind. Kinds are a short table read in one request and cached,
+ * so a grid of fifty programs asks for the list once rather than per row.
+ */
+export function LoyaltyProgramKindName({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, isSuccess } = useLoyaltyProgramKinds()
+  if (id == null) return <>—</>
+  // An id no row could carry names no record: say so without waiting on the list.
+  if (!valid) return <NotFound label={`#${id}`} />
+  const kind = data?.find(k => k.id === id)
+  // The code (AIRLINE, HOTEL) says the same thing as the name here, so the name stands alone.
+  if (kind) return <NameLink to={`/data/loyalty-program-kinds/${id}`}>{kind.name || `#${id}`}</NameLink>
+  if (isSuccess) return <NotFound label={`#${id}`} />
+  return <Pending label={`#${id}`} />
+}
+
+/**
+ * "oneworld", the code it is stored as on hover. A program carries its alliance as a code rather
+ * than an id, and GET /admin/refdata/alliances answers with codes and names and no ids — so there
+ * is no record to link to, unlike every other reference here.
+ */
+export function AllianceName({ code }: { code: string | null | undefined }) {
+  const { data, isSuccess } = useAdminGetAllAlliances()
+  if (code == null || code === '') return <>—</>
+  const alliance = data?.find(a => a.code === code)
+  if (alliance) return <span title={code}>{alliance.name ?? code}</span>
+  // A code no alliance carries stays on screen as itself: it is what the record says.
+  if (isSuccess) return <NotFound label={code} />
+  return <Pending label={code} />
 }
 
 /** A tier's name, read from its program's tiers (the only place the API names a tier). */

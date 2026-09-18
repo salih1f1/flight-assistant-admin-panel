@@ -17,7 +17,7 @@ import {
 import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
-import { columnValue } from './columnValue'
+import { columnLabel, columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
 import { filterLabel, parseFilter, withFilter, withoutColumn, withoutFilter } from './appliedFilters'
@@ -73,18 +73,6 @@ const VERIFICATION_REQUESTS_TABLE = 'verification-requests'
 const ICON_COLUMN = 'Name'
 
 /**
- * What a column's header says, where the cells under it hold a record rather than the id the API
- * stores. The header is also the sort control, and sorting still sends the raw column name — so
- * "Airline ↑" orders by AirlineId, not alphabetically by name.
- */
-const COLUMN_LABELS: Record<string, string> = {
-  AirlineId: 'Airline',
-  AirportId: 'Airport',
-  DepartureAirportId: 'From',
-  ArrivalAirportId: 'To',
-}
-
-/**
  * What the filter's value box says an id stands for while it is being typed. The full name, not the
  * bare IATA code the grid shows: there is nothing to scan here, only one id to confirm before
  * applying it. Neither airports nor airlines can be looked up by code, so the box takes an id —
@@ -118,9 +106,14 @@ const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
  * it from the row data via recordKey, revealing a masked value reads row.original.Id, and the
  * Verify dialog prepends the key column itself. Foreign keys (AirportId, TravelerId) are not
  * bookkeeping — they name a relationship, and render as the record they point at (#129, #132).
+ *
+ * `CreatedUtc` joins it for the same reason (#152): every record has one, so it separates no row
+ * from any other, and it is the column a grid ends on rather than the one it is read by. When a
+ * record was first seen is a question asked of one record, which is the record page's job; a list
+ * sorted or filtered by it asks for the column back with the same press as the id.
  */
 const HIDDEN_COLUMNS = new Set([
-  'Id',
+  'Id', 'CreatedUtc',
   'SourceType', 'FirstSeenAt',
   'VerifiedAt', 'VerifiedBy', 'VerificationSource', 'VerificationIssue', 'Notes', 'RawPayloadJson', 'DedupHash',
 ])
@@ -463,7 +456,7 @@ export function DataBrowserPage() {
     accessorFn: row => row[name],
     header: () => (
       <button type="button" onClick={() => toggleSort(name)} className="font-medium hover:text-gray-900">
-        {lookup(COLUMN_LABELS, name) ?? name}
+        {columnLabel(name)}
         {sort === name ? ' ↑' : sort === `-${name}` ? ' ↓' : ''}
       </button>
     ),
@@ -822,7 +815,7 @@ function FilterForm({ columns, published, allowed, appliedColumns, onAdd }: {
         className={SELECT_CLASS}
       >
         {options.map(option => (
-          <option key={option.name} value={option.name}>{lookup(COLUMN_LABELS, option.name) ?? option.name}</option>
+          <option key={option.name} value={option.name}>{columnLabel(option.name)}</option>
         ))}
       </select>
 

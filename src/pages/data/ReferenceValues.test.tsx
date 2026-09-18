@@ -133,8 +133,10 @@ describe('references in the raw grid', () => {
     expect(gets(`/admin/travelers/${ANN}`)).toHaveLength(1)
   })
 
+  // With all columns shown: CreatedUtc is bookkeeping and starts hidden (#152), and the claim here
+  // is about how an instant reads, not about which grid shows one.
   it('shows a timestamp to the minute in UTC, keeping the exact value in the title', async () => {
-    renderAt('/data/traveler-flights')
+    renderAt('/data/traveler-flights?columns=all')
 
     const shown = await screen.findByText('2026-09-18 21:44 UTC')
     expect(shown).toHaveAttribute('title', '2026-09-18T21:44:30.987798Z')

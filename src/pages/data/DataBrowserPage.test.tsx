@@ -173,8 +173,8 @@ describe('DataBrowserPage', () => {
     expect(await screen.findByText('Traveler 001')).toBeInTheDocument()
     expect(screen.getByText('Traveler 050')).toBeInTheDocument()
     expect(screen.queryByText('Traveler 051')).not.toBeInTheDocument()
-    // Email is masked on every row and Id is bookkeeping (#153), so both start hidden.
-    expect(headers()).toEqual(['DisplayName', 'CreatedUtc', 'UpdatedUtc'])
+    // Email is masked on every row; Id (#153) and CreatedUtc (#152) are bookkeeping.
+    expect(headers()).toEqual(['DisplayName', 'UpdatedUtc'])
     expect(screen.getByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
   })
 
@@ -191,14 +191,14 @@ describe('DataBrowserPage', () => {
     const router = renderAt('/data/travelers')
     await screen.findByText('Traveler 001')
 
-    await user.click(screen.getByRole('button', { name: 'Show 2 hidden columns' }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 hidden columns' }))
 
     expect(headers()).toEqual(['Id', 'Email', 'DisplayName', 'CreatedUtc', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBe('all')
 
-    await user.click(screen.getByRole('button', { name: 'Hide 2 columns' }))
+    await user.click(screen.getByRole('button', { name: 'Hide 3 columns' }))
 
-    expect(headers()).toEqual(['DisplayName', 'CreatedUtc', 'UpdatedUtc'])
+    expect(headers()).toEqual(['DisplayName', 'UpdatedUtc'])
     expect(search(router).get('columns')).toBeNull()
   })
 
@@ -272,7 +272,9 @@ describe('DataBrowserPage', () => {
 
     const options = within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
     expect(options).toContain('DisplayName')
-    expect(options).toContain('CreatedUtc')
+    expect(options).toContain('UpdatedUtc')
+    // The fallback knows a bookkeeping column when it sees one, masked or not (#152, #153).
+    expect(options).not.toContain('CreatedUtc')
   })
 
   it('has no Manage | Raw data tabs: the grid is the only list', async () => {
