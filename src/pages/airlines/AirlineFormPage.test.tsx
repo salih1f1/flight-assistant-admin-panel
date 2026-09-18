@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -14,10 +14,13 @@ vi.mock('@/api/client', () => ({
 type AirlineRow = { id: number; iata: string | null; icao: string | null; name: string; countryCode: string; allianceCode: string | null }
 
 let airlines: AirlineRow[]
+let alliances: { code: string; name: string }[]
 let sent: SentRequest[]
 
 /** An in-memory /admin/airlines: list, get, create and update change what later reads return. */
 function airlinesApi(req: SentRequest) {
+  // The alliance select's options.
+  if (req.method === 'GET' && req.url === '/admin/refdata/alliances') return alliances
   // The grid the form returns to: the same records, as GET /admin/data/airlines rows.
   if (req.method === 'GET' && req.url === '/admin/data/tables') return []
   if (req.method === 'GET' && req.url === '/admin/data/airlines') return pagedResult(rawRows(airlines), req.params)
@@ -66,6 +69,11 @@ function renderRoutes(initialEntry: string) {
 describe('AirlineFormPage', () => {
   beforeEach(() => {
     airlines = [{ id: 5, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'OW' }]
+    alliances = [
+      { code: 'SA', name: 'Star Alliance' },
+      { code: 'OW', name: 'oneworld' },
+      { code: 'ST', name: 'SkyTeam' },
+    ]
     ;({ sent } = installFakeApi(airlinesApi))
   })
 
@@ -133,5 +141,113 @@ describe('AirlineFormPage', () => {
     // The form navigates back to the /data/airlines grid on success.
     expect(await screen.findByText('BA Euroflyer')).toBeInTheDocument()
     expect(screen.queryByText('British Airways')).not.toBeInTheDocument()
+  })
+
+  describe('the alliance select (#96)', () => {
+    it('offers every alliance the API lists, plus no alliance at all', async () => {
+      renderRoutes('/airlines/new')
+      const select = await screen.findByLabelText('Alliance')
+      // The select renders before the list arrives, so wait for the API's options to appear.
+      await screen.findByRole('option', { name: 'Star Alliance (SA)' })
+
+      const options = within(select).getAllByRole('option').map(o => o.textContent)
+
+      expect(options).toEqual(['No alliance', 'Star Alliance (SA)', 'oneworld (OW)', 'SkyTeam (ST)'])
+    })
+
+    it('is a select, not a free-text box, so an alliance cannot be typed', async () => {
+      renderRoutes('/airlines/new')
+
+      expect(await screen.findByLabelText('Alliance')).toHaveProperty('tagName', 'SELECT')
+    })
+
+    it("starts on the airline's stored alliance when editing", async () => {
+      renderRoutes('/airlines/5/edit')
+
+      await waitFor(() => expect(screen.getByLabelText('Alliance')).toHaveValue('OW'))
+    })
+
+    it('PUTs the alliance the admin picked', async () => {
+      const user = userEvent.setup()
+      renderRoutes('/airlines/5/edit')
+      await waitFor(() => expect(screen.getByLabelText('Alliance')).toHaveValue('OW'))
+
+      await user.selectOptions(screen.getByLabelText('Alliance'), 'SA')
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      await waitFor(() =>
+        expect(sent).toContainEqual(
+          expect.objectContaining({
+            method: 'PUT',
+            url: '/admin/airlines/5',
+            data: expect.objectContaining({ allianceCode: 'SA' }),
+          }),
+        ),
+      )
+    })
+
+    it('leaves allianceCode unset when "No alliance" is chosen', async () => {
+      const user = userEvent.setup()
+      renderRoutes('/airlines/5/edit')
+      await waitFor(() => expect(screen.getByLabelText('Alliance')).toHaveValue('OW'))
+
+      await user.selectOptions(screen.getByLabelText('Alliance'), '')
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      await waitFor(() => expect(sent.some(r => r.method === 'PUT')).toBe(true))
+      const put = sent.find(r => r.method === 'PUT')!
+      expect((put.data as Record<string, unknown>).allianceCode).toBeUndefined()
+    })
+
+    it('says so rather than showing an empty select when the alliance list fails', async () => {
+      ;({ sent } = installFakeApi(req => {
+        if (req.method === 'GET' && req.url === '/admin/refdata/alliances') throw httpError(503)
+        return airlinesApi(req)
+      }))
+      renderRoutes('/airlines/new')
+
+      expect(await screen.findByText(/could not load alliances/i)).toBeInTheDocument()
+    })
+
+    /**
+     * A select that silently omitted an unknown stored code would blank that airline's alliance
+     * the moment an admin saved an unrelated field, which is a worse failure than the one #96 fixes.
+     */
+    it("keeps an airline's alliance code that the API no longer lists, and warns about it", async () => {
+      airlines = [{ id: 7, iata: 'LH', icao: 'DLH', name: 'Lufthansa', countryCode: 'DE', allianceCode: 'LEGACY' }]
+      renderRoutes('/airlines/7/edit')
+
+      await waitFor(() => expect(screen.getByLabelText('Alliance')).toHaveValue('LEGACY'))
+      expect(screen.getByText(/isn't in the alliances list/i)).toBeInTheDocument()
+    })
+
+    /**
+     * A failed list is "we don't know what the alliances are", not "this airline has none". The
+     * select must still hold the stored code, or saving an unrelated field would clear it — and
+     * it must not claim the code is unlisted, which a failed load is no evidence of.
+     */
+    it("keeps the airline's alliance when the list can't be loaded, without calling it unlisted", async () => {
+      const user = userEvent.setup()
+      ;({ sent } = installFakeApi(req => {
+        if (req.method === 'GET' && req.url === '/admin/refdata/alliances') throw httpError(503)
+        return airlinesApi(req)
+      }))
+      renderRoutes('/airlines/5/edit')
+
+      await waitFor(() => expect(screen.getByLabelText('Alliance')).toHaveValue('OW'))
+      expect(screen.queryByText(/isn't in the alliances list/i)).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      await waitFor(() =>
+        expect(sent).toContainEqual(
+          expect.objectContaining({
+            method: 'PUT',
+            url: '/admin/airlines/5',
+            data: expect.objectContaining({ allianceCode: 'OW' }),
+          }),
+        ),
+      )
+    })
   })
 })
