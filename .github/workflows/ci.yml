@@ -1,21 +1,31 @@
 name: CI
 
 # Every pull request, and every push to main — the second catches anything that reaches main
-# without a pull request, which is how the build stayed broken for a day (#135).
+# without a pull request, which is how the build stayed broken for a day (#135). pull_request is
+# left unfiltered on purpose: a stacked pull request, targeting another feature branch rather than
+# main, needs checking just as much.
 on:
   pull_request:
   push:
     branches: [main]
+  # So a flaky failure can be re-run, or main re-checked, without an empty commit to trigger it.
+  workflow_dispatch:
 
-# A newer push to the same branch makes the running check's answer worthless.
+# A newer push to a pull request branch makes the running check's answer worthless. A run on main
+# is not an answer to anything — it is the record of whether that commit built — so two merges in
+# quick succession must not leave the first one unrecorded.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
     name: Lint, build and test
     runs-on: ubuntu-latest
+    # Every step only reads the repository. Dropping the rest means a compromised dependency
+    # running during npm ci or a test cannot push, open pull requests or publish with this token.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
