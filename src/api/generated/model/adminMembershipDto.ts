@@ -14,6 +14,4 @@ export interface AdminMembershipDto {
   tierId?: number | null;
   /** @nullable */
   tierExpiryDate?: string | null;
-  /** @nullable */
-  pointsExpiryDate?: string | null;
 }

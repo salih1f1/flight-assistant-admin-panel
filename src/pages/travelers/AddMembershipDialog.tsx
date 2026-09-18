@@ -24,7 +24,6 @@ const schema = z.object({
   tierId: optionalInt(),
   accountNumber: z.string().trim().min(1, 'Required').max(MAX_ACCOUNT_NUMBER, `At most ${MAX_ACCOUNT_NUMBER} characters`),
   tierExpiryDate: z.string().optional(),
-  pointsExpiryDate: z.string().optional(),
 })
 
 // The form holds raw input values (coerced fields are `unknown` until parsed);
@@ -32,7 +31,7 @@ const schema = z.object({
 type FormInput = z.input<typeof schema>
 type FormData = z.output<typeof schema>
 
-const EMPTY: FormInput = { programId: '', tierId: '', accountNumber: '', tierExpiryDate: '', pointsExpiryDate: '' }
+const EMPTY: FormInput = { programId: '', tierId: '', accountNumber: '', tierExpiryDate: '' }
 
 const programLabel = (program: LoyaltyProgramDto) => `${program.name ?? `#${program.id}`} (${program.code ?? '—'})`
 
@@ -78,7 +77,6 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
           ...(data.tierId === undefined ? {} : { tierId: data.tierId }),
           accountNumber: data.accountNumber,
           ...(data.tierExpiryDate ? { tierExpiryDate: data.tierExpiryDate } : {}),
-          ...(data.pointsExpiryDate ? { pointsExpiryDate: data.pointsExpiryDate } : {}),
         },
       },
       {
@@ -148,15 +146,9 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
             {errors.accountNumber && <p className="text-xs text-red-500">{errors.accountNumber.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="membership-tier-expiry">Tier expiry</Label>
-              <Input id="membership-tier-expiry" type="date" {...register('tierExpiryDate')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="membership-points-expiry">Points expiry</Label>
-              <Input id="membership-points-expiry" type="date" {...register('pointsExpiryDate')} />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="membership-tier-expiry">Tier expiry</Label>
+            <Input id="membership-tier-expiry" type="date" {...register('tierExpiryDate')} />
           </div>
 
           {/* The API's own words: a 409 for a program or tier it doesn't have, a 400 for a past expiry date. */}

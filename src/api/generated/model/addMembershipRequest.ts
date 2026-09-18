@@ -13,6 +13,4 @@ export interface AddMembershipRequest {
   tierId?: number | null;
   /** @nullable */
   tierExpiryDate?: string | null;
-  /** @nullable */
-  pointsExpiryDate?: string | null;
 }
