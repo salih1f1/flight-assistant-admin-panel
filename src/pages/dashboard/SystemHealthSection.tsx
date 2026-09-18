@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useAdminGetHealth } from '@/api/generated/admin'
+import { useAdminGetBrowsableTableData, useAdminGetHealth } from '@/api/generated/admin'
 import type {
   AdminHealthDto, AdminHealthFlightSyncDto, AdminHealthMigrationsDto, AdminHealthSystemDto, AdminHealthVerificationDto,
   AdminHealthVerificationFailureDto,
@@ -9,6 +10,7 @@ import type {
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
+import { formatWaited, PENDING_QUEUE_LINK } from './pendingVerifications'
 
 // HealthStatus names as the API sends them.
 const statusColor: Record<string, string> = {
@@ -263,6 +265,7 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
 
   const lastRunAt = verification?.lastRunCompletedUtc ?? verification?.lastRunStartedUtc
   const run = FINISHED_RUN[verification?.lastOutcome ?? '']
+  const pending = verification?.pendingCount ?? 0
   const stuckAbandoned = verification?.stuckAbandoned ?? 0
   const failuresUnrecorded = verification?.failuresUnrecorded ?? 0
   const requestsPaused = verification?.requestsPaused ?? 0
@@ -285,8 +288,18 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
           count never renders as 0 — and, matching Migrations' own "can't tell" state, it's amber
           rather than the neutral gray a known count gets. */}
       <p className={cn('text-xs', verification?.pendingCount == null ? 'text-amber-600' : 'text-gray-500')}>
-        {verification?.pendingCount == null ? "Can't tell how many are pending" : `${verification.pendingCount} pending`}
+        {verification?.pendingCount == null
+          ? "Can't tell how many are pending"
+          : pending > 0
+            // The count is the only thing on this panel that names a set of rows an operator can go
+            // and look at, so it leads to exactly those rows. Unlinked at zero, like the
+            // needs-attention counts: a link to an empty grid answers nothing.
+            ? <Link to={PENDING_QUEUE_LINK} className="underline decoration-gray-300 hover:decoration-gray-900">{`${pending} pending`}</Link>
+            : `${pending} pending`}
       </p>
+      {/* Mounted only when something is pending, which is also what keeps the queue read below from
+          happening otherwise. */}
+      {pending > 0 && <OldestWaiting />}
       {stuckAbandoned > 0 && <p className="text-xs text-amber-600">{plural(stuckAbandoned, 'stuck request')}</p>}
       {failuresUnrecorded > 0 && <p className="text-xs text-amber-600">{plural(failuresUnrecorded, 'unrecorded failure')}</p>}
       {/* Amber, not red, for the same reason the Paused outcome is: these requests were left
@@ -298,6 +311,27 @@ function Verification({ verification }: { verification: AdminHealthVerificationD
       <StaleWindow days={verification?.staleAfterDays} />
     </Panel>
   )
+}
+
+/**
+ * How long the oldest waiting request has waited. The count beside it comes from the health report,
+ * which carries no date, so this reads the queue itself — one row, oldest first, never a page: the
+ * dashboard needs the date of the oldest request, not the queue.
+ *
+ * A queue that answers with nothing (an empty page, a failed read, a row whose date won't parse)
+ * renders no line at all. The count above already said something is pending; a second line guessing
+ * at its age would be the only claim on this panel not read from data.
+ */
+function OldestWaiting() {
+  const { data } = useAdminGetBrowsableTableData(
+    'verification-requests',
+    { Page: 1, PageSize: 1, sort: 'RequestedUtc', filter: 'Status:Pending' },
+  )
+  const oldest = (data?.items ?? [])[0] as Record<string, unknown> | undefined
+  const waited = formatWaited(oldest?.RequestedUtc, Date.now())
+
+  if (waited === undefined) return null
+  return <p className="text-xs text-gray-500">{`Oldest waiting ${waited}`}</p>
 }
 
 /**
