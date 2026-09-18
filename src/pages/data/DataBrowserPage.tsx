@@ -12,9 +12,11 @@ import {
   adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey,
   getAdminGetVerificationNeedsAttentionQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
+import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { ExportCsvButton } from './ExportCsvButton'
+import { filterColumns, filterControl } from './filterColumns'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
@@ -462,6 +464,9 @@ export function DataBrowserPage() {
             // Every column, hidden or not: filtering on one doesn't need it on screen.
             columns={columnNames}
             filter={filter}
+            // What GET /admin/data/tables published about this table's columns (#451), so the value
+            // control can match the column's kind. Undefined against an API that publishes none.
+            published={tables.data?.find(t => t.slug === table)?.columns}
             onApply={value => updateView({ filter: value })}
             onClear={() => updateView({ filter: undefined })}
           />
@@ -564,38 +569,92 @@ function ActionError({ text, error }: { text: string; error: unknown }) {
   )
 }
 
-function FilterForm({ columns, filter, onApply, onClear }: {
+const SELECT_CLASS = 'h-10 rounded-md border border-gray-200 bg-white px-3 text-sm'
+// The only two values the API parses for a Bool column, offered rather than spelled out in a hint.
+const BOOL_VALUES = ['true', 'false']
+
+function FilterForm({ columns, published, filter, onApply, onClear }: {
   columns: string[]
+  published: BrowsableColumnDto[] | null | undefined
   filter: string | undefined
   onApply: (filter: string) => void
   onClear: () => void
 }) {
   // The API splits on the first ':' only, so a value may itself contain colons.
   const separator = filter?.indexOf(':') ?? -1
-  const [column, setColumn] = useState(separator >= 0 ? filter!.slice(0, separator) : '')
-  const [value, setValue] = useState(separator >= 0 ? filter!.slice(separator + 1) : '')
-  // Offer the applied column even when the current page has no rows to take column names from.
-  const options = column && !columns.includes(column) ? [column, ...columns] : columns
-  const chosen = column || options[0] || ''
+  const appliedColumn = separator >= 0 ? filter!.slice(0, separator) : ''
+  const appliedValue = separator >= 0 ? filter!.slice(separator + 1) : ''
+
+  const [column, setColumn] = useState(appliedColumn)
+  const [value, setValue] = useState(appliedValue.replace(/^>=/, ''))
+  // ">=" is the API's only operator, and dates its only operand (#334). Applied filters keep
+  // whichever the URL carries; a fresh date filter leads with "on or after", since an exact match
+  // on a stored timestamp almost never matches the day an admin picks.
+  // Only an applied filter that names an exact value selects "exactly"; with nothing applied the
+  // default leads, the same as after the column picker changes.
+  const [comparison, setComparison] = useState(appliedValue !== '' && !appliedValue.startsWith('>=') ? 'exact' : 'gte')
+
+  const options = filterColumns(published, columns, appliedColumn || undefined)
+  const chosen = column || options[0]?.name || ''
+  const chosenColumn = options.find(option => option.name === chosen)
+  const control = filterControl(chosenColumn?.kind)
+
+  // A picker always has a value: whatever is typed (or carried in from the URL) if it is one of the
+  // options, else the option the browser is already showing as selected.
+  const picked = control === 'enum' ? chosenColumn?.values ?? [] : control === 'bool' ? BOOL_VALUES : []
+  const effective = picked.length > 0 ? (picked.includes(value) ? value : picked[0]) : value
+  const submitted = control === 'date' && comparison === 'gte' ? `>=${effective}` : effective
 
   return (
     <form
       className="flex flex-wrap items-center gap-2"
       onSubmit={e => {
         e.preventDefault()
-        if (chosen && value) onApply(`${chosen}:${value}`)
+        if (chosen && effective && control !== 'none') onApply(`${chosen}:${submitted}`)
       }}
     >
       <select
         aria-label="Filter column"
         value={chosen}
-        onChange={e => setColumn(e.target.value)}
-        className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm"
+        onChange={e => {
+          setColumn(e.target.value)
+          // The value belongs to the column it was typed for: a date left behind in an enum picker,
+          // or "Pending" left in a date box, would apply as a filter nobody asked for.
+          setValue('')
+          setComparison('gte')
+        }}
+        className={SELECT_CLASS}
       >
-        {options.map(name => <option key={name} value={name}>{name}</option>)}
+        {options.map(option => <option key={option.name} value={option.name}>{option.name}</option>)}
       </select>
-      <Input aria-label="Filter value" value={value} onChange={e => setValue(e.target.value)} placeholder="Value" className="max-w-xs" />
-      <Button type="submit" variant="outline">Apply filter</Button>
+
+      {control === 'date' && (
+        <select aria-label="Date comparison" value={comparison} onChange={e => setComparison(e.target.value)} className={SELECT_CLASS}>
+          <option value="gte">On or after</option>
+          <option value="exact">Exactly</option>
+        </select>
+      )}
+
+      {control === 'none' ? (
+        // The API said outright it cannot filter this column, so no control is offered at all — one
+        // that produced a 400 on every press would be worse than none.
+        <p className="text-sm text-gray-500">{"This column can't be filtered."}</p>
+      ) : picked.length > 0 ? (
+        <select aria-label="Filter value" value={effective} onChange={e => setValue(e.target.value)} className={SELECT_CLASS}>
+          {picked.map(option => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : (
+        <Input
+          aria-label="Filter value"
+          type={control === 'date' ? 'date' : 'text'}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="Value"
+          className="max-w-xs"
+        />
+      )}
+
+      <Button type="submit" variant="outline" disabled={control === 'none'}>Apply filter</Button>
       {filter && <Button type="button" variant="ghost" onClick={onClear}>Clear filter</Button>}
     </form>
   )

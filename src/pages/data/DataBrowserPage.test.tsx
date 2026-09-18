@@ -12,15 +12,60 @@ vi.mock('@/api/client', () => ({
 
 const pad = (n: number) => String(n).padStart(3, '0')
 
-// Shaped like BrowsableTableDto.
+type Row = Record<string, unknown>
+
+// Shaped like BrowsableTableDto, columns and all (#451). flight-statuses deliberately publishes
+// none: that is the shape an API predating the metadata sends, and the form must still work.
+const column = (name: string, kind: string, values: string[] | null = null) => ({ name, kind, values })
 const TABLES = [
-  { slug: 'travelers', displayName: 'Travelers', rowCount: 120 },
+  {
+    slug: 'travelers',
+    displayName: 'Travelers',
+    rowCount: 120,
+    columns: [
+      column('Id', 'Guid'), column('Email', 'Text'), column('DisplayName', 'Text'),
+      column('CreatedUtc', 'Date'), column('UpdatedUtc', 'Date'),
+    ],
+  },
   { slug: 'flight-statuses', displayName: 'Flight Statuses', rowCount: 1 },
+  {
+    slug: 'airports',
+    displayName: 'Airports',
+    rowCount: 2,
+    columns: [column('Iata', 'Text'), column('Name', 'Text'), column('IsVerified', 'Bool')],
+  },
+  {
+    slug: 'admin-audit-log',
+    displayName: 'Audit Log',
+    rowCount: 1,
+    columns: [column('OccurredUtc', 'Date'), column('Action', 'Enum', ['Create', 'Update', 'Delete'])],
+  },
+  {
+    slug: 'verification-requests',
+    displayName: 'Verification Requests',
+    rowCount: 2,
+    columns: [
+      column('Id', 'Number'), column('EntityKey', 'Text'),
+      column('Status', 'Enum', ['Pending', 'Running', 'Mismatch', 'Verified', 'Error']),
+      column('RequestedUtc', 'Date'), column('SourceValuesJson', 'Unsupported'),
+    ],
+  },
+]
+
+const AIRPORTS: Row[] = [
+  { Iata: 'IST', Name: 'Istanbul', IsVerified: true },
+  { Iata: 'JFK', Name: 'John F. Kennedy', IsVerified: false },
+]
+
+const AUDIT: Row[] = [{ OccurredUtc: '2026-09-18T09:00:00Z', Action: 'Update' }]
+
+const VERIFICATION_REQUESTS: Row[] = [
+  { Id: 1, EntityKey: 'IST', Status: 'Pending', RequestedUtc: '2026-09-18T09:00:00Z', SourceValuesJson: null },
+  { Id: 2, EntityKey: 'JFK', Status: 'Error', RequestedUtc: '2026-09-17T09:00:00Z', SourceValuesJson: null },
 ]
 
 // Shaped like GET /admin/data/travelers: PascalCase keys in the registry's column order,
 // Email masked server-side (SensitiveProperties), nullable columns null.
-type Row = Record<string, unknown>
 const TRAVELERS: Row[] = Array.from({ length: 120 }, (_, i) => ({
   Id: `00000000-0000-0000-0000-000000000${pad(i + 1)}`,
   Email: '<redacted>',
@@ -39,7 +84,11 @@ function dataApi(req: SentRequest) {
   if (req.method !== 'GET') throw httpError(404)
   if (req.url === '/admin/data/tables') return TABLES
   const table = req.url.match(/^\/admin\/data\/([a-z-]+)$/)?.[1]
-  const source = table === 'travelers' ? TRAVELERS : table === 'flight-statuses' ? FLIGHT_STATUSES : null
+  const source = table === 'travelers' ? TRAVELERS
+    : table === 'flight-statuses' ? FLIGHT_STATUSES
+      : table === 'verification-requests' ? VERIFICATION_REQUESTS
+        : table === 'airports' ? AIRPORTS
+          : table === 'admin-audit-log' ? AUDIT : null
   if (!source) throw httpError(404, { title: `Unknown table '${table}'.`, status: 404 })
 
   let rows = [...source]
@@ -227,6 +276,114 @@ describe('DataBrowserPage', () => {
 
     expect(await screen.findByText('Page 1 of 3 · 120 total')).toBeInTheDocument()
     expect(search(router).get('filter')).toBeNull()
+  })
+
+  // ── Filter controls from the published kinds (#94) ─────────────────────────
+
+  it('offers an enum column its published values to pick from, instead of a text box', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/verification-requests')
+    await screen.findByText('IST')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'Status')
+
+    const value = screen.getByLabelText('Filter value')
+    expect(value.tagName).toBe('SELECT')
+    expect(within(value).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['Pending', 'Running', 'Mismatch', 'Verified', 'Error'])
+
+    await user.selectOptions(value, 'Error')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'Status:Error' }))
+  })
+
+  it('filters a date column on or after a date by default, and exactly when asked', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/verification-requests')
+    await screen.findByText('IST')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'RequestedUtc')
+    // An exact match on a timestamp almost never matches, so the useful default leads.
+    expect((screen.getByLabelText('Filter value') as HTMLInputElement).type).toBe('date')
+    expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('gte')
+
+    await user.type(screen.getByLabelText('Filter value'), '2026-09-18')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'RequestedUtc:>=2026-09-18' }))
+
+    await user.selectOptions(screen.getByLabelText('Date comparison'), 'exact')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'RequestedUtc:2026-09-18' }))
+  })
+
+  /** The default has to hold on arrival, not only after the column picker is touched: a date column
+   *  that is already selected is the first thing an admin sees on these tables. */
+  it('leads with "on or after" for a date column selected on arrival', async () => {
+    renderAt('/data/admin-audit-log')
+    await screen.findByText('Update')
+
+    expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('gte')
+  })
+
+  it('keeps whichever comparison the applied filter carries', async () => {
+    renderAt('/data/admin-audit-log?filter=OccurredUtc%3A2026-09-18')
+    await screen.findByText('Update')
+
+    expect((screen.getByLabelText('Date comparison') as HTMLSelectElement).value).toBe('exact')
+    expect((screen.getByLabelText('Filter value') as HTMLInputElement).value).toBe('2026-09-18')
+  })
+
+  it('offers true and false for a bool column', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/airports')
+    await screen.findByText('Istanbul')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'IsVerified')
+
+    const value = screen.getByLabelText('Filter value')
+    expect(within(value).getAllByRole('option').map(o => o.textContent)).toEqual(['true', 'false'])
+
+    await user.selectOptions(value, 'false')
+    await user.click(screen.getByRole('button', { name: 'Apply filter' }))
+
+    await waitFor(() => expect(lastDataRequest()?.params).toEqual({ Page: 1, PageSize: 50, filter: 'IsVerified:false' }))
+  })
+
+  it('cannot filter a column the API says it cannot, and says so', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/verification-requests')
+    await screen.findByText('IST')
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'SourceValuesJson')
+
+    expect(screen.queryByLabelText('Filter value')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply filter' })).toBeDisabled()
+    expect(screen.getByText("This column can't be filtered.")).toBeInTheDocument()
+  })
+
+  it('takes the column list from the published columns, not the rows on screen', async () => {
+    renderAt('/data/verification-requests')
+    await screen.findByText('IST')
+
+    expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['Id', 'EntityKey', 'Status', 'RequestedUtc', 'SourceValuesJson'])
+  })
+
+  /** An API predating #451 publishes no columns: the form keeps inferring names from the rows and
+   *  offering a free-text value, exactly as it did before kinds existed. */
+  it('falls back to inferred names and a text box for a table that publishes no columns', async () => {
+    const user = userEvent.setup()
+    renderAt('/data/flight-statuses')
+    await screen.findByText('Scheduled')
+
+    expect(within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['Id', 'Code', 'Name', 'Description'])
+
+    await user.selectOptions(screen.getByLabelText('Filter column'), 'Code')
+    const value = screen.getByLabelText('Filter value')
+    expect(value.tagName).toBe('INPUT')
+    expect((value as HTMLInputElement).type).toBe('text')
   })
 
   it('sorting keeps a filter applied after the page loaded', async () => {

@@ -52,6 +52,7 @@ export * from './airlineAdminDtoPagedResult';
 export * from './airportAdminDto';
 export * from './airportAdminDtoPagedResult';
 export * from './allianceAdminDto';
+export * from './browsableColumnDto';
 export * from './browsableTableDto';
 export * from './ciRunDto';
 export * from './ciTestCaseDto';
