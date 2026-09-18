@@ -160,7 +160,9 @@ function UsageReport({ usage }: { usage: AeroApiUsageDto }) {
         )}
       </div>
 
-      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {/* Four columns when the discount tile is showing, so it sits in the row rather than
+          wrapping alone underneath three. With three tiles the fourth column is simply empty. */}
+      <dl className={cn('grid grid-cols-2 gap-4', discount > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3')}>
         <Stat label="Calls" value={usage.totalCalls ?? 0} />
         {/* FlightAware bills per page: a four-page search is four units. */}
         <Stat label="Pages billed" value={usage.totalPages ?? 0} />
