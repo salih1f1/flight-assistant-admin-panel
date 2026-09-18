@@ -63,14 +63,34 @@ describe('Dashboard needs-attention', () => {
     expect(within(region).getByRole('link', { name: '5' })).toHaveAttribute('href', gridLink('airlines'))
   })
 
-  it('does not link a zero count', async () => {
+  it('does not link a zero count standing beside a flagged one', async () => {
+    installApi(() => counts({ Airport: 3 }))
+    renderWithProviders(<NeedsAttentionSection />)
+    const region = await section()
+
+    // Waits for the loaded state before asserting the absence of a link — otherwise this would
+    // trivially pass during the loading state too, before any count is on screen.
+    await within(region).findByText('Airports')
+    expect(within(region).queryByRole('link', { name: '0' })).not.toBeInTheDocument()
+  })
+
+  it('heads the card with the total across the types when something is flagged', async () => {
+    installApi(() => counts({ Airport: 3, Country: 12 }))
+    renderWithProviders(<NeedsAttentionSection />)
+    const region = await section()
+
+    expect(await within(region).findByText('15 rows need attention')).toBeInTheDocument()
+  })
+
+  /** The point of the card is that a glance tells an operator whether to stop on it, so the healthy
+   *  state says one line rather than three big zeros that read like the alarming state. */
+  it('says nothing needs attention, with no counts to read, when every count is zero', async () => {
     installApi(() => counts())
     renderWithProviders(<NeedsAttentionSection />)
     const region = await section()
 
-    // Waits for the loaded state (all zero) before asserting the absence of a link — otherwise
-    // this would trivially pass during the loading state too, before any count is on screen.
-    await within(region).findByText('Airports')
+    expect(await within(region).findByText('Nothing needs attention')).toBeInTheDocument()
+    expect(within(region).queryByText('Airports')).not.toBeInTheDocument()
     expect(within(region).queryByRole('link')).not.toBeInTheDocument()
   })
 
