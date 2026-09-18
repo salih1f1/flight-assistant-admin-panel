@@ -16,6 +16,7 @@ import {
 import type { BrowsableColumnDto } from '@/api/generated/model'
 import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
+import { columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
 import { DELETERS, EDITABLE, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
@@ -380,7 +381,7 @@ export function DataBrowserPage() {
       // Every table with a sensitive column is keyed by a single Id, which is what the reveal endpoint takes.
       const id = row.original.Id
       const content = value !== MASKED || id === null || id === undefined || !table
-        ? <Cell value={value} />
+        ? <Cell column={name} value={value} row={row.original} />
         // Keyed so another row, page, sort or filter never inherits a revealed value.
         : <RevealableValue key={`${table}|${String(id)}|${name}`} table={table} id={String(id)} column={name} />
       if (name !== iconColumn || !table) return content
@@ -605,9 +606,17 @@ function VerificationIcon({ table, row }: { table: string; row: Row }) {
     : icon
 }
 
-function Cell({ value }: { value: unknown }) {
+/**
+ * One cell of a raw row. A column the panel can say something better about — another record's key,
+ * an instant — is shown through columnValue, which the record page shares, so a row reads the same
+ * in the list as it does opened. Anything else is the API's own value, truncated to keep the grid
+ * legible, with the whole of it in the title.
+ */
+function Cell({ column, value, row }: { column: string; value: unknown; row: Row }) {
   if (value === MASKED) return <MaskedBadge />
   if (value === null || value === undefined) return <span className="text-gray-400">—</span>
+  const better = columnValue(column, value, row)
+  if (better) return <span className="block max-w-xs truncate" title={better.title}>{better.node}</span>
   const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <span className="block max-w-xs truncate" title={text}>{text}</span>
 }

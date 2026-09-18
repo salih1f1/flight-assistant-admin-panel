@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
-import { useAdminGetAirlineById, useAdminGetAirportById } from '@/api/generated/admin'
+import { useAdminGetAirlineById, useAdminGetAirportById, useAdminGetFlightById, useAdminGetTravelerById } from '@/api/generated/admin'
 import { useLoyaltyProgram } from '@/api/loyaltyLookups'
+import { isTravelerId, shortId } from '@/lib/travelerId'
 
 /*
  * Names for the ids the API hands back (a flight's airline, a lounge's airport, a membership's
@@ -24,12 +25,12 @@ const retryUnless404 = (failureCount: number, error: unknown) => statusOf(error)
 const withCode = (name: string | null | undefined, code: string | null | undefined) =>
   code ? `${name ?? 'Unnamed'} (${code})` : (name ?? 'Unnamed')
 
-function Pending({ id }: { id: number }) {
-  return <span className="text-gray-400">{`#${id}`}</span>
+function Pending({ label }: { label: string }) {
+  return <span className="text-gray-400">{label}</span>
 }
 
-function NotFound({ id }: { id: number }) {
-  return <span className="text-amber-700">{`#${id}, not found`}</span>
+function NotFound({ label }: { label: string }) {
+  return <span className="text-amber-700">{`${label}, not found`}</span>
 }
 
 function NameLink({ to, children }: { to: string; children: string }) {
@@ -42,9 +43,9 @@ export function AirlineName({ id }: { id: number | null | undefined }) {
   const { data, error } = useAdminGetAirlineById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
   if (id == null) return <>—</>
   // An id no route could match names no record: say so without asking the API.
-  if (!valid) return <NotFound id={id} />
-  if (statusOf(error) === 404) return <NotFound id={id} />
-  if (!data) return <Pending id={id} />
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
   return <NameLink to={`/data/airlines/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
 }
 
@@ -54,9 +55,9 @@ export function AirportName({ id }: { id: number | null | undefined }) {
   const { data, error } = useAdminGetAirportById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
   if (id == null) return <>—</>
   // An id no route could match names no record: say so without asking the API.
-  if (!valid) return <NotFound id={id} />
-  if (statusOf(error) === 404) return <NotFound id={id} />
-  if (!data) return <Pending id={id} />
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
   return <NameLink to={`/data/airports/${id}`}>{withCode(data.name, data.iata ?? data.icao)}</NameLink>
 }
 
@@ -66,9 +67,9 @@ export function LoyaltyProgramName({ id }: { id: number | null | undefined }) {
   const { data, isSuccess } = useLoyaltyProgram(valid ? id : undefined)
   if (id == null) return <>—</>
   // An id no route could match names no record: say so without asking the API.
-  if (!valid) return <NotFound id={id} />
-  if (isSuccess && !data) return <NotFound id={id} />
-  if (!data) return <Pending id={id} />
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (isSuccess && !data) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
   return <NameLink to={`/data/loyalty-programs/${id}`}>{withCode(data.name, data.code)}</NameLink>
 }
 
@@ -79,6 +80,31 @@ export function LoyaltyTierName({ programId, tierId }: { programId: number | nul
   if (tierId == null) return <>—</>
   const tier = data?.tiers?.find(t => t.id === tierId)
   if (tier) return <>{tier.name ?? `#${tierId}`}</>
-  if (!valid || isSuccess) return <NotFound id={tierId} />
-  return <Pending id={tierId} />
+  if (!valid || isSuccess) return <NotFound label={`#${tierId}`} />
+  return <Pending label={`#${tierId}`} />
+}
+
+/** "Ann Example", linking to the traveler. Their id is a guid, so it stands in shortened. */
+export function TravelerName({ id }: { id: string | null | undefined }) {
+  const valid = typeof id === 'string' && isTravelerId(id)
+  const { data, error } = useAdminGetTravelerById(valid ? id : '', { query: { enabled: valid, retry: retryUnless404 } })
+  if (id == null || id === '') return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={id} />
+  if (statusOf(error) === 404) return <NotFound label={`#${shortId(id)}`} />
+  if (!data) return <Pending label={`#${shortId(id)}`} />
+  // A traveler need not have given a display name, and their email arrives masked.
+  return <NameLink to={`/travelers/${id}`}>{data.displayName || `#${shortId(id)}`}</NameLink>
+}
+
+/** "BA117 · 2026-09-20", linking to the flight: a flight number alone repeats every service day. */
+export function FlightName({ id }: { id: number | null | undefined }) {
+  const valid = isApiId(id)
+  const { data, error } = useAdminGetFlightById(valid ? id : 0, { query: { enabled: valid, retry: retryUnless404 } })
+  if (id == null) return <>—</>
+  // An id no route could match names no record: say so without asking the API.
+  if (!valid) return <NotFound label={`#${id}`} />
+  if (statusOf(error) === 404) return <NotFound label={`#${id}`} />
+  if (!data) return <Pending label={`#${id}`} />
+  return <NameLink to={`/flights/${id}`}>{[data.flightNumber || `#${id}`, data.serviceDate].filter(Boolean).join(' · ')}</NameLink>
 }
