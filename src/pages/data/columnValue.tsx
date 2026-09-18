@@ -95,6 +95,8 @@ const COLUMN_LABELS: Record<string, string> = {
   ArrivalAirportId: 'To',
   KindId: 'Kind',
   AllianceCode: 'Alliance',
+  TravelerId: 'Traveler',
+  FlightId: 'Flight',
 }
 
 /** What a column is called on screen: its label where it has one, otherwise the API's own name. */

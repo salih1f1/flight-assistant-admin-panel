@@ -610,7 +610,7 @@ export function DataBrowserPage() {
               </Button>
             )}
           </div>
-          <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
+          <ExportCsvButton key={`export-${table}`} table={table} tableName={selected?.displayName ?? table} />
           {filters.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               {filters.map(applied => (
@@ -635,8 +635,10 @@ export function DataBrowserPage() {
             </div>
           )}
           <FilterForm
-            // Remount on a table change, so the inputs never carry another table's columns.
-            key={table}
+            // Remount on a table change, so the inputs never carry another table's columns. Keyed
+            // apart from ExportCsvButton above: two siblings sharing one key is a duplicate key,
+            // which React warns about as soon as anything else in the row renders conditionally.
+            key={`filter-${table}`}
             // Exactly the columns the grid is showing — the picker and the table agree (#149).
             columns={filterableNames}
             // The published kinds, so the value control can match the column's kind. Undefined
