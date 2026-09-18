@@ -49,21 +49,30 @@ let sent: SentRequest[]
 let verifyAnswer: (req: SentRequest) => unknown
 let verifyCountryAnswer: (req: SentRequest) => unknown
 
+/**
+ * Every criterion the request carries, ANDed, as the API applies them (#146): an exact match on a
+ * bool column such as IsVerified, a case-insensitive contains on a string column such as Name.
+ */
+function applyFilters<T extends Record<string, unknown>>(rows: T[], req: SentRequest): T[] {
+  return ((req.params?.filter ?? []) as string[]).reduce((kept, filter) => {
+    const separator = filter.indexOf(':')
+    const column = filter.slice(0, separator)
+    const value = filter.slice(separator + 1)
+    return kept.filter(row => typeof row[column] === 'string'
+      ? (row[column] as string).toLowerCase().includes(value.toLowerCase())
+      : String(row[column]) === value)
+  }, rows)
+}
+
 /** Reads like the data browser (IsVerified is a bool column, so the filter is an exact match); verify writes like VerifyEntityCommand. */
 function install() {
   ;({ sent } = installFakeApi(req => {
     if (req.method === 'GET' && req.url === '/admin/data/tables') return TABLES
     if (req.method === 'GET' && req.url === '/admin/data/airlines') {
-      const filters = (req.params?.filter ?? []) as string[]
-      const verified = filters.find(f => f.startsWith('IsVerified:'))
-      const rows = verified ? airlines.filter(a => String(a.IsVerified) === verified.slice('IsVerified:'.length)) : airlines
-      return pagedResult(rows, req.params)
+      return pagedResult(applyFilters(airlines, req), req.params)
     }
     if (req.method === 'GET' && req.url === '/admin/data/countries') {
-      const filters = (req.params?.filter ?? []) as string[]
-      const verified = filters.find(f => f.startsWith('IsVerified:'))
-      const rows = verified ? countries.filter(c => String(c.IsVerified) === verified.slice('IsVerified:'.length)) : countries
-      return pagedResult(rows, req.params)
+      return pagedResult(applyFilters(countries, req), req.params)
     }
     // flight-statuses is not verifiable, but carries an IsVerified-shaped field to prove the grid
     // never mistakes a column name for verifiability: only a table with a verifier gets the badge.
@@ -189,6 +198,50 @@ describe('DataBrowserPage verify', () => {
     await verifyFromGrid(user, 'Beta Air')
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() }))
+  })
+
+  it('keeps a column filter when the Verified toggle is used', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/airlines?columns=all&filter=Name%3Aa')
+    await rowOf('Alpha Air')
+
+    await user.click(screen.getByRole('button', { name: 'Unverified' }))
+
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).getAll('filter'))
+      .toEqual(['Name:a', 'IsVerified:false']))
+    expect(screen.getByText('Beta Air')).toBeInTheDocument()
+    expect(screen.queryByText('Alpha Air')).not.toBeInTheDocument()
+  })
+
+  it('swaps its own criterion rather than contradicting itself', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/airlines?columns=all&filter=Name%3Aa&filter=IsVerified%3Afalse')
+    await rowOf('Beta Air')
+
+    await user.click(screen.getByRole('button', { name: 'Verified' }))
+
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).getAll('filter'))
+      .toEqual(['Name:a', 'IsVerified:true']))
+    expect(await screen.findByText('Alpha Air')).toBeInTheDocument()
+  })
+
+  it('All removes only the verified criterion', async () => {
+    const user = userEvent.setup()
+    const router = renderAt('/data/airlines?columns=all&filter=Name%3Aa&filter=IsVerified%3Afalse')
+    await rowOf('Beta Air')
+
+    await user.click(screen.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(new URLSearchParams(router.state.location.search).getAll('filter'))
+      .toEqual(['Name:a']))
+  })
+
+  it('marks the toggle from the criterion that is applied, whatever else is', async () => {
+    renderAt('/data/airlines?columns=all&filter=Name%3Aa&filter=IsVerified%3Atrue')
+    await rowOf('Alpha Air')
+
+    expect(screen.getByRole('button', { name: 'Verified' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('filters to unverified, verified or all rows, keeping the choice in the URL', async () => {

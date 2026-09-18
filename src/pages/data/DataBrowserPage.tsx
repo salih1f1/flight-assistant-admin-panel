@@ -20,7 +20,7 @@ import { apiErrorMessage } from '@/lib/apiError'
 import { columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
-import { filterLabel, parseFilter, withFilter, withoutFilter } from './appliedFilters'
+import { filterLabel, parseFilter, withFilter, withoutColumn, withoutFilter } from './appliedFilters'
 import { DELETERS, EDITABLE, LIST_COLUMNS, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
@@ -96,6 +96,9 @@ const FILTER_PREVIEWS: Record<string, (id: number) => ReactNode> = {
   DepartureAirportId: id => <AirportName id={id} />,
   ArrivalAirportId: id => <AirportName id={id} />,
 }
+
+/** The column the Verified toggle owns: its buttons replace only this column's criterion. */
+const VERIFIED_COLUMN = 'IsVerified'
 
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
@@ -524,19 +527,31 @@ export function DataBrowserPage() {
         <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             {verifier && (
-              // The API takes one filter, so choosing one of these replaces any column filter.
+              // One criterion among the rest: these add or remove IsVerified and leave every other
+              // filter applied, so "unverified airlines whose name contains air" is expressible
+              // (#146). Dropping the column before adding is what makes Verified → Unverified a
+              // swap rather than a contradiction that matches nothing.
               <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
-                {VERIFIED_FILTERS.map(option => (
-                  <button
-                    key={option.label}
-                    type="button"
-                    aria-pressed={filters[0] === option.filter && filters.length <= 1}
-                    onClick={() => updateView({ filters: option.filter ? [option.filter] : [] })}
-                    className={cn('px-3 py-1.5 text-sm', filters[0] === option.filter && filters.length <= 1 ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                {VERIFIED_FILTERS.map(option => {
+                  const pressed = option.filter
+                    ? filters.includes(option.filter)
+                    : !filters.some(applied => parseFilter(applied).column === VERIFIED_COLUMN)
+                  return (
+                    <button
+                      key={option.label}
+                      type="button"
+                      aria-pressed={pressed}
+                      onClick={() => updateView({
+                        filters: option.filter
+                          ? withFilter(withoutColumn(filters, VERIFIED_COLUMN), option.filter)
+                          : withoutColumn(filters, VERIFIED_COLUMN),
+                      })}
+                      className={cn('px-3 py-1.5 text-sm', pressed ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
             {/* Opens the Verify dialog on the rows selected via the checkbox column. */}
