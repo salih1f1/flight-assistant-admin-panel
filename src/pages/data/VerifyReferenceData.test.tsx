@@ -369,6 +369,9 @@ describe('DataBrowserPage verify', () => {
     renderAt('/data/airlines')
     await rowOf('Alpha Air')
 
+    // The picker offers what the grid shows, so a bookkeeping column is reached the same way the
+    // grid reaches it (#149). What this test is about is the value that goes out: the raw one.
+    await user.click(screen.getByRole('button', { name: /^Show \d+ hidden/ }))
     await user.selectOptions(screen.getByLabelText('Filter column'), 'VerificationSource')
     await user.type(screen.getByLabelText('Filter value'), 'manual')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
