@@ -53,7 +53,7 @@ function Record({ table, id }: { table: string; id: string }) {
   // The key's string filter is a contains match (Countries' Code), so the exact row is picked below.
   const rows = useAdminGetBrowsableTableData(
     table,
-    { Page: 1, PageSize: 50, filter: key ? `${key}:${id}` : undefined },
+    { Page: 1, PageSize: 50, filter: key ? [`${key}:${id}`] : undefined },
     { query: { enabled: key !== undefined } },
   )
   const verifier = lookup(VERIFIERS, table)

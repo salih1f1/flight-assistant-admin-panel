@@ -12,6 +12,11 @@ export function setMsalInstance(instance: PublicClientApplication) {
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL as string,
   headers: { 'Content-Type': 'application/json' },
+  // Several filters go to the API as the same parameter repeated —
+  // ?filter=Country:TR&filter=Name:air (#146). Axios would otherwise write an array as
+  // filter[]=…&filter[]=…, and `filter[]` is a different parameter name to ASP.NET Core's
+  // binding: the server ignores it and returns the table unfiltered, with no error anywhere.
+  paramsSerializer: { indexes: null },
 })
 
 apiClient.interceptors.request.use(async (config) => {

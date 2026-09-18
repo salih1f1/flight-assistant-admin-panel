@@ -9,5 +9,5 @@ export type AdminGetBrowsableTableDataParams = {
 Page?: number;
 PageSize?: number;
 sort?: string;
-filter?: string;
+filter?: string[];
 };

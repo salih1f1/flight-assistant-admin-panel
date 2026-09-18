@@ -2,7 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CellContext, type ColumnDef } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
 import { DataTable } from '@/components/DataTable'
 import { TableSkeleton } from '@/components/TableSkeleton'
@@ -20,6 +20,7 @@ import { apiErrorMessage } from '@/lib/apiError'
 import { columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
 import { filterColumns, filterControl } from './filterColumns'
+import { filterLabel, parseFilter, withFilter, withoutColumn, withoutFilter } from './appliedFilters'
 import { DELETERS, EDITABLE, LIST_COLUMNS, lookup, MASKED, recordKey, recordPath, VERIFIERS } from './records'
 import { RowActions } from './RowActions'
 import { syncResultMessage } from '../flights/syncOutcome'
@@ -95,6 +96,9 @@ const FILTER_PREVIEWS: Record<string, (id: number) => ReactNode> = {
   DepartureAirportId: id => <AirportName id={id} />,
   ArrivalAirportId: id => <AirportName id={id} />,
 }
+
+/** The column the Verified toggle owns: its buttons replace only this column's criterion. */
+const VERIFIED_COLUMN = 'IsVerified'
 
 const VERIFIED_FILTERS: { label: string; filter: string | undefined }[] = [
   { label: 'All', filter: undefined },
@@ -259,13 +263,15 @@ export function DataBrowserPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, Number(searchParams.get('page')) || 1)
   const sort = searchParams.get('sort') ?? undefined
-  const filter = searchParams.get('filter') ?? undefined
+  const filters = searchParams.getAll('filter')
   const showAll = searchParams.get('columns') === 'all'
 
   const tables = useAdminListBrowsableTables()
   const rows = useAdminGetBrowsableTableData(
     table ?? '',
-    { Page: page, PageSize: PAGE_SIZE, sort, filter },
+    // No criteria means no `filter` parameter at all, rather than an empty one: an unfiltered
+    // request should look exactly as it always did, on the wire and in the query key.
+    { Page: page, PageSize: PAGE_SIZE, sort, filter: filters.length > 0 ? filters : undefined },
     {
       query: {
         enabled: !!table,
@@ -325,19 +331,25 @@ export function DataBrowserPage() {
   }
 
   /** Changes the view in the URL. Any change other than paging starts again at page 1. */
-  const updateView = useCallback((changes: { page?: number; sort?: string; filter?: string }) => {
+  const updateView = useCallback((changes: { page?: number; sort?: string; filters?: string[] }) => {
     const next = new URLSearchParams(searchParams)
     // page comes only from `changes`, so leaving it out resets to page 1.
-    const values = {
-      page: changes.page,
-      sort: searchParams.get('sort') ?? undefined,
-      filter: searchParams.get('filter') ?? undefined,
-      ...changes,
+    const sort = 'sort' in changes ? changes.sort : searchParams.get('sort') ?? undefined
+
+    if (changes.page === undefined || changes.page === 1) next.delete('page')
+    else next.set('page', String(changes.page))
+
+    if (sort === undefined || sort === '') next.delete('sort')
+    else next.set('sort', sort)
+
+    // One `filter` entry per criterion: the API takes the parameter repeated rather than as a
+    // separated list, so a value may contain any character at all — including the commas and
+    // colons that are ordinary in a name or a timestamp (#146).
+    if (changes.filters) {
+      next.delete('filter')
+      for (const filter of changes.filters) next.append('filter', filter)
     }
-    for (const [key, value] of Object.entries(values)) {
-      if (value === undefined || value === '' || (key === 'page' && value === 1)) next.delete(key)
-      else next.set(key, String(value))
-    }
+
     setSearchParams(next)
   }, [searchParams, setSearchParams])
 
@@ -378,7 +390,7 @@ export function DataBrowserPage() {
   // if one ever doesn't, the verify column below keeps the icon rather than the state vanishing.
   const iconColumn = verifier && visibleNames.includes(ICON_COLUMN) ? ICON_COLUMN : undefined
 
-  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filter ?? ''}`
+  const viewKey = `${table ?? ''}|${page}|${sort ?? ''}|${filters.join('|')}`
   const selection = useRowSelection(items, keyColumn, viewKey)
   const selectedRows = selection.selectedRows
 
@@ -521,19 +533,31 @@ export function DataBrowserPage() {
         <div className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             {verifier && (
-              // The API takes one filter, so choosing one of these replaces any column filter.
+              // One criterion among the rest: these add or remove IsVerified and leave every other
+              // filter applied, so "unverified airlines whose name contains air" is expressible
+              // (#146). Dropping the column before adding is what makes Verified → Unverified a
+              // swap rather than a contradiction that matches nothing.
               <div role="group" aria-label="Verified filter" className="inline-flex overflow-hidden rounded-md border border-gray-200">
-                {VERIFIED_FILTERS.map(option => (
-                  <button
-                    key={option.label}
-                    type="button"
-                    aria-pressed={filter === option.filter}
-                    onClick={() => updateView({ filter: option.filter })}
-                    className={cn('px-3 py-1.5 text-sm', filter === option.filter ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                {VERIFIED_FILTERS.map(option => {
+                  const pressed = option.filter
+                    ? filters.includes(option.filter)
+                    : !filters.some(applied => parseFilter(applied).column === VERIFIED_COLUMN)
+                  return (
+                    <button
+                      key={option.label}
+                      type="button"
+                      aria-pressed={pressed}
+                      onClick={() => updateView({
+                        filters: option.filter
+                          ? withFilter(withoutColumn(filters, VERIFIED_COLUMN), option.filter)
+                          : withoutColumn(filters, VERIFIED_COLUMN),
+                      })}
+                      className={cn('px-3 py-1.5 text-sm', pressed ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50')}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
             {/* Opens the Verify dialog on the rows selected via the checkbox column. */}
@@ -550,20 +574,42 @@ export function DataBrowserPage() {
             )}
           </div>
           <ExportCsvButton key={table} table={table} tableName={selected?.displayName ?? table} />
+          {filters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {filters.map(applied => (
+                <span
+                  key={applied}
+                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-1 pl-3 pr-1 text-sm text-gray-700"
+                >
+                  {filterLabel(applied)}
+                  <button
+                    type="button"
+                    aria-label={`Remove filter ${filterLabel(applied)}`}
+                    onClick={() => updateView({ filters: withoutFilter(filters, applied) })}
+                    className="rounded-full p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <Button type="button" variant="ghost" size="sm" onClick={() => updateView({ filters: [] })}>
+                Clear filters
+              </Button>
+            </div>
+          )}
           <FilterForm
-            // Remount when the applied filter or table changes, so the inputs show what's applied.
-            key={`${table}|${filter ?? ''}`}
+            // Remount on a table change, so the inputs never carry another table's columns.
+            key={table}
             // Every column, hidden or not: filtering on one doesn't need it on screen.
             columns={columnNames}
-            filter={filter}
             // What GET /admin/data/tables published about this table's columns (#451), so the value
             // control can match the column's kind. Undefined against an API that publishes none.
             published={tables.data?.find(t => t.slug === table)?.columns}
             // The table's own list of what it is about, so the picker isn't longer than the useful
             // part of it. "Show all columns" means everything in both places, so it passes none.
             allowed={showAll ? undefined : listColumns}
-            onApply={value => updateView({ filter: value })}
-            onClear={() => updateView({ filter: undefined })}
+            appliedColumns={filters.map(applied => parseFilter(applied).column)}
+            onAdd={value => updateView({ filters: withFilter(filters, value) })}
           />
           {remove.error && remove.variables?.table === table && (
             <ActionError
@@ -677,29 +723,26 @@ const SELECT_CLASS = 'h-10 rounded-md border border-gray-200 bg-white px-3 text-
 // The only two values the API parses for a Bool column, offered rather than spelled out in a hint.
 const BOOL_VALUES = ['true', 'false']
 
-function FilterForm({ columns, published, allowed, filter, onApply, onClear }: {
+/**
+ * The row that adds one criterion. It does not show what is applied — the chips above it do — so it
+ * is only ever a picker, a value and an Add button (#146).
+ */
+function FilterForm({ columns, published, allowed, appliedColumns, onAdd }: {
   columns: string[]
   published: BrowsableColumnDto[] | null | undefined
   allowed: string[] | undefined
-  filter: string | undefined
-  onApply: (filter: string) => void
-  onClear: () => void
+  /** The columns the applied criteria name, kept pickable even when off the table's own list. */
+  appliedColumns: string[]
+  onAdd: (filter: string) => void
 }) {
-  // The API splits on the first ':' only, so a value may itself contain colons.
-  const separator = filter?.indexOf(':') ?? -1
-  const appliedColumn = separator >= 0 ? filter!.slice(0, separator) : ''
-  const appliedValue = separator >= 0 ? filter!.slice(separator + 1) : ''
+  const [column, setColumn] = useState('')
+  const [value, setValue] = useState('')
+  // ">=" is the API's only operator, and dates its only operand (#334). A fresh date filter leads
+  // with "on or after", since an exact match on a stored timestamp almost never matches the day an
+  // admin picks.
+  const [comparison, setComparison] = useState('gte')
 
-  const [column, setColumn] = useState(appliedColumn)
-  const [value, setValue] = useState(appliedValue.replace(/^>=/, ''))
-  // ">=" is the API's only operator, and dates its only operand (#334). Applied filters keep
-  // whichever the URL carries; a fresh date filter leads with "on or after", since an exact match
-  // on a stored timestamp almost never matches the day an admin picks.
-  // Only an applied filter that names an exact value selects "exactly"; with nothing applied the
-  // default leads, the same as after the column picker changes.
-  const [comparison, setComparison] = useState(appliedValue !== '' && !appliedValue.startsWith('>=') ? 'exact' : 'gte')
-
-  const options = filterColumns(published, columns, appliedColumn || undefined, allowed)
+  const options = filterColumns(published, columns, appliedColumns, allowed)
   const chosen = column || options[0]?.name || ''
   const chosenColumn = options.find(option => option.name === chosen)
   const control = filterControl(chosenColumn?.kind)
@@ -715,7 +758,13 @@ function FilterForm({ columns, published, allowed, filter, onApply, onClear }: {
       className="flex flex-wrap items-center gap-2"
       onSubmit={e => {
         e.preventDefault()
-        if (chosen && effective && control !== 'none') onApply(`${chosen}:${submitted}`)
+        if (!chosen || !effective || control === 'none') return
+        onAdd(`${chosen}:${submitted}`)
+        // The value belongs to the criterion just added; the column stays, since adding a second
+        // criterion on the same column (Name contains "air", then "tur") is an ordinary thing to do
+        // now that criteria AND.
+        setValue('')
+        setComparison('gte')
       }}
     >
       <select
@@ -763,8 +812,7 @@ function FilterForm({ columns, published, allowed, filter, onApply, onClear }: {
 
       <ReferencePreview column={chosen} value={effective} />
 
-      <Button type="submit" variant="outline" disabled={control === 'none'}>Apply filter</Button>
-      {filter && <Button type="button" variant="ghost" onClick={onClear}>Clear filter</Button>}
+      <Button type="submit" variant="outline" disabled={control === 'none'}>Add filter</Button>
     </form>
   )
 }
