@@ -25,6 +25,7 @@ import type {
 
 import type {
   AcceptVerificationSourceRequest,
+  AddMembershipRequest,
   AdminAuditDtoPagedResult,
   AdminDataSourceDto,
   AdminFlightDetailDto,
@@ -5580,6 +5581,76 @@ export const useAdminTrackFlightForTraveler = <TError = ErrorType<HttpValidation
         TContext
       > => {
       return useMutation(getAdminTrackFlightForTravelerMutationOptions(options), queryClient);
+    }
+
+/**
+ * Links a loyalty program membership to this traveler, exactly as POST /loyalty/memberships does for the signed-in traveler. Body fields: ProgramId (from GET /admin/loyalty/programs), AccountNumber, TierId (optional, from that program's tier list), TierExpiryDate (optional, YYYY-MM-DD, today or later), PointsExpiryDate (same). An unknown traveler is a 404 and writes nothing. A ProgramId we don't have, or a TierId belonging to another program, is a 409 and writes nothing. Adding a membership the traveler already has is not refused: the same program can be added twice, as it can through POST /loyalty/memberships.
+ * @summary Add a loyalty membership for a traveler
+ */
+export const adminAddMembershipForTraveler = (
+    id: string,
+    addMembershipRequest: BodyType<AddMembershipRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/travelers/${id}/memberships`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: addMembershipRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminAddMembershipForTravelerMutationKey = () => ['adminAddMembershipForTraveler'] as const;
+
+export const getAdminAddMembershipForTravelerMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminAddMembershipForTraveler>>, TError,AdminAddMembershipForTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminAddMembershipForTraveler>>, TError,AdminAddMembershipForTravelerMutationVariables, TContext> => {
+
+const mutationKey = getAdminAddMembershipForTravelerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminAddMembershipForTraveler>>, AdminAddMembershipForTravelerMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminAddMembershipForTraveler(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminAddMembershipForTravelerMutationResult = NonNullable<Awaited<ReturnType<typeof adminAddMembershipForTraveler>>>
+    export type AdminAddMembershipForTravelerMutationBody = BodyType<AddMembershipRequest>
+    export type AdminAddMembershipForTravelerMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminAddMembershipForTravelerMutationVariables = {id: string;data: BodyType<AddMembershipRequest>}
+
+    /**
+ * @summary Add a loyalty membership for a traveler
+ */
+export const useAdminAddMembershipForTraveler = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminAddMembershipForTraveler>>, TError,AdminAddMembershipForTravelerMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminAddMembershipForTraveler>>,
+        TError,
+        AdminAddMembershipForTravelerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminAddMembershipForTravelerMutationOptions(options), queryClient);
     }
 
 /**
