@@ -105,7 +105,7 @@ Sign-in uses the MSAL redirect flow, with the token cache in `sessionStorage`.
 
 Never lowercase the comparison, and never read roles from the id token. Either change can make the panel disagree with the API.
 
-`RequireAdmin` is only a UX gate; the API's `AdminOnly` policy is what protects data. In development, `RoleClaimDiagnostic` shows an overlay with the roles on each token, the first thing to check when sign-in works but the panel says Access Denied.
+`RequireAdmin` is only a UX gate; the API's `AdminOnly` policy is what protects data. In development, `RoleClaimDiagnostic` shows an overlay with the roles on each token — but only when there is something to explain: roles that do not match, no `roles` claim at all, or no access token. When the access token already grants admin it renders nothing, so the overlay appearing is itself the signal.
 
 ## Tests
 
