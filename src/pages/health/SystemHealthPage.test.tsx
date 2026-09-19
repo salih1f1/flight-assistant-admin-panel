@@ -79,6 +79,9 @@ function installApi(healthAnswer: () => unknown) {
     if (req.method === 'GET' && req.url === '/admin/usage/aeroapi') throw httpError(503)
     // The page also lists the data sources; DataSourcesSection has its own tests for that.
     if (req.method === 'GET' && req.url === '/admin/health/sources') return []
+    // Likewise the background jobs (#169). Both answer with a plain array, so neither can fall
+    // through to the paged catch-all below.
+    if (req.method === 'GET' && req.url === '/admin/jobs') return []
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))

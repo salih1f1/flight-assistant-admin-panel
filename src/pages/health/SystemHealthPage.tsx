@@ -2,6 +2,7 @@ import { useAdminGetHealth } from '@/api/generated/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiErrorMessage } from '@/lib/apiError'
 import { DataSourcesSection } from './DataSourcesSection'
+import { JobsSection } from './JobsSection'
 import { HealthReport } from './HealthReport'
 
 /**
@@ -38,6 +39,10 @@ export function SystemHealthPage() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Above the inventory: this is the only section here an operator can act on, and
+          the thing they came for when a job is misbehaving. */}
+      <JobsSection />
 
       <DataSourcesSection />
     </div>
