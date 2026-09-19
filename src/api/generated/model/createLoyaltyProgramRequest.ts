@@ -13,6 +13,4 @@ export interface CreateLoyaltyProgramRequest {
   kindId?: number;
   /** @nullable */
   airlineId?: number | null;
-  /** @nullable */
-  allianceCode?: string | null;
 }
