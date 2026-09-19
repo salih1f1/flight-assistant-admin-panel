@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Assembled deployment package (dist + server.js + manifest), built by .github/workflows/deploy.yml
+package
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
