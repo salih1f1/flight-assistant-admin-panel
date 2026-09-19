@@ -58,6 +58,7 @@ export * from './airportAdminDtoPagedResult';
 export * from './allianceAdminDto';
 export * from './allianceAirlineDto';
 export * from './allianceDetailAdminDto';
+export * from './appServiceStatusDto';
 export * from './azureBudgetDto';
 export * from './browsableColumnDto';
 export * from './browsableTableDto';

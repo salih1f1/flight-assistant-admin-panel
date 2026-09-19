@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, type SentRequest } from '@/test/fakeApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import type { AdminJobDto } from '@/api/generated/model'
+import type { AdminJobDto, AppServiceStatusDto } from '@/api/generated/model'
 import { JobsSection } from './JobsSection'
 
 vi.mock('@/api/client', () => ({
@@ -28,9 +28,21 @@ const job = (overrides: Partial<AdminJobDto> = {}): AdminJobDto => ({
 
 let sent: SentRequest[]
 
-function renderWith(jobs: AdminJobDto[], onToggle?: (req: SentRequest) => unknown) {
+/**
+ * A site that is up with Always On enabled — the state in which the section says nothing extra.
+ * Every test that is not about hosting gets this, so a note appearing in one of them is a signal
+ * rather than noise.
+ */
+const ALWAYS_ON: AppServiceStatusDto = { state: 'Ok', alwaysOn: true }
+
+function renderWith(
+  jobs: AdminJobDto[],
+  onToggle?: (req: SentRequest) => unknown,
+  appService: AppServiceStatusDto = ALWAYS_ON,
+) {
   ;({ sent } = installFakeApi(async req => {
     if (req.method === 'GET' && req.url === '/admin/jobs') return jobs
+    if (req.method === 'GET' && req.url === '/admin/health/app-service') return appService
     if (req.method === 'PUT' && req.url.startsWith('/admin/jobs/')) {
       return onToggle ? onToggle(req) : { ...jobs[0], switchEnabled: false, effectiveEnabled: false }
     }
@@ -41,6 +53,96 @@ function renderWith(jobs: AdminJobDto[], onToggle?: (req: SentRequest) => unknow
 
 describe('JobsSection', () => {
   beforeEach(() => { sent = [] })
+
+  // The point of the whole feature (#188). This section says "Running" in green; with Always On
+  // off that is only true while someone is using the panel, because App Service unloads the app
+  // after ~20 minutes idle and IHostedService stops with it.
+  describe('the Always On note', () => {
+    it('warns that the jobs pause when the app is unloaded', async () => {
+      renderWith([job()], undefined, { state: 'Ok', alwaysOn: false })
+
+      expect(await screen.findByText(/pause and resume with traffic/i)).toBeInTheDocument()
+    })
+
+    it('names the remedy', async () => {
+      renderWith([job()], undefined, { state: 'Ok', alwaysOn: false })
+
+      expect(await screen.findByText(/always on/i)).toBeInTheDocument()
+    })
+
+    // A deliberate hosting choice is not a fault: leaving Always On off is cheaper, and with the
+    // jobs idle a forgotten test flight cannot poll overnight. Same rule NotConfigured follows on
+    // the source rows, and an operator stop follows on these very rows.
+    it('renders the warning in amber, not red', async () => {
+      renderWith([job()], undefined, { state: 'Ok', alwaysOn: false })
+
+      expect(await screen.findByText(/pause and resume with traffic/i)).toHaveClass('text-amber-600')
+    })
+
+    it('says nothing when Always On is enabled', async () => {
+      renderWith([job()], undefined, { state: 'Ok', alwaysOn: true })
+      await screen.findByText('Running')
+
+      expect(screen.queryByText(/pause and resume/i)).not.toBeInTheDocument()
+    })
+
+    // Unknown is not false. A refusal never learned whether Always On is on, and a warning drawn
+    // from a value we never read would have no evidence behind it — the inverse of the $0.00 bug:
+    // inventing a fault rather than hiding one.
+    it.each([
+      ['NotAuthorized', 'the managed identity lacks Reader'],
+      ['Unavailable', 'ARM could not be reached'],
+      ['NotConfigured', 'not hosted on App Service at all'],
+    ])('says nothing when the App Service read returned %s', async state => {
+      renderWith([job()], undefined, { state, alwaysOn: null })
+      await screen.findByText('Running')
+
+      expect(screen.queryByText(/pause and resume/i)).not.toBeInTheDocument()
+    })
+
+    // A SUCCESSFUL read that still does not know. The backend returns Ok with alwaysOn null when
+    // the ARM response carries no siteConfig, so this is a real state, not a hypothetical — and it
+    // is the one case the state check above cannot catch, because the state is Ok. Added after
+    // breaking the guard to `!alwaysOn` and finding only the undefined case failed: every other
+    // "says nothing" test was being saved by the state check rather than by the null check.
+    it.each([
+      ['null', null],
+      ['absent', undefined],
+    ])('says nothing when an Ok read reports alwaysOn as %s', async (_label, alwaysOn) => {
+      renderWith([job()], undefined, { state: 'Ok', alwaysOn })
+      await screen.findByText('Running')
+
+      expect(screen.queryByText(/pause and resume/i)).not.toBeInTheDocument()
+    })
+
+    // Belt and braces, and it is the state check's only test. The backend nulls every fact on a
+    // refusal (proven there by ARefusal_ReportsNoFactsAtAll), so alwaysOn: false alongside a failed
+    // state should be unreachable — but the panel must not DEPEND on that. Found by deleting the
+    // state check and watching all 26 tests still pass: every other "says nothing" case pairs a
+    // failed state with a null alwaysOn, so the null check alone was carrying them.
+    it.each(['NotAuthorized', 'Unavailable', 'NotConfigured'])(
+      'refuses to warn from a %s read even if it carries alwaysOn false',
+      async state => {
+        renderWith([job()], undefined, { state, alwaysOn: false })
+        await screen.findByText('Running')
+
+        expect(screen.queryByText(/pause and resume/i)).not.toBeInTheDocument()
+      },
+    )
+
+    // The jobs table is the point of the section; the note must never replace it or block it.
+    it('still renders the jobs when the App Service read fails outright', async () => {
+      installFakeApi(async req => {
+        if (req.method === 'GET' && req.url === '/admin/jobs') return [job()]
+        if (req.method === 'GET' && req.url === '/admin/health/app-service') throw httpError(500, 'boom')
+        throw new Error(`unexpected ${req.method} ${req.url}`)
+      })
+      renderWithProviders(<JobsSection />)
+
+      expect(await screen.findByText('Running')).toBeInTheDocument()
+      expect(screen.queryByText(/pause and resume/i)).not.toBeInTheDocument()
+    })
+  })
 
   it('shows a running job as running', async () => {
     renderWith([job()])

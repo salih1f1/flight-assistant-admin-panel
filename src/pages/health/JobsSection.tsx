@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getAdminGetJobsQueryKey, useAdminGetJobs, useAdminToggleJob } from '@/api/generated/admin'
-import type { AdminJobDto } from '@/api/generated/model'
+import { getAdminGetJobsQueryKey, useAdminGetAppServiceStatus, useAdminGetJobs, useAdminToggleJob } from '@/api/generated/admin'
+import type { AdminJobDto, AppServiceStatusDto } from '@/api/generated/model'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,10 @@ const CONFIG_KEY: Record<string, string> = {
  */
 export function JobsSection() {
   const { data, isLoading, error } = useAdminGetJobs()
+  // Deliberately unguarded by the jobs query's own state: this is a second, independent fact, and
+  // a failure to read it must never stop the jobs table rendering. react-query gives us undefined
+  // on error, which AlwaysOnNote reads as "unknown" — the same as a refusal.
+  const { data: appService } = useAdminGetAppServiceStatus()
 
   return (
     <section className="space-y-3">
@@ -48,6 +52,8 @@ export function JobsSection() {
           ) : isLoading || !data ? (
             <p className="text-sm text-gray-400">Loading jobs…</p>
           ) : (
+            <>
+            <AlwaysOnNote appService={appService} />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -61,10 +67,42 @@ export function JobsSection() {
                 {data.map(job => <JobRow key={job.job} job={job} />)}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+/**
+ * Says that "Running" above is conditional, when it is (#188).
+ *
+ * With Always On off, App Service unloads the app after roughly twenty minutes idle and
+ * IHostedService stops with it — so these jobs run while someone is using the panel and pause
+ * shortly after they close it. Measured on the dev resource as six consecutive hours of zero
+ * requests overnight, with the section reading "Running" throughout.
+ *
+ * It sits here rather than on a row elsewhere on the page because that is where the false
+ * impression is made. A fact stating `alwaysOn: false` a scroll away is true and useless: nobody
+ * connects it to the green "Running" beside it.
+ *
+ * Amber, never red. Leaving Always On off is a defensible choice — it is cheaper, and with the
+ * jobs idle a forgotten test flight cannot poll overnight. The same rule NotConfigured follows on
+ * the data-source rows, and an operator stop follows on these very rows.
+ */
+function AlwaysOnNote({ appService }: { appService: AppServiceStatusDto | undefined }) {
+  // Only a successful read that came back false earns the note. `null`, `undefined`, a refusal, an
+  // outage and a developer machine all mean we do not know, and a warning drawn from a value we
+  // never read would have no evidence behind it — the inverse of reporting $0.00 for a refused
+  // cost query: inventing a fault rather than hiding one. Silence is the honest answer.
+  if (appService?.state !== 'Ok' || appService.alwaysOn !== false) return null
+
+  return (
+    <p className="mb-4 text-sm text-amber-600">
+      The app is unloaded when idle, so these jobs pause and resume with traffic rather than running
+      continuously. Turn on Always On in App Service to run them around the clock.
+    </p>
   )
 }
 
