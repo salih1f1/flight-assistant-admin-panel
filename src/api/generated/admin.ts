@@ -4925,7 +4925,7 @@ export const useAdminDeleteLoyaltyProgram = <TError = ErrorType<HttpValidationPr
     }
 
 /**
- * 404 when the program does not exist. 409 when the program already has a tier with that code or at that rank — loyalty_tiers is unique on both, per program.
+ * 404 when the program does not exist. 409 when the program already has a tier with that code or at that rank — loyalty_tiers is unique on both, per program — or when allianceCode names no alliance we hold. That last check is case-insensitive and skipped entirely when allianceCode is absent or blank, which is the ordinary case for a tier belonging to no alliance.
  * @summary Add a tier to a loyalty program
  */
 export const adminCreateLoyaltyTier = (
@@ -4995,7 +4995,7 @@ export const useAdminCreateLoyaltyTier = <TError = ErrorType<HttpValidationProbl
     }
 
 /**
- * 404 when the program does not exist, or when the tier is not one of its tiers. 409 when another tier of the program already has that code or rank.
+ * 404 when the program does not exist, or when the tier is not one of its tiers. 409 when another tier of the program already has that code or rank, or when allianceCode names no alliance we hold — case-insensitive, and skipped when allianceCode is absent or blank.
  * @summary Update one of a loyalty program's tiers
  */
 export const adminUpdateLoyaltyTier = (
