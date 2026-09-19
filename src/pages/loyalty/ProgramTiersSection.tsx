@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +6,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAdminDeleteLoyaltyTier } from '@/api/generated/admin'
 import type { LoyaltyTierDto } from '@/api/generated/model'
-import { invalidateLoyaltyTiers } from '@/api/cache'
 import { useLoyaltyProgram } from '@/api/loyaltyLookups'
 import { apiErrorMessage } from '@/lib/apiError'
 import { TierDialog } from './TierDialog'
@@ -25,8 +23,8 @@ function allianceLabel(tier: LoyaltyTierDto) {
  * add, edit and delete the API allows on them. Tiers belong to a program — this is where they are
  * read and written, rather than in a flat grid of every program's tiers.
  *
- * The tiers come from the program itself (GET /admin/loyalty/programs returns them nested), so a
- * write invalidates the program list and the raw tiers table together.
+ * The tiers come from the program itself (GET /admin/loyalty/programs returns them nested), so the
+ * program list is what a tier write shows up in.
  */
 export function ProgramTiersSection({ programId }: { programId: number }) {
   const { data: program, isLoading, isError } = useLoyaltyProgram(programId)
@@ -119,7 +117,6 @@ function DeleteTierDialog({ programId, tier, onClose }: {
   tier?: LoyaltyTierDto
   onClose: () => void
 }) {
-  const queryClient = useQueryClient()
   const deleteMutation = useAdminDeleteLoyaltyTier()
   const [failure, setFailure] = useState<ReturnType<typeof apiErrorMessage>>()
 
@@ -127,10 +124,7 @@ function DeleteTierDialog({ programId, tier, onClose }: {
     if (!tier?.id) return
     setFailure(undefined)
     deleteMutation.mutate({ programId, tierId: tier.id }, {
-      onSuccess: () => {
-        invalidateLoyaltyTiers(queryClient)
-        onClose()
-      },
+      onSuccess: () => onClose(),
       onError: error => setFailure(apiErrorMessage(error)),
     })
   }

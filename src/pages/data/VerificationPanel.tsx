@@ -1,14 +1,12 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   adminListVerificationSources, adminQueueVerificationRequests,
-  getAdminGetBrowsableTableDataQueryKey, getAdminGetVerificationNeedsAttentionQueryKey,
-  getAdminListVerificationRequestsQueryKey, useAdminAcceptVerificationSource, useAdminListVerificationRequests,
+  useAdminAcceptVerificationSource, useAdminListVerificationRequests,
 } from '@/api/generated/admin'
 import type { VerificationRequestDto } from '@/api/generated/model'
-import { invalidateAirlines, invalidateAirports } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { lookup, VERIFIERS } from './records'
@@ -39,9 +37,9 @@ const definedStrings = (values: readonly (string | null | undefined)[] | null | 
  * Fetches sparingly: GET /admin/verification-requests?limit=1 runs only when both `entityType` is
  * set and the row needs attention — a verified or never-checked row, or a table with no outside
  * source, sends no request at all, since there would be nothing useful to show for one. The row's
- * own state is owned by the record page, not here: every action below only invalidates the raw
- * table and the needs-attention counts, and lets the next render pick up the refetched row, rather
- * than tracking a local copy of it.
+ * own state is owned by the record page, not here: every action below leaves the refresh a write
+ * triggers to bring the row back, and lets the next render pick it up, rather than tracking a
+ * local copy of it.
  */
 export function VerificationPanel({ table, entityType, recordKey, row, onEdit }: {
   table: string
@@ -52,7 +50,6 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
   // must not be shown, so RecordPage only supplies this when there's somewhere for it to go.
   onEdit?: () => void
 }) {
-  const queryClient = useQueryClient()
   const state = verificationState(row)
   // Both must hold: a checkable type, and a row that actually needs attention.
   const fetchChecks = entityType !== undefined && needsAttention(row)
@@ -61,33 +58,16 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
   const checks = useAdminListVerificationRequests(checksParams, { query: { enabled: fetchChecks } })
   const check = checks.data?.[0]
 
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
-    void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
-  }
-
   const verify = useMutation({
     // Only ever invoked where a verifier is guaranteed (RecordPage renders this panel only then).
     mutationFn: (isVerified: boolean) => lookup(VERIFIERS, table)!(recordKey, { isVerified }),
-    onSuccess: refresh,
   })
 
-  const acceptSource = useAdminAcceptVerificationSource({
-    mutation: {
-      onSuccess: () => {
-        refresh()
-        // Accept-source writes real typed columns (Name, City, CountryCode, coordinates,
-        // elevation), but refresh() above only invalidates the raw table and the counts. The
-        // typed edit form prefetches from GET /admin/airports|airlines/{id}, which the
-        // QueryClient's 5-minute staleTime would otherwise leave stale: open Edit, back out,
-        // accept a source's values, open Edit again within five minutes, and it would show —
-        // and let an admin save back — the pre-accept values. Countries has no typed edit form
-        // (and so no invalidator here) to go stale in the first place.
-        if (table === 'airports') invalidateAirports(queryClient, Number(recordKey))
-        else if (table === 'airlines') invalidateAirlines(queryClient, Number(recordKey))
-      },
-    },
-  })
+  // Accept-source writes real typed columns (Name, City, CountryCode, coordinates, elevation),
+  // which the typed edit form reads from GET /admin/airports|airlines/{id} — one more cache the
+  // refresh after a write has to reach, or opening Edit within the 5-minute staleTime would show,
+  // and let an admin save back, the pre-accept values.
+  const acceptSource = useAdminAcceptVerificationSource()
 
   const checkAgain = useMutation({
     // Re-checks with the sources that check actually used; only when it names none does this ask
@@ -98,11 +78,6 @@ export function VerificationPanel({ table, entityType, recordKey, row, onEdit }:
         ? named
         : definedStrings((await adminListVerificationSources({ entityType })).map(s => s.name))
       return adminQueueVerificationRequests({ entityType, keys: [recordKey], sources })
-    },
-    onSuccess: () => {
-      refresh()
-      // Its own read query: re-fetch so a Pending row shows up without waiting for a navigation.
-      void queryClient.invalidateQueries({ queryKey: getAdminListVerificationRequestsQueryKey(checksParams) })
     },
   })
 

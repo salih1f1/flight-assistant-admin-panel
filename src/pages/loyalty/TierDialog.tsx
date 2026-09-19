@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAdminCreateLoyaltyTier, useAdminUpdateLoyaltyTier } from '@/api/generated/admin'
 import type { LoyaltyTierDto } from '@/api/generated/model'
-import { invalidateLoyaltyTiers } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 
 // The lengths LoyaltyTierConfiguration gives the columns, which the API's validator enforces.
@@ -52,7 +50,6 @@ export function TierDialog({ programId, tier, open, onOpenChange }: {
   onOpenChange: (open: boolean) => void
 }) {
   const isEdit = tier !== undefined
-  const queryClient = useQueryClient()
   const createMutation = useAdminCreateLoyaltyTier()
   const updateMutation = useAdminUpdateLoyaltyTier()
   const [failure, setFailure] = useState<ReturnType<typeof apiErrorMessage>>()
@@ -83,10 +80,7 @@ export function TierDialog({ programId, tier, open, onOpenChange }: {
       allianceTierCode: data.allianceTierCode || undefined,
     }
     const options = {
-      onSuccess: () => {
-        invalidateLoyaltyTiers(queryClient)
-        onOpenChange(false)
-      },
+      onSuccess: () => onOpenChange(false),
       // A clash with another tier of the program is a 409 the API raises on purpose: shown here,
       // with the dialog left open, so the admin can change the code or rank and try again.
       onError: (error: unknown) => setFailure(apiErrorMessage(error)),

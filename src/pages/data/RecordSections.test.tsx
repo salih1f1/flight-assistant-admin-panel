@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, rawRows } from '@/test/fakeApi'
@@ -38,7 +39,7 @@ beforeEach(() => {
 })
 
 function renderRecord(table: string, id: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = createTestQueryClient()
   const router = createMemoryRouter([{ path: '/data/:table/:id', element: <RecordPage /> }], {
     initialEntries: [`/data/${table}/${id}`],
   })

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query'
+import { QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { describe, expect, it } from 'vitest'
 import { APPEAR_DELAY_MS, LoadingBar } from './LoadingBar'
 
@@ -18,7 +19,7 @@ function Saving({ gate }: { gate: Promise<unknown> }) {
 }
 
 function renderBar(inFlight?: ReactNode) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = createTestQueryClient()
   render(
     <QueryClientProvider client={queryClient}>
       <LoadingBar />

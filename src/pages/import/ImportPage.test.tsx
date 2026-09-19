@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, type SentRequest } from '@/test/fakeApi'
-import { renderWithProviders } from '@/test/renderWithProviders'
+import { createTestQueryClient, renderWithProviders } from '@/test/renderWithProviders'
 import { ImportPage } from './ImportPage'
 
 vi.mock('@/api/client', () => ({
@@ -113,7 +113,7 @@ describe('ImportPage', () => {
   })
 
   it('marks cached data stale after an import, so lists and counts show the imported rows', async () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createTestQueryClient()
     queryClient.setQueryData(['/admin/countries'], [])
     const user = userEvent.setup()
     render(

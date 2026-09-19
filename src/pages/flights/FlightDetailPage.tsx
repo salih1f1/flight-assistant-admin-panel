@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AirlineName, AirportName } from '@/components/ReferenceNames'
-import { adminSyncFlightStatus, getAdminGetFlightDetailQueryKey, useAdminGetFlightDetail } from '@/api/generated/admin'
+import { adminSyncFlightStatus, useAdminGetFlightDetail } from '@/api/generated/admin'
 import type { AdminFlightDetailDto, AdminFlightStatusEventDto } from '@/api/generated/model'
-import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
@@ -141,16 +140,9 @@ function FlightDetail({ flight }: { flight: AdminFlightDetailDto }) {
  * no way to tell an actively-polled flight from one the loop has stopped touching.
  */
 function SyncSection({ flight }: { flight: AdminFlightDetailDto }) {
-  const queryClient = useQueryClient()
-  const sync = useMutation({
-    mutationFn: () => adminSyncFlightStatus(flight.id!),
-    onSuccess: () => {
-      // The sync re-plans the flight and may record a status event, so the page it's shown on and
-      // the raw grids both go stale.
-      void queryClient.invalidateQueries({ queryKey: getAdminGetFlightDetailQueryKey(flight.id!) })
-      void invalidateRawTables(queryClient)
-    },
-  })
+  // The sync re-plans the flight and may record a status event; the refetch every write
+  // triggers covers both this page and the raw grids.
+  const sync = useMutation({ mutationFn: () => adminSyncFlightStatus(flight.id!) })
 
   const mode = flight.syncMode
   const now = Date.now()

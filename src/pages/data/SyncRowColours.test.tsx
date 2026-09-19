@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
@@ -34,7 +35,7 @@ const makeRows = (): Record<string, Row[]> => ({
 function renderAt(entry: string) {
   const router = createMemoryRouter([{ path: '/data/:table', element: <DataBrowserPage /> }], { initialEntries: [entry] })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })}>
+    <QueryClientProvider client={createTestQueryClient()}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )

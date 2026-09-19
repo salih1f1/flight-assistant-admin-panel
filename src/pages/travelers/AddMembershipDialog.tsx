@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,7 +10,6 @@ import { Label } from '@/components/ui/label'
 import { useAdminAddMembershipForTraveler } from '@/api/generated/admin'
 import type { LoyaltyProgramDto } from '@/api/generated/model'
 import { useLoyaltyPrograms } from '@/api/loyaltyLookups'
-import { invalidateLoyaltyMemberships } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { optionalInt } from '@/lib/formNumbers'
 
@@ -44,7 +42,6 @@ const programLabel = (program: LoyaltyProgramDto) => `${program.name ?? `#${prog
  */
 export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
   const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
   const { data: programs, isLoading: programsLoading, isError: programsFailed } = useLoyaltyPrograms()
   const addMutation = useAdminAddMembershipForTraveler()
   const [failure, setFailure] = useState<ReturnType<typeof apiErrorMessage>>()
@@ -82,10 +79,7 @@ export function AddMembershipDialog({ travelerId }: { travelerId: string }) {
         },
       },
       {
-        onSuccess: () => {
-          invalidateLoyaltyMemberships(queryClient, travelerId)
-          setOpen(false)
-        },
+        onSuccess: () => setOpen(false),
         onError: error => setFailure(apiErrorMessage(error)),
       },
     )

@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAdminUpdateLoyaltyProgram } from '@/api/generated/admin'
 import type { LoyaltyProgramDto } from '@/api/generated/model'
-import { invalidateLoyaltyPrograms } from '@/api/cache'
 import { type LoyaltyProgramKind, useLoyaltyProgramKinds, useLoyaltyPrograms } from '@/api/loyaltyLookups'
 import { apiErrorMessage } from '@/lib/apiError'
 
@@ -110,7 +108,6 @@ function AttachProgram({ airlineId, programs, kinds }: {
   programs: LoyaltyProgramDto[]
   kinds?: LoyaltyProgramKind[]
 }) {
-  const queryClient = useQueryClient()
   const [chosenId, setChosenId] = useState('')
   const [failure, setFailure] = useState<ReturnType<typeof apiErrorMessage>>()
   const update = useAdminUpdateLoyaltyProgram()
@@ -141,10 +138,7 @@ function AttachProgram({ airlineId, programs, kinds }: {
         },
       },
       {
-        onSuccess: () => {
-          invalidateLoyaltyPrograms(queryClient)
-          setChosenId('')
-        },
+        onSuccess: () => setChosenId(''),
         // The choice stays on screen: the attach can be tried again without finding the program afresh.
         onError: error => setFailure(apiErrorMessage(error)),
       },

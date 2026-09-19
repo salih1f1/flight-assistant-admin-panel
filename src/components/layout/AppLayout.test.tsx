@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { AppLayout } from './AppLayout'
@@ -21,7 +22,7 @@ describe('AppLayout', () => {
       [{ element: <AppLayout />, children: [{ path: '/', element: <SlowPage /> }] }],
       { initialEntries: ['/'] },
     )
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createTestQueryClient()
     render(
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
