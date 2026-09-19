@@ -14,9 +14,10 @@ import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { AirlineProgramsSection } from '@/pages/loyalty/AirlineProgramsSection'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
+import { AllianceAirlinesSection } from '@/pages/alliances/AllianceAirlinesSection'
 import { ProgramTiersSection } from '@/pages/loyalty/ProgramTiersSection'
 import { columnLabel, columnValue } from './columnValue'
-import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, RELATED_VIEWS, VERIFIERS } from './records'
+import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, VERIFIERS } from './records'
 import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
 import { VerificationPanel } from './VerificationPanel'
 
@@ -29,15 +30,18 @@ const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void
 }
 
 /**
- * Sections that ADD to a record page, below its fields: a child collection the record owns, which
- * belongs with the record rather than in a grid of its own. Shown in Read mode only — Edit swaps
- * the fields for the entity's form, and the collection is not part of that form.
+ * Sections that ADD to a record page, below its fields: the records this one is read together
+ * with, which belong with it rather than in a grid or a page of their own. Shown in Read mode
+ * only — Edit swaps the fields for the entity's form, and these are not part of that form.
  *
- * Like EDIT_FORMS above and unlike RELATED_VIEWS, which links away to a page built elsewhere.
+ * A program's tiers it owns; an airline's programs and an alliance's airlines it does not — they
+ * name it, by AirlineId and by AllianceCode. Ownership is not the test: what you opened the record
+ * to see is, which is what puts all three on this page (#173, #174).
  */
 const RECORD_SECTIONS: Record<string, ComponentType<{ id: string }>> = {
   airlines: ({ id }) => <AirlineProgramsSection airlineId={Number(id)} />,
   'loyalty-programs': ({ id }) => <ProgramTiersSection programId={Number(id)} />,
+  alliances: AllianceAirlinesSection,
 }
 
 /**
@@ -53,10 +57,15 @@ export function RecordPage() {
   return <Record key={`${table}|${id}`} table={table} id={id} />
 }
 
-/** The old /{entity}/:id/edit links: the record, opened in Edit. */
-export function RedirectToRecord({ table }: { table: string }) {
+/**
+ * A path that no longer has a page of its own: the record it was about. `mode="edit"` for the old
+ * /{entity}/:id/edit links, which land on the record opened in Edit; plain for /alliances/:id,
+ * whose page became a section of the record page (#174).
+ */
+export function RedirectToRecord({ table, mode }: { table: string; mode?: 'edit' }) {
   const { id = '' } = useParams<{ id: string }>()
-  return <Navigate to={`/data/${table}/${encodeURIComponent(id)}?mode=edit`} replace />
+  const query = mode === 'edit' ? '?mode=edit' : ''
+  return <Navigate to={`/data/${table}/${encodeURIComponent(id)}${query}`} replace />
 }
 
 function Record({ table, id }: { table: string; id: string }) {
@@ -76,8 +85,6 @@ function Record({ table, id }: { table: string; id: string }) {
   const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
   const Form = lookup(EDIT_FORMS, table)
   const Section = lookup(RECORD_SECTIONS, table)
-  // A view that adds to this page rather than replacing it (RELATED_VIEWS, not OWN_DETAIL_PAGES).
-  const relatedView = lookup(RELATED_VIEWS, table)?.(id)
   const editing = Form !== undefined && searchParams.get('mode') === 'edit'
   const setEditing = (edit: boolean) => {
     const next = new URLSearchParams(searchParams)
@@ -118,11 +125,6 @@ function Record({ table, id }: { table: string; id: string }) {
               <p className="text-sm text-gray-500">{`${displayName} · ${key} ${id}`}</p>
             </div>
             <div className="flex items-center gap-2">
-              {relatedView && (
-                <Link to={relatedView.to} className="text-sm text-blue-600 hover:underline">
-                  {relatedView.label}
-                </Link>
-              )}
               {Form && (
                 <div role="group" aria-label="Mode" className="inline-flex overflow-hidden rounded-md border border-gray-200">
                   {[{ label: 'Read', edit: false }, { label: 'Edit', edit: true }].map(option => (
@@ -180,7 +182,8 @@ function Record({ table, id }: { table: string; id: string }) {
                   </dl>
                 </CardContent>
               </Card>
-              {/* What the record owns, below what it is: a program's tiers, an airline's programs. */}
+              {/* What the record is read with, below what it is: a program's tiers, an
+                  airline's programs, an alliance's airlines. */}
               {Section && <Section id={id} />}
             </>
           )}

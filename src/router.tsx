@@ -5,7 +5,6 @@ import { Dashboard } from '@/pages/Dashboard'
 import { TravelerDetailPage } from '@/pages/travelers/TravelerDetailPage'
 import { FlightDetailPage } from '@/pages/flights/FlightDetailPage'
 import { TrackFlightPage } from '@/pages/flights/TrackFlightPage'
-import { AllianceDetailPage } from '@/pages/alliances/AllianceDetailPage'
 import { AirlineFormPage } from '@/pages/airlines/AirlineFormPage'
 import { AirportFormPage } from '@/pages/airports/AirportFormPage'
 import { LoyaltyProgramFormPage } from '@/pages/loyalty/LoyaltyProgramFormPage'
@@ -32,20 +31,21 @@ export const router = createBrowserRouter([
           { path: '/flights/track', element: <TrackFlightPage /> },
           { path: '/flights/:id', element: <FlightDetailPage /> },
           { path: '/alliances', element: <Navigate to="/data/alliances" replace /> },
-          { path: '/alliances/:id', element: <AllianceDetailPage /> },
+          // The airlines are a section of the alliance's record now (#174): no page of its own left.
+          { path: '/alliances/:id', element: <RedirectToRecord table="alliances" /> },
           { path: '/airlines', element: <Navigate to="/data/airlines" replace /> },
           { path: '/airlines/new', element: <AirlineFormPage /> },
-          { path: '/airlines/:id/edit', element: <RedirectToRecord table="airlines" /> },
+          { path: '/airlines/:id/edit', element: <RedirectToRecord table="airlines" mode="edit" /> },
           { path: '/airports', element: <Navigate to="/data/airports" replace /> },
           { path: '/airports/new', element: <AirportFormPage /> },
-          { path: '/airports/:id/edit', element: <RedirectToRecord table="airports" /> },
+          { path: '/airports/:id/edit', element: <RedirectToRecord table="airports" mode="edit" /> },
           { path: '/countries', element: <Navigate to="/data/countries" replace /> },
           { path: '/loyalty', element: <Navigate to="/data/loyalty-programs" replace /> },
           { path: '/loyalty/new', element: <LoyaltyProgramFormPage /> },
-          { path: '/loyalty/:id/edit', element: <RedirectToRecord table="loyalty-programs" /> },
+          { path: '/loyalty/:id/edit', element: <RedirectToRecord table="loyalty-programs" mode="edit" /> },
           { path: '/lounges', element: <Navigate to="/data/lounges" replace /> },
           { path: '/lounges/new', element: <LoungeFormPage /> },
-          { path: '/lounges/:id/edit', element: <RedirectToRecord table="lounges" /> },
+          { path: '/lounges/:id/edit', element: <RedirectToRecord table="lounges" mode="edit" /> },
           // The tables are in the side menu now; the old table picker has no page of its own.
           { path: '/data', element: <Navigate to="/" replace /> },
           { path: '/data/:table', element: <DataBrowserRoute /> },
