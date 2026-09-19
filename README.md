@@ -97,6 +97,10 @@ repository's own `package.json`.
 The Content-Security-Policy comes from the `CONTENT_SECURITY_POLICY` app setting and is omitted
 when unset. If a policy change breaks the app, clear that setting to recover.
 
+**Standing up stage or production?** Follow [docs/deploying-an-environment.md](docs/deploying-an-environment.md)
+— the ordered runbook, with the two steps that fail in ways that look like a different problem
+entirely.
+
 ### Things that will confuse you later
 
 **Every auth configuration change restarts the auth container**, and this B1 plan takes 60 seconds
