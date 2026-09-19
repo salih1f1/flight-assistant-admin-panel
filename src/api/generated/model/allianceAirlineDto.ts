@@ -15,4 +15,6 @@ export interface AllianceAirlineDto {
   name?: string | null;
   /** @nullable */
   countryCode?: string | null;
+  /** @nullable */
+  loyaltyProgramName?: string | null;
 }
