@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -6,6 +6,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, rawRows, type SentRequest } from '@/test/fakeApi'
 import { LoyaltyProgramFormPage } from './LoyaltyProgramFormPage'
 import { DataBrowserPage } from '@/pages/data/DataBrowserPage'
+
+const airlineField = () => screen.getByRole('combobox', { name: /Airline/ })
+
+/** Picks an airline the way a person does: open the picker, type, click the single match. */
+async function chooseAirline(user: ReturnType<typeof userEvent.setup>, query: string) {
+  await user.click(airlineField())
+  await user.type(screen.getByRole('textbox', { name: 'Search airlines' }), query)
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option')
+  if (shown.length !== 1) throw new Error(`"${query}" matched ${shown.length} airlines, not one`)
+  await user.click(shown[0])
+}
+
 
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
@@ -42,12 +54,15 @@ let sent: SentRequest[]
 /** An in-memory loyalty API: create and update change what later reads return. */
 // Shaped like AirlineAdminDto, as GET /admin/airlines/{id} returns it.
 const BRITISH_AIRWAYS = { id: 42, iata: 'BA', icao: 'BAW', name: 'British Airways', countryCode: 'GB', allianceCode: 'ONEWORLD' }
+const LUFTHANSA = { id: 7, iata: 'LH', icao: 'DLH', name: 'Lufthansa', countryCode: 'DE', allianceCode: 'STAR' }
+let airlines: (typeof BRITISH_AIRWAYS)[]
 
 function loyaltyApi(req: SentRequest) {
   // The grid the form returns to: the same records, as GET /admin/data/loyalty-programs rows.
   if (req.method === 'GET' && req.url === '/admin/data/tables') return []
   if (req.method === 'GET' && req.url === '/admin/data/loyalty-programs') return pagedResult(rawRows(programs), req.params)
   if (req.method === 'GET' && req.url === '/admin/airlines/42') return BRITISH_AIRWAYS
+  if (req.method === 'GET' && req.url === '/admin/airlines') return pagedResult(airlines, req.params)
   if (req.method === 'GET' && req.url === '/admin/loyalty/programs') return pagedResult(programs, req.params)
   if (req.method === 'GET' && req.url === '/admin/data/loyalty-program-kinds') return pagedResult(KINDS, req.params)
   const body = req.data as { code: string; name: string; kindId: number; airlineId?: number; allianceCode?: string }
@@ -93,6 +108,7 @@ const putRequest = () => sent.find(r => r.method === 'PUT')
 describe('LoyaltyProgramFormPage', () => {
   beforeEach(() => {
     programs = makePrograms()
+    airlines = [LUFTHANSA, BRITISH_AIRWAYS]
     ;({ sent } = installFakeApi(loyaltyApi))
   })
 
@@ -192,26 +208,85 @@ describe('LoyaltyProgramFormPage', () => {
     )
   })
 
-  it('names the airline behind the Airline ID, and says when there is no such airline', async () => {
+  it('shows the airline a program already has, by name', async () => {
+    programs = programs.map(p => (p.id === 3 ? { ...p, airlineId: 42 } : p))
+    renderRoutes('/loyalty/3/edit')
+
+    await waitFor(() => expect(airlineField()).toHaveTextContent('British Airways (BA)'))
+    expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/data/airlines/42')
+  })
+
+  it('picks an airline by name, with no id to know', async () => {
+    const user = userEvent.setup()
+    renderRoutes('/loyalty/3/edit')
+    await screen.findByDisplayValue('Alliance (ALLIANCE)')
+
+    await chooseAirline(user, 'British')
+
+    expect(airlineField()).toHaveTextContent('British Airways (BA)')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(putRequest()).toEqual(expect.objectContaining({ data: expect.objectContaining({ airlineId: 42 }) })),
+    )
+  })
+
+  it('finds an airline by its code as well as its name', async () => {
+    const user = userEvent.setup()
+    renderRoutes('/loyalty/3/edit')
+    await screen.findByDisplayValue('Alliance (ALLIANCE)')
+
+    await chooseAirline(user, 'DLH')
+
+    expect(airlineField()).toHaveTextContent('Lufthansa (LH)')
+  })
+
+  it('clears the airline back to none', async () => {
     programs = programs.map(p => (p.id === 3 ? { ...p, airlineId: 42 } : p))
     const user = userEvent.setup()
     renderRoutes('/loyalty/3/edit')
-    const airlineId = await screen.findByPlaceholderText('optional')
-    await waitFor(() => expect(airlineId).toHaveValue(42))
+    await waitFor(() => expect(airlineField()).toHaveTextContent('British Airways (BA)'))
 
-    expect(await screen.findByRole('link', { name: 'British Airways (BA)' })).toHaveAttribute('href', '/data/airlines/42')
+    await user.click(airlineField())
+    await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: 'No airline' }))
 
-    await user.clear(airlineId)
-    await user.type(airlineId, '999')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(putRequest()).toBeDefined())
+    expect((putRequest()!.data as Record<string, unknown>).airlineId).toBeUndefined()
+  })
 
-    expect(await screen.findByText('#999, not found')).toBeInTheDocument()
+  /**
+   * GET /admin/airlines is paged at 200 and takes no filter, so the picker holds the whole list.
+   * Stopping at the first page would hide most of seven hundred airlines.
+   */
+  it('offers airlines past the first page of the API', async () => {
+    const filler = Array.from({ length: 200 }, (_, i) => ({
+      id: 500 + i, iata: null, icao: null, name: `Filler ${i}`, countryCode: 'GB', allianceCode: null,
+    })) as unknown as (typeof BRITISH_AIRWAYS)[]
+    airlines = [...filler, BRITISH_AIRWAYS]
+    const user = userEvent.setup()
+    renderRoutes('/loyalty/3/edit')
+    await screen.findByDisplayValue('Alliance (ALLIANCE)')
 
-    await user.clear(airlineId)
-    await user.type(airlineId, '99999999999')
+    await chooseAirline(user, 'British')
 
-    // Past int's range no route matches (and an unmatched /admin route fails CORS), so it isn't looked up.
-    expect(await screen.findByText('#99999999999, not found')).toBeInTheDocument()
-    expect(sent.some(r => r.url === '/admin/airlines/99999999999')).toBe(false)
+    expect(airlineField()).toHaveTextContent('British Airways (BA)')
+  })
+
+  /**
+   * A program can point at an airline the list doesn't hold — one removed since, or a list that
+   * failed to load. Dropping it to "no airline" would quietly rewrite the record on the next save.
+   */
+  it('keeps an airline id the list does not have, and still saves it', async () => {
+    programs = programs.map(p => (p.id === 3 ? { ...p, airlineId: 999 } : p))
+    const user = userEvent.setup()
+    renderRoutes('/loyalty/3/edit')
+
+    await waitFor(() => expect(airlineField()).toHaveTextContent('#999'))
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(putRequest()).toEqual(expect.objectContaining({ data: expect.objectContaining({ airlineId: 999 }) })),
+    )
   })
 
   it('after saving, the loyalty program list shows the change without a reload', async () => {
