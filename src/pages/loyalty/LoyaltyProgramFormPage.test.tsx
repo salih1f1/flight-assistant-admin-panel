@@ -89,6 +89,7 @@ function renderRoutes(initialEntry: string) {
   const router = createMemoryRouter(
     [
       { path: '/data/:table', element: <DataBrowserPage /> },
+      { path: '/data/:table/:id', element: <p>record page</p> },
       { path: '/loyalty/new', element: <LoyaltyProgramFormPage /> },
       { path: '/loyalty/:id/edit', element: <LoyaltyProgramFormPage /> },
     ],
@@ -312,5 +313,62 @@ describe('LoyaltyProgramFormPage', () => {
       await router.navigate('/loyalty/3/edit')
     })
     expect(await screen.findByDisplayValue('Renamed Program')).toBeInTheDocument()
+  })
+})
+
+/** Fills the create form's required fields and submits it. Code and Name have no associated label. */
+async function fillNewProgram(user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
+  await screen.findByRole('option', { name: 'Hotel (HOTEL)' })
+  await user.type(screen.getByPlaceholderText('e.g. EXEC_CLUB'), 'NEW_ONE')
+  await user.type(container.querySelector<HTMLInputElement>('input[name="name"]')!, 'New One')
+  await user.selectOptions(screen.getByLabelText(/Kind/), 'Hotel (HOTEL)')
+  await user.click(screen.getByRole('button', { name: 'Create program' }))
+}
+
+/**
+ * The airline record page's "New program" link: the airline is already known, so the form starts
+ * with it chosen and hands the admin back to the airline they came from.
+ */
+describe('creating a program for a known airline', () => {
+  beforeEach(() => {
+    programs = makePrograms()
+    airlines = [LUFTHANSA, BRITISH_AIRWAYS]
+    ;({ sent } = installFakeApi(loyaltyApi))
+  })
+
+  it('starts with the airline from the link already chosen', async () => {
+    renderRoutes('/loyalty/new?airlineId=42')
+
+    await waitFor(() => expect(airlineField()).toHaveTextContent('British Airways'))
+  })
+
+  it('saves that airline with the new program', async () => {
+    const user = userEvent.setup()
+    const { container } = renderRoutes('/loyalty/new?airlineId=42')
+    await waitFor(() => expect(airlineField()).toHaveTextContent('British Airways'))
+
+    await fillNewProgram(user, container)
+
+    await waitFor(() => expect(sent.some(r => r.method === 'POST')).toBe(true))
+    expect((sent.find(r => r.method === 'POST')!.data as { airlineId?: number }).airlineId).toBe(42)
+  })
+
+  it('goes back to the airline it was opened from, not to the programs grid', async () => {
+    const user = userEvent.setup()
+    const { router, container } = renderRoutes('/loyalty/new?airlineId=42')
+    await waitFor(() => expect(airlineField()).toHaveTextContent('British Airways'))
+
+    await fillNewProgram(user, container)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/data/airlines/42'))
+  })
+
+  it('still returns to the programs grid when it was not opened from an airline', async () => {
+    const user = userEvent.setup()
+    const { router, container } = renderRoutes('/loyalty/new')
+
+    await fillNewProgram(user, container)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/data/loyalty-programs'))
   })
 })

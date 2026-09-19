@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -35,20 +35,29 @@ export function LoyaltyProgramFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = id !== 'new' && id !== undefined
   const navigate = useNavigate()
+  // ?airlineId=: the airline record page's "New program" link. The airline is already known there,
+  // so the form starts with it chosen and hands the admin back to where they pressed it.
+  const [searchParams] = useSearchParams()
+  const fromAirline = Number(searchParams.get('airlineId')) || undefined
 
   return (
     <div className="max-w-lg space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit loyalty program' : 'New loyalty program'}</h1>
-      <LoyaltyProgramForm id={isEdit ? Number(id) : undefined} onDone={() => navigate('/data/loyalty-programs')} />
+      <LoyaltyProgramForm
+        id={isEdit ? Number(id) : undefined}
+        airlineId={fromAirline}
+        onDone={() => navigate(fromAirline ? `/data/airlines/${fromAirline}` : '/data/loyalty-programs')}
+      />
     </div>
   )
 }
 
 /**
  * The loyalty program form: edits loyalty program `id`, or creates one when there's no id. `onDone` runs after a
- * successful save and on Cancel, so the page around it decides where the admin goes next.
+ * successful save and on Cancel, so the page around it decides where the admin goes next. `airlineId` is the
+ * airline a new program starts out pointing at; an existing program's own airline always wins over it.
  */
-export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => void }) {
+export function LoyaltyProgramForm({ id, airlineId, onDone }: { id?: number; airlineId?: number; onDone: () => void }) {
   const isEdit = id !== undefined
   const queryClient = useQueryClient()
   const { data: existing } = useLoyaltyProgram(id)
@@ -59,6 +68,7 @@ export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => 
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { airlineId },
   })
 
   // The API sends a program's kind as its code, while saving needs the kind's id.
