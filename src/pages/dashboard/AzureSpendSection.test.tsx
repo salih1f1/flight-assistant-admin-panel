@@ -16,8 +16,11 @@ const budget = (overrides: Partial<AzureBudgetDto> = {}): AzureBudgetDto => ({
   budgetAmount: 50,
   currentSpendAmount: 12.34,
   currency: 'USD',
-  periodStartUtc: '2026-09-01T00:00:00Z',
-  periodEndUtc: '2026-09-30T23:59:59Z',
+  // The real budget's shape: a monthly grain with a validity window spanning years. That gap is
+  // the whole point — the spend covers the month, timePeriod says how long the budget exists.
+  timeGrain: 'Monthly',
+  periodStartUtc: '2025-08-01T00:00:00Z',
+  periodEndUtc: '2028-07-31T00:00:00Z',
   // Always null: neither Cost Management endpoint reports a freshness timestamp.
   dataAsOfUtc: null,
   message: null,
@@ -117,15 +120,42 @@ describe('AzureSpendSection', () => {
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
-  // An Azure budget can be quarterly or annual. Calling a quarterly budget "this month" would
-  // misrepresent both the figure and how much of the period is left.
-  it('names the real period rather than calling it this month', async () => {
+  // #186: says how often the budget RESETS, which is what describes the figure. The old version
+  // of this test asserted the raw date range and so encoded the same misunderstanding as the code
+  // it was meant to guard.
+  it('says how often the budget resets', async () => {
+    renderWith(() => budget({ timeGrain: 'Monthly' }))
+
+    expect(await screen.findByText(/monthly budget/i)).toBeInTheDocument()
+  })
+
+  // The validity window is administrative detail. Beside a month's spend it reads as though the
+  // spend accumulated over the whole window — three years, for the real budget.
+  it('does not show the budget\'s validity window', async () => {
     renderWith(() => budget({
-      periodStartUtc: '2026-07-01T00:00:00Z', periodEndUtc: '2026-09-30T23:59:59Z',
+      timeGrain: 'Monthly',
+      periodStartUtc: '2025-08-01T00:00:00Z', periodEndUtc: '2028-07-31T00:00:00Z',
     }))
 
-    expect(await screen.findByText(/2026-07-01.*2026-09-30/)).toBeInTheDocument()
-    expect(screen.queryByText(/this month/i)).not.toBeInTheDocument()
+    await screen.findByText(/of \$50\.00/)
+    expect(screen.queryByText(/2025-08-01/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/2028-07-31/)).not.toBeInTheDocument()
+  })
+
+  it('names a quarterly budget as quarterly', async () => {
+    renderWith(() => budget({ timeGrain: 'Quarterly' }))
+
+    expect(await screen.findByText(/quarterly budget/i)).toBeInTheDocument()
+  })
+
+  // No grain means no honest claim to make — and falling back to the range would reinstate
+  // exactly the line that misleads.
+  it('makes no period claim when the grain is missing', async () => {
+    renderWith(() => budget({ timeGrain: null }))
+
+    await screen.findByText(/of \$50\.00/)
+    expect(screen.queryByText(/budget resets|monthly budget/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/2025-08-01/)).not.toBeInTheDocument()
   })
 
   it('says when the API cannot be read at all', async () => {

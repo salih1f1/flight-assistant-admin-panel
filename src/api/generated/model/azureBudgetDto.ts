@@ -17,6 +17,8 @@ export interface AzureBudgetDto {
   /** @nullable */
   currency?: string | null;
   /** @nullable */
+  timeGrain?: string | null;
+  /** @nullable */
   periodStartUtc?: string | null;
   /** @nullable */
   periodEndUtc?: string | null;

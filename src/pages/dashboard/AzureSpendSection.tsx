@@ -2,7 +2,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useAdminGetAzureBudget } from '@/api/generated/admin'
 import type { AzureBudgetDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
-import { formatUtcMinute } from '@/lib/formatUtc'
 import { cn } from '@/lib/utils'
 
 // The API caches for an hour, because Azure's own data only moves every few hours.
@@ -100,7 +99,7 @@ function BudgetReport({ budget }: { budget: AzureBudgetDto }) {
         <Gauge spend={spend} amount={amount} currency={currency} />
       )}
 
-      <Period startUtc={budget.periodStartUtc} endUtc={budget.periodEndUtc} />
+      <Resets timeGrain={budget.timeGrain} />
 
       {/* Azure reports cost on a delay, and neither Cost Management endpoint says how long — so
           this is the honest form of the warning. The AeroAPI gauge directly above is near-live,
@@ -145,12 +144,17 @@ function Gauge({ spend, amount, currency }: { spend: number; amount: number; cur
 }
 
 /**
- * The budget's real period. Never "this month": an Azure budget can be quarterly or annual, and
- * calling a quarterly one monthly would misstate both the figure and how much of it remains.
+ * How often the budget resets — which is what describes the figure beside it (#186).
+ *
+ * Deliberately NOT the budget's `periodStartUtc`–`periodEndUtc`, which this used to render. That
+ * pair is the budget's *validity window* and can span years: the real subscription's is
+ * 2025-08-01 to 2028-07-31 while its spend figure covers one month. Drawn beside a month's spend
+ * it reads as though the spend accumulated over the whole window.
+ *
+ * No grain means no honest claim, so nothing is rendered — falling back to the window would
+ * reinstate exactly the line that misleads.
  */
-function Period({ startUtc, endUtc }: { startUtc: string | null | undefined; endUtc: string | null | undefined }) {
-  if (!startUtc || !endUtc) return null
-  return (
-    <p className="text-xs text-gray-400">{`${formatUtcMinute(startUtc)} – ${formatUtcMinute(endUtc)} UTC`}</p>
-  )
+function Resets({ timeGrain }: { timeGrain: string | null | undefined }) {
+  if (!timeGrain) return null
+  return <p className="text-xs text-gray-400">{`${timeGrain} budget`}</p>
 }
