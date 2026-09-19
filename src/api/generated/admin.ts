@@ -62,6 +62,7 @@ import type {
   AirportAdminDtoPagedResult,
   AllianceAdminDto,
   AllianceDetailAdminDto,
+  AppServiceStatusDto,
   AzureBudgetDto,
   BrowsableTableDto,
   CiRunDto,
@@ -3347,6 +3348,100 @@ export const useAdminProbeDataSource = <TError = ErrorType<ProblemDetails>,
       > => {
       return useMutation(getAdminProbeDataSourceMutationOptions(options), queryClient);
     }
+
+/**
+ * Whether the API's own App Service is running, and whether Always On is enabled. With Always On off, App Service unloads the app after roughly twenty minutes idle and the background jobs stop with it — so they run while the panel is in use and pause afterwards. 'state' says whether the resource could be read: Ok, NotConfigured when not hosted on App Service, NotAuthorized when the managed identity lacks Reader on the resource group, or Unavailable. 'siteState' is Azure's own word for the site. 'alwaysOn' null means unknown, not false. Cached for five minutes, except refusals and outages, which are not cached.
+ * @summary The App Service hosting this API
+ */
+export const adminGetAppServiceStatus = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AppServiceStatusDto>(
+      {url: `/admin/health/app-service`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetAppServiceStatusQueryKey = () => {
+    return [
+    `/admin/health/app-service`
+    ] as const;
+    }
+
+
+export const getAdminGetAppServiceStatusQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetAppServiceStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetAppServiceStatus>>> = ({ signal }) => adminGetAppServiceStatus(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetAppServiceStatusQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetAppServiceStatus>>>
+export type AdminGetAppServiceStatusQueryError = ErrorType<unknown>
+
+
+export function useAdminGetAppServiceStatus<TData = Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAppServiceStatus>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAppServiceStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAppServiceStatus<TData = Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAppServiceStatus>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAppServiceStatus>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAppServiceStatus<TData = Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary The App Service hosting this API
+ */
+
+export function useAdminGetAppServiceStatus<TData = Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAppServiceStatus>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetAppServiceStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 /**
  * Every row ends verified: kept as-is when the CSV's VerifiedAt/VerifiedBy/VerificationSource columns are all present, stamped `import` when none are present, or rejected into Errors (207, the rest of the file still imports) when only some are present.

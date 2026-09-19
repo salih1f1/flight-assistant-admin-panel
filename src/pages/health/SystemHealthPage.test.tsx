@@ -82,6 +82,11 @@ function installApi(healthAnswer: () => unknown) {
     // Likewise the background jobs (#169). Both answer with a plain array, so neither can fall
     // through to the paged catch-all below.
     if (req.method === 'GET' && req.url === '/admin/jobs') return []
+    // And the App Service the jobs run on (#188), which answers a single object. Named explicitly
+    // rather than left to the catch-all below: that would hand the Jobs section a paged envelope
+    // with no `state`, which happens to render nothing today, so a regression making the note
+    // appear on a missing state would pass here unnoticed. Ok + alwaysOn true is the quiet case.
+    if (req.method === 'GET' && req.url === '/admin/health/app-service') return { state: 'Ok', alwaysOn: true }
     if (req.method === 'GET' && req.url.startsWith('/admin/')) return pagedResult([], req.params)
     throw httpError(404)
   }))
