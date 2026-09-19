@@ -847,22 +847,44 @@ assumption.
 Separate from the panel's SPA registration, per the documented guidance against sharing one
 registration across purposes:
 
+The CIAM tenant has no subscription, so reaching it requires `--allow-no-subscriptions`; without
+that flag the CLI falls back to the subscription's tenant and Graph reports the app as not found.
+
 ```bash
+az login --tenant 87b8547f-dda8-4e2e-915b-3484cd8419bc --allow-no-subscriptions
 az ad app create --display-name "flight-assistant-panel-gate" \
   --web-redirect-uris "https://flight-assistant-dev-panel.azurewebsites.net/.auth/login/aad/callback"
+az ad sp create --id <GATE_APP_ID>
 az ad app credential reset --id <GATE_APP_ID> --append --display-name "easyauth"
 ```
 
+**Then enable ID token issuance — this step was missing and cost the most time of anything in the
+plan.** Easy Auth uses the hybrid flow (`response_type=code+id_token`); `az ad app create` leaves
+it off, and without it sign-in succeeds at the tenant and the callback returns a bare `401`. The
+PATCH replaces the whole `web` object, so the redirect URI must be repeated in it:
+
+```bash
+az rest --method PATCH \
+  --uri "https://graph.microsoft.com/v1.0/applications(appId='<GATE_APP_ID>')" \
+  --headers "Content-Type=application/json" \
+  --body '{"web":{"redirectUris":["https://flight-assistant-dev-panel.azurewebsites.net/.auth/login/aad/callback"],"implicitGrantSettings":{"enableIdTokenIssuance":true}}}'
+```
+
 - [ ] **Step 2: Put the secret in Key Vault and reference it**
+
+> **Corrected during execution.** The vault has `enableRbacAuthorization: true`, so
+> `az keyvault set-policy` does not apply — access is a role assignment. The commands below are
+> the ones that actually ran.
 
 ```bash
 az keyvault secret set --vault-name flightassistantdev-kv --name panel-gate-client-secret \
   --value "<the secret from Step 1>"
 
-az webapp identity assign -g flight-assistant-dev -n flight-assistant-dev-panel
+PANEL_PRINCIPAL=$(az webapp identity assign -g flight-assistant-dev \
+  -n flight-assistant-dev-panel --query principalId -o tsv)
 
-az keyvault set-policy --name flightassistantdev-kv --secret-permissions get list \
-  --object-id "$(az webapp identity show -g flight-assistant-dev -n flight-assistant-dev-panel --query principalId -o tsv)"
+az role assignment create --assignee "$PANEL_PRINCIPAL" --role "Key Vault Secrets User" \
+  --scope "/subscriptions/a39b9c33-675b-40ca-84fc-6e548ef6d6c5/resourceGroups/flight-assistant-dev/providers/Microsoft.KeyVault/vaults/flightassistantdev-kv"
 
 az webapp config appsettings set -g flight-assistant-dev -n flight-assistant-dev-panel --settings \
   GATE_CLIENT_SECRET="@Microsoft.KeyVault(SecretUri=https://flightassistantdev-kv.vault.azure.net/secrets/panel-gate-client-secret/)"

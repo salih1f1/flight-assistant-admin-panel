@@ -183,3 +183,50 @@ worsen it, but a hard disable would block deployment the same way it blocked the
    commands to be run on their behalf.
 2. The object ID of each admin account that should pass the gate.
 3. The public IP addresses for the allowlist.
+
+---
+
+## Verified, 2026-09-19
+
+Built and confirmed against the real environment. The risk this design was most exposed to has
+been settled.
+
+**`allowedPrincipals.identities` is enforced for Entra External ID accounts.** This was the spec's
+flagged unknown, and the fallback plan existed because of it. Proved by pointing the allowlist at a
+GUID belonging to nobody: a valid sign-in completed at the tenant and then ended in
+`403 — You don't have authorization to view this page`. Authentication passed, authorization did
+not, which is the behaviour the whole identity layer depends on. No fallback was needed.
+
+**What the three layers actually do**, measured rather than assumed:
+
+| Request | Result |
+|---|---|
+| Anonymous, from an allowlisted IP | `401`; a browser gets `302` to the tenant |
+| Any request for `/assets/*` | `401` — assets are gated too, not just documents |
+| Signed-in account not on the list | `403` at the callback |
+| Signed-in account on the list | the panel loads |
+| Deployment from GitHub Actions | succeeds — the SCM site does not inherit the IP rules |
+
+**Three things the design got wrong**, all found by executing it:
+
+1. **The gate's app registration needs ID token issuance enabled.** Easy Auth uses the hybrid flow;
+   `az ad app create` leaves `enableIdTokenIssuance` off, and the portal only sets it when it
+   creates the registration itself. The symptom was a bare `401` from `/.auth/login/aad/callback`
+   after a successful tenant sign-in — indistinguishable from a bad secret or a rejected identity,
+   and it cost the most time of anything here. The A/B that isolated it was removing the
+   authorization policy entirely and watching the callback still fail.
+2. **Key Vault access is a role assignment, not an access policy.** The vault has
+   `enableRbacAuthorization: true`, so the spec's `az keyvault set-policy` would not have worked;
+   the panel's managed identity needs `Key Vault Secrets User` on the vault.
+3. **The gate and the deploy identity live in different tenants.** The deploy registration belongs
+   to the subscription's tenant; the gate's belongs to `flightassistantextid`, which has no
+   subscription — so `az login --tenant <ciam> --allow-no-subscriptions` is required. Without the
+   flag the CLI falls back to the subscription's tenant and Graph reports the app as not found.
+
+**Still untested at the time of writing:** a request from an IP that is not allowlisted (every
+machine to hand shares the allowlisted address), and the Content-Security-Policy, which only
+appears on authenticated responses and so needs a signed-in browser to confirm.
+
+**Sign-in is two redirects, not one silent hop.** The spec predicted the MSAL step would complete
+silently after the Easy Auth sign-in. In practice the first visit to a new gate registration also
+shows a consent prompt, which is expected and one-time.

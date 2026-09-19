@@ -72,9 +72,16 @@ costs nothing beyond the plan that was already running.
 
 | Layer | What it checks | Where it is configured |
 |---|---|---|
-| Access restrictions | your IP is allowlisted | App Service → Networking |
+| Access restrictions | your IP is allowlisted, default action Deny | App Service → Networking |
 | Easy Auth | your account is named in `allowedPrincipals.identities` | App Service → Authentication |
 | The API | your access token carries the `admin` role | unchanged, `AdminOnly` policy |
+
+The second layer carries the weight, because the `flightassistantextid` directory also holds
+**traveler** accounts — an admin account is created the same way a traveler's is. "Signed in to the
+tenant" is therefore not a meaningful gate on its own, which is why the allowlist is a list of
+object IDs rather than a "require authentication" flag. That it genuinely refuses a non-listed
+account was proved, not assumed: with the allowlist pointed at a different GUID, a valid sign-in
+ends in `403 — You don't have authorization to view this page`.
 
 ### The server
 
@@ -89,6 +96,37 @@ repository's own `package.json`.
 
 The Content-Security-Policy comes from the `CONTENT_SECURITY_POLICY` app setting and is omitted
 when unset. If a policy change breaks the app, clear that setting to recover.
+
+### Things that will confuse you later
+
+**Every auth configuration change restarts the auth container**, and this B1 plan takes 60 seconds
+or more to warm up. A timeout or `ERR_TIMED_OUT` immediately after changing auth settings is the
+restart, not a fault. Wait a minute before concluding anything.
+
+**The gate's app registration needs ID token issuance enabled.** Easy Auth uses the hybrid flow
+(`response_type=code+id_token`), and `az ad app create` does *not* enable it — the portal does it
+silently when it creates the registration for you. Without it, sign-in succeeds at the tenant and
+then the callback returns a bare `401`, which looks exactly like a secret or allowlist problem and
+is neither:
+
+```sh
+az rest --method PATCH \
+  --uri "https://graph.microsoft.com/v1.0/applications(appId='<gate app id>')" \
+  --headers "Content-Type=application/json" \
+  --body '{"web":{"redirectUris":["https://flight-assistant-dev-panel.azurewebsites.net/.auth/login/aad/callback"],"implicitGrantSettings":{"enableIdTokenIssuance":true}}}'
+```
+
+That PATCH replaces the whole `web` object, so `redirectUris` has to be repeated in it or the
+callback URL is wiped.
+
+**The gate lives in a different tenant from the subscription.** The deploy identity is in the
+subscription's tenant; the gate's registration is in `flightassistantextid`, which has no
+subscriptions — so reaching it needs `az login --tenant <ciam tenant> --allow-no-subscriptions`.
+Without that flag the CLI silently falls back to the subscription's tenant and Graph answers
+`Request_ResourceNotFound` for an app that exists perfectly well in the other directory.
+
+**The Key Vault is RBAC-based**, so access is a role assignment (`Key Vault Secrets User` on the
+vault), not `az keyvault set-policy`.
 
 ### When your public IP changes
 
