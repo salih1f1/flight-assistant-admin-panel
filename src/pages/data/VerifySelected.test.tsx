@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
-import { getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { DataBrowserPage } from './DataBrowserPage'
 
 vi.mock('@/api/client', () => ({
@@ -101,7 +101,7 @@ function install() {
   }))
 }
 
-function renderAt(entry: string, queryClient: QueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderAt(entry: string, queryClient: QueryClient = createTestQueryClient()) {
   const router = createMemoryRouter(
     [{ path: '/data/:table', element: <DataBrowserPage /> }],
     { initialEntries: [entry] },
@@ -299,12 +299,12 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(within(await rowOf('Alpha Airport')).queryByRole('button', { name: /^(Verify|Unverify)$/ })).not.toBeInTheDocument()
   })
 
-  it("a per-row Verify also invalidates the dashboard card's needs-attention counts", async () => {
+  it("a per-row Verify refreshes what it isn't on screen with, like the dashboard card's counts", async () => {
     // The dashboard card (NeedsAttentionSection) isn't mounted in this test's tree, so there's no
-    // behavioural way to show its count updating here. Spying on the QueryClient and asserting
-    // the invalidated key is the closest available proof.
+    // behavioural way to show its count updating here. Spying on the QueryClient is the closest
+    // available proof: a verify asks for the refresh every write gets, which reaches the card.
     const user = userEvent.setup()
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     renderAt('/data/airports', queryClient)
     await screen.findByText('Alpha Airport')
@@ -318,7 +318,8 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
 
     await within(dialogRow).findByText('Verified · manual')
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+    // No filter: everything, the card's counts included.
+    expect(invalidateSpy).toHaveBeenCalledWith()
   })
 
   it('7. Verify all shown skips an already-verified row, sending the rest in list order', async () => {
@@ -346,11 +347,11 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     expect(within(bravoRow).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
   })
 
-  it("Verify all shown also invalidates the dashboard card's needs-attention counts, once for the whole run", async () => {
+  it('Verify all shown refreshes the app once for the whole run, not once per row', async () => {
     // Same reasoning as the per-row test above: no consumer mounted here, so this spies on the
     // QueryClient instead of asserting on the (absent) dashboard card.
     const user = userEvent.setup()
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     renderAt('/data/airports', queryClient)
     await screen.findByText('Alpha Airport')
@@ -363,9 +364,7 @@ describe('DataBrowserPage row selection and the Verify dialog', () => {
     const charlieRow = (await within(dialog).findByText('Charlie Airport')).closest('tr')!
     await within(charlieRow).findByText('Verified · manual')
 
-    const needsAttentionKey = JSON.stringify(getAdminGetVerificationNeedsAttentionQueryKey())
-    const matches = invalidateSpy.mock.calls.filter(([arg]) => JSON.stringify((arg as { queryKey?: unknown })?.queryKey) === needsAttentionKey)
-    expect(matches).toHaveLength(1)
+    expect(invalidateSpy).toHaveBeenCalledTimes(1)
   })
 
   it('a Verify all shown run over 3 rows refetches the grid once, not once per verified row', async () => {

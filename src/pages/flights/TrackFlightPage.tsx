@@ -1,6 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,7 +7,6 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAdminGetTravelerById, useAdminSearchFlights, useAdminTrackFlightForTraveler } from '@/api/generated/admin'
 import type { AdminSearchFlightsParams, AdminTravelerDto, FlightSearchResultDto } from '@/api/generated/model'
-import { invalidateTrackedFlights } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
 import { isTravelerId } from '@/lib/travelerId'
@@ -36,7 +34,6 @@ export function TrackFlightPage() {
   const [criteria, setCriteria] = useState<AdminSearchFlightsParams>()
   const results = useAdminSearchFlights(criteria ?? { date: '' }, { query: { enabled: criteria !== undefined } })
 
-  const queryClient = useQueryClient()
   const trackMutation = useAdminTrackFlightForTraveler()
   const [tracked, setTracked] = useState<Record<string, number>>({})
   const [outcome, setOutcome] = useState<Outcome>()
@@ -50,7 +47,6 @@ export function TrackFlightPage() {
         const { flightId } = response as unknown as { flightId: number }
         setTracked(previous => ({ ...previous, [`${id}|${rowKey(row)}`]: flightId }))
         setOutcome({ row, flightId, traveler })
-        void invalidateTrackedFlights(queryClient, id)
       },
       onError: error => setOutcome({ row, error }),
     })

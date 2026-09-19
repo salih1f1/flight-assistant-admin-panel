@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AirportName } from '@/components/ReferenceNames'
 import { useAdminCreateLounge, useAdminGetLoungeById, useAdminUpdateLounge } from '@/api/generated/admin'
-import { invalidateLounges } from '@/api/cache'
 
 const schema = z.object({
   airportId: z.coerce.number().int().positive('Airport ID is required'),
@@ -48,12 +46,9 @@ export function LoungeFormPage() {
  */
 export function LoungeForm({ id, onDone }: { id?: number; onDone: () => void }) {
   const isEdit = id !== undefined
-  const queryClient = useQueryClient()
   const { data: lounge, isLoading } = useAdminGetLoungeById(id ?? 0, { query: { enabled: isEdit } })
-  const createMutation = useAdminCreateLounge({ mutation: { onSuccess: () => invalidateLounges(queryClient) } })
-  const updateMutation = useAdminUpdateLounge({
-    mutation: { onSuccess: (_, variables) => invalidateLounges(queryClient, variables.id) },
-  })
+  const createMutation = useAdminCreateLounge()
+  const updateMutation = useAdminUpdateLounge()
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),

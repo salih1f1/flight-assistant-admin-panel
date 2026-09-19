@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { type CellContext, type ColumnDef } from '@tanstack/react-table'
 import { Plus, X } from 'lucide-react'
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog'
@@ -16,7 +16,6 @@ import {
   useAdminGetBrowsableTableData, useAdminListBrowsableTables,
 } from '@/api/generated/admin'
 import type { BrowsableColumnDto } from '@/api/generated/model'
-import { invalidateRawTables } from '@/api/cache'
 import { apiErrorMessage } from '@/lib/apiError'
 import { columnLabel, columnValue } from './columnValue'
 import { ExportCsvButton } from './ExportCsvButton'
@@ -288,7 +287,6 @@ export function DataBrowserPage() {
     },
   )
 
-  const queryClient = useQueryClient()
   const verifier = table ? lookup(VERIFIERS, table) : undefined
   const keyColumn = table ? recordKey(table) : undefined
   // The rows the Verify dialog is open on, or null for closed: the checkbox selection when the
@@ -301,23 +299,18 @@ export function DataBrowserPage() {
   const deleter = table ? lookup(DELETERS, table) : undefined
   const [deleting, setDeleting] = useState<Row | null>(null)
   const remove = useMutation({
+    // A delete can cascade — a traveler's device tokens go with them — which the refresh every
+    // write triggers covers.
     mutationFn: ({ table: slug, row }: { table: string; row: Row }) => DELETERS[slug].remove(row),
-    // Every raw table: a delete can cascade, e.g. a traveler's device tokens go with them.
-    onSuccess: () => invalidateRawTables(queryClient),
     onSettled: () => setDeleting(null),
   })
-  const sync = useMutation({
-    mutationFn: (flight: Row) => adminSyncFlightStatus(Number(flight.Id)),
-    // The flight's times change, and the sync records status events.
-    onSuccess: () => invalidateRawTables(queryClient),
-  })
+  const sync = useMutation({ mutationFn: (flight: Row) => adminSyncFlightStatus(Number(flight.Id)) })
   const retry = useMutation({
     // The request's own Id column, never the entity key: the route is scoped to one check, not
     // one entity. Carries `table` alongside it, the same way `remove` does below, so the banners
     // can tell this table's own last retry apart from one left over from a table the admin has
     // since switched away from.
     mutationFn: ({ row }: { table: string; row: Row }) => adminRetryVerificationRequest(Number(row.Id)),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(VERIFICATION_REQUESTS_TABLE) }),
   })
   // Retry is the one row action with a success line, not just an error one (Sync/Delete/Verify
   // only ever show a failure), so its result must not survive leaving this table and coming back.

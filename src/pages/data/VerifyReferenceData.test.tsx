@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createTestQueryClient } from '@/test/renderWithProviders'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
-import { getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
 import { DataBrowserPage } from './DataBrowserPage'
 
 /**
@@ -137,7 +137,7 @@ const defaultVerifyCountry = (req: SentRequest) => {
   return undefined
 }
 
-function renderAt(entry: string, queryClient: QueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderAt(entry: string, queryClient: QueryClient = createTestQueryClient()) {
   const router = createMemoryRouter(
     [
       { path: '/data', element: <DataBrowserPage /> },
@@ -198,19 +198,20 @@ describe('DataBrowserPage verify', () => {
     expect(within(await rowOf('Beta Air')).queryByRole('button', { name: 'Verify' })).not.toBeInTheDocument()
   })
 
-  it("verifying a row from the grid also invalidates the dashboard card's needs-attention counts", async () => {
+  it("verifying a row from the grid refreshes what it isn't on screen with, like the dashboard card's counts", async () => {
     // The dashboard card (NeedsAttentionSection) isn't mounted in this test's tree, so there's no
     // behavioural way to show its count updating here — e.g. after verifying from the filtered
-    // "needs attention" grid the card linked from. Spying on the QueryClient and asserting the
-    // invalidated key is the closest available proof.
+    // "needs attention" grid the card linked from. Spying on the QueryClient is the closest
+    // available proof: a verify asks for the refresh every write gets, which reaches the card.
     const user = userEvent.setup()
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = createTestQueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     renderAt('/data/airlines?columns=all', queryClient)
 
     await verifyFromGrid(user, 'Beta Air')
 
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() }))
+    // No filter: everything, the card's counts included.
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith())
   })
 
   it('keeps a column filter when the Verified toggle is used', async () => {

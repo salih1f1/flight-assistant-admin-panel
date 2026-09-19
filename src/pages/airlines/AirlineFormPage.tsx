@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   useAdminCreateAirline, useAdminGetAirlineById, useAdminGetAllAlliances, useAdminUpdateAirline,
 } from '@/api/generated/admin'
-import { invalidateAirlines } from '@/api/cache'
 
 const schema = z.object({
   iata: z.string().max(3).optional(),
@@ -42,13 +40,10 @@ export function AirlineFormPage() {
  */
 export function AirlineForm({ id, onDone }: { id?: number; onDone: () => void }) {
   const isEdit = id !== undefined
-  const queryClient = useQueryClient()
   const { data: existing } = useAdminGetAirlineById(id ?? 0, { query: { enabled: isEdit } })
   const { data: alliances, isError: alliancesFailed } = useAdminGetAllAlliances()
-  const createMutation = useAdminCreateAirline({ mutation: { onSuccess: () => invalidateAirlines(queryClient) } })
-  const updateMutation = useAdminUpdateAirline({
-    mutation: { onSuccess: (_, variables) => invalidateAirlines(queryClient, variables.id) },
-  })
+  const createMutation = useAdminCreateAirline()
+  const updateMutation = useAdminUpdateAirline()
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),

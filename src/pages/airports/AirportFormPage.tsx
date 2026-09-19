@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdminCreateAirport, useAdminGetAirportById, useAdminUpdateAirport } from '@/api/generated/admin'
-import { invalidateAirports } from '@/api/cache'
 import { optionalInt, optionalNumber } from '@/lib/formNumbers'
 
 const schema = z.object({
@@ -47,12 +45,9 @@ export function AirportFormPage() {
  */
 export function AirportForm({ id, onDone }: { id?: number; onDone: () => void }) {
   const isEdit = id !== undefined
-  const queryClient = useQueryClient()
   const { data: existing } = useAdminGetAirportById(id ?? 0, { query: { enabled: isEdit } })
-  const createMutation = useAdminCreateAirport({ mutation: { onSuccess: () => invalidateAirports(queryClient) } })
-  const updateMutation = useAdminUpdateAirport({
-    mutation: { onSuccess: (_, variables) => invalidateAirports(queryClient, variables.id) },
-  })
+  const createMutation = useAdminCreateAirport()
+  const updateMutation = useAdminUpdateAirport()
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),

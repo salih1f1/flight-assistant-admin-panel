@@ -1,11 +1,8 @@
 import type { ComponentType } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { RevealableValue } from '@/components/RevealableValue'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  getAdminGetBrowsableTableDataQueryKey, useAdminGetBrowsableTableData, useAdminListBrowsableTables,
-} from '@/api/generated/admin'
+import { useAdminGetBrowsableTableData, useAdminListBrowsableTables } from '@/api/generated/admin'
 import { apiErrorMessage } from '@/lib/apiError'
 import { shortId } from '@/lib/travelerId'
 import { cn } from '@/lib/utils'
@@ -70,7 +67,6 @@ export function RedirectToRecord({ table, mode }: { table: string; mode?: 'edit'
 
 function Record({ table, id }: { table: string; id: string }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const queryClient = useQueryClient()
   const key = recordKey(table)
   const tables = useAdminListBrowsableTables()
   // The key's string filter is a contains match (Countries' Code), so the exact row is picked below.
@@ -80,7 +76,6 @@ function Record({ table, id }: { table: string; id: string }) {
     { query: { enabled: key !== undefined } },
   )
   const verifier = lookup(VERIFIERS, table)
-  const refresh = () => queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
 
   const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
   const Form = lookup(EDIT_FORMS, table)
@@ -159,11 +154,9 @@ function Record({ table, id }: { table: string; id: string }) {
             <div className="max-w-xl">
               <Form
                 id={Number(id)}
-                onDone={() => {
-                  // The form refreshes its entity's typed caches; the fields here come from the raw table.
-                  void refresh()
-                  setEditing(false)
-                }}
+                // The fields here come from the raw table; the save refreshes it along with
+                // everything else on screen.
+                onDone={() => setEditing(false)}
               />
             </div>
           ) : (

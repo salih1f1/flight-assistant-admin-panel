@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { getAdminGetBrowsableTableDataQueryKey, getAdminGetVerificationNeedsAttentionQueryKey } from '@/api/generated/admin'
+import { refreshAfterWrite } from '@/api/queryClient'
 import { apiErrorMessage } from '@/lib/apiError'
 import { cn } from '@/lib/utils'
 import { lookup, VERIFIERS } from './records'
@@ -151,14 +151,11 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       // exists where lookup(VERIFIERS, table) is defined), so this always finds a verifier.
       await lookup(VERIFIERS, table)!(key, { isVerified: true })
       applyOutcome({ status: 'verified' })
-      // The row really did change server-side, so the grid should refresh regardless of whether
-      // this dialog is still open, or has since been closed (or closed and reopened).
-      if (invalidate) {
-        void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
-        // The dashboard card's counts: verifying from the filtered "needs attention" grid this
-        // dialog opened from would otherwise leave the card's count stale for up to five minutes.
-        void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
-      }
+      // The row really did change server-side, so the app should refresh regardless of whether
+      // this dialog is still open, or has since been closed (or closed and reopened). The verify
+      // endpoints are called directly rather than through useMutation, so this is the one place
+      // that has to ask for the refresh itself.
+      if (invalidate) refreshAfterWrite(queryClient)
       return true
     } catch (error) {
       // Matches the grid's own verify: the API answers a missing row with an empty 404.
@@ -195,8 +192,7 @@ export function VerifyDialog({ open, onOpenChange, table, keyColumn, rows, manua
       if (isVerified(row) || isPending(row)) continue
       await verifyOne(row, { invalidate: false })
     }
-    void queryClient.invalidateQueries({ queryKey: getAdminGetBrowsableTableDataQueryKey(table) })
-    void queryClient.invalidateQueries({ queryKey: getAdminGetVerificationNeedsAttentionQueryKey() })
+    refreshAfterWrite(queryClient)
     if (generationRef.current === generation) setRunningAll(false)
   }
 

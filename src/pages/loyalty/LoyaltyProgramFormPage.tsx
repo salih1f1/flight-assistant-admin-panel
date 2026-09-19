@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdminCreateLoyaltyProgram, useAdminUpdateLoyaltyProgram } from '@/api/generated/admin'
 import { airlineLabel, useAirlines } from '@/api/airlineLookups'
 import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
-import { invalidateLoyaltyPrograms } from '@/api/cache'
 import { optionalInt } from '@/lib/formNumbers'
 
 const schema = z.object({
@@ -59,12 +57,11 @@ export function LoyaltyProgramFormPage() {
  */
 export function LoyaltyProgramForm({ id, airlineId, onDone }: { id?: number; airlineId?: number; onDone: () => void }) {
   const isEdit = id !== undefined
-  const queryClient = useQueryClient()
   const { data: existing } = useLoyaltyProgram(id)
   const { data: kinds, isError: kindsFailed } = useLoyaltyProgramKinds()
   const { data: airlines, isLoading: airlinesLoading, isError: airlinesFailed } = useAirlines()
-  const createMutation = useAdminCreateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
-  const updateMutation = useAdminUpdateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
+  const createMutation = useAdminCreateLoyaltyProgram()
+  const updateMutation = useAdminUpdateLoyaltyProgram()
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
