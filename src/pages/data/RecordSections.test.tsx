@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ vi.mock('@/api/client', () => ({
 }))
 
 const TABLES = [
+  { slug: 'airlines', displayName: 'Airlines', rowCount: 1 },
   { slug: 'loyalty-programs', displayName: 'Loyalty Programs', rowCount: 1 },
   { slug: 'loyalty-program-kinds', displayName: 'Program Kinds', rowCount: 1 },
 ]
@@ -20,6 +21,7 @@ const PROGRAM = {
 }
 
 const ROWS: Record<string, object[]> = {
+  airlines: [{ id: 7, iata: 'TK', icao: 'THY', name: 'Turk Hava Yollari', isVerified: true }],
   'loyalty-programs': [{ id: 3, code: 'EXEC_CLUB', name: 'Executive Club', kindId: 1, isVerified: true }],
   'loyalty-program-kinds': [{ id: 1, code: 'AIRLINE', name: 'Airline programme', isVerified: true }],
 }
@@ -51,6 +53,14 @@ describe('sections that add to a record page', () => {
     expect(await screen.findByRole('table', { name: 'Tiers' })).toBeInTheDocument()
     expect(screen.getByText('Gold')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add tier/i })).toBeInTheDocument()
+  })
+
+  it('shows an airline\'s loyalty programs on the airline record page', async () => {
+    renderRecord('airlines', '7')
+
+    // PROGRAM points at airline 7; the section reads it from the program list, not from this row.
+    const table = await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(within(table).getByRole('link', { name: 'Executive Club' })).toHaveAttribute('href', '/data/loyalty-programs/3')
   })
 
   it('leaves every other table\'s record page alone', async () => {

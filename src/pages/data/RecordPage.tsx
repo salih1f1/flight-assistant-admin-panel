@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
 import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
+import { AirlineProgramsSection } from '@/pages/loyalty/AirlineProgramsSection'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
 import { ProgramTiersSection } from '@/pages/loyalty/ProgramTiersSection'
 import { columnLabel, columnValue } from './columnValue'
@@ -35,6 +36,7 @@ const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void
  * Like EDIT_FORMS above and unlike RELATED_VIEWS, which links away to a page built elsewhere.
  */
 const RECORD_SECTIONS: Record<string, ComponentType<{ id: string }>> = {
+  airlines: ({ id }) => <AirlineProgramsSection airlineId={Number(id)} />,
   'loyalty-programs': ({ id }) => <ProgramTiersSection programId={Number(id)} />,
 }
 
@@ -178,7 +180,7 @@ function Record({ table, id }: { table: string; id: string }) {
                   </dl>
                 </CardContent>
               </Card>
-              {/* What the record owns, below what it is: a loyalty program's tiers. */}
+              {/* What the record owns, below what it is: a program's tiers, an airline's programs. */}
               {Section && <Section id={id} />}
             </>
           )}
