@@ -24,7 +24,10 @@ const GROUPS: [string, [string, string][]][] = [
   ['Travelers', [['Travelers', '/data/travelers'], ['Device Tokens', '/data/device-tokens'], ['Loyalty Memberships', '/data/traveler-loyalty-memberships']]],
   ['Flights', [['Flights', '/data/flights'], ['Track a flight', '/flights/track'], ['Traveler Flights', '/data/traveler-flights'], ['Flight Status Events', '/data/flight-status-events']]],
   ['Lounges', [['Lounges', '/data/lounges'], ['Lounge Providers', '/data/lounge-providers'], ['Provider Links', '/data/lounge-provider-links']]],
-  ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds'], ['Tiers', '/data/loyalty-tiers']]],
+  // No Tiers entry: a program's tiers are managed on the program itself (#170), and the flat
+  // grid of every program's tiers is no longer offered — like the raw audit log, it is still at
+  // /data/loyalty-tiers if something links there.
+  ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds']]],
   ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries'], ['Flight Statuses', '/data/flight-statuses']]],
   ['System', [['System health', '/health'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Data Source Status', '/data/data-source-status'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
 ]

@@ -13,6 +13,7 @@ import { AirlineForm } from '@/pages/airlines/AirlineFormPage'
 import { AirportForm } from '@/pages/airports/AirportFormPage'
 import { LoungeForm } from '@/pages/lounges/LoungeFormPage'
 import { LoyaltyProgramForm } from '@/pages/loyalty/LoyaltyProgramFormPage'
+import { ProgramTiersSection } from '@/pages/loyalty/ProgramTiersSection'
 import { columnLabel, columnValue } from './columnValue'
 import { lookup, MASKED, OWN_DETAIL_PAGES, recordKey, RELATED_VIEWS, VERIFIERS } from './records'
 import { VERIFICATION_ENTITY_TYPES } from './verificationChecks'
@@ -24,6 +25,17 @@ const EDIT_FORMS: Record<string, ComponentType<{ id?: number; onDone: () => void
   airports: AirportForm,
   lounges: LoungeForm,
   'loyalty-programs': LoyaltyProgramForm,
+}
+
+/**
+ * Sections that ADD to a record page, below its fields: a child collection the record owns, which
+ * belongs with the record rather than in a grid of its own. Shown in Read mode only — Edit swaps
+ * the fields for the entity's form, and the collection is not part of that form.
+ *
+ * Like EDIT_FORMS above and unlike RELATED_VIEWS, which links away to a page built elsewhere.
+ */
+const RECORD_SECTIONS: Record<string, ComponentType<{ id: string }>> = {
+  'loyalty-programs': ({ id }) => <ProgramTiersSection programId={Number(id)} />,
 }
 
 /**
@@ -61,6 +73,7 @@ function Record({ table, id }: { table: string; id: string }) {
 
   const displayName = tables.data?.find(t => t.slug === table)?.displayName ?? table
   const Form = lookup(EDIT_FORMS, table)
+  const Section = lookup(RECORD_SECTIONS, table)
   // A view that adds to this page rather than replacing it (RELATED_VIEWS, not OWN_DETAIL_PAGES).
   const relatedView = lookup(RELATED_VIEWS, table)?.(id)
   const editing = Form !== undefined && searchParams.get('mode') === 'edit'
@@ -150,20 +163,24 @@ function Record({ table, id }: { table: string; id: string }) {
               />
             </div>
           ) : (
-            <Card>
-              <CardContent className="p-6">
-                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                  {Object.entries(row).map(([column, value]) => (
-                    <div key={column} className="min-w-0">
-                      <dt className="text-xs font-medium text-gray-500">{columnLabel(column)}</dt>
-                      <dd className="mt-1 break-words text-gray-900">
-                        <FieldValue table={table} id={id} column={column} value={value} row={row} />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </CardContent>
-            </Card>
+            <>
+              <Card>
+                <CardContent className="p-6">
+                  <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(row).map(([column, value]) => (
+                      <div key={column} className="min-w-0">
+                        <dt className="text-xs font-medium text-gray-500">{columnLabel(column)}</dt>
+                        <dd className="mt-1 break-words text-gray-900">
+                          <FieldValue table={table} id={id} column={column} value={value} row={row} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </CardContent>
+              </Card>
+              {/* What the record owns, below what it is: a loyalty program's tiers. */}
+              {Section && <Section id={id} />}
+            </>
           )}
         </>
       )}

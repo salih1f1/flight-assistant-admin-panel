@@ -39,6 +39,13 @@ export const invalidateLounges = (queryClient: QueryClient, id?: number) =>
 export const invalidateLoyaltyPrograms = (queryClient: QueryClient) =>
   invalidate(queryClient, getAdminGetLoyaltyProgramsQueryKey(), rawTable('loyalty-programs'))
 
+/**
+ * After writing one of a program's tiers: the program list, which carries the tiers nested and is
+ * what the program page reads them from, and the raw tiers table that still lists them all.
+ */
+export const invalidateLoyaltyTiers = (queryClient: QueryClient) =>
+  invalidate(queryClient, getAdminGetLoyaltyProgramsQueryKey(), rawTable('loyalty-programs'), rawTable('loyalty-tiers'))
+
 /** After tracking a flight for a traveler: their detail page, and the flights and tracking tables, since tracking can create the flight. */
 export const invalidateTrackedFlights = (queryClient: QueryClient, travelerId: string) =>
   invalidate(queryClient, getAdminGetTravelerDetailQueryKey(travelerId), getAdminGetAllFlightsQueryKey(), rawTable('flights'), rawTable('traveler-flights'))

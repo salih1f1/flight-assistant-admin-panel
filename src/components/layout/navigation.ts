@@ -51,7 +51,10 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       table('Loyalty Programs', 'loyalty-programs', '/loyalty'),
       table('Program Kinds', 'loyalty-program-kinds'),
-      table('Tiers', 'loyalty-tiers'),
+      // No Tiers entry: a tier belongs to a program, and the program's record page manages its
+      // tiers (#170). The flat grid of every program's tiers answered no question the program
+      // page doesn't answer better, so it is unlisted — still at /data/loyalty-tiers, like the
+      // raw admin audit log, if something links there.
     ],
   },
   {
