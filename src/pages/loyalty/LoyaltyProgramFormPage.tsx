@@ -21,7 +21,6 @@ const schema = z.object({
   // a kind the admin did not choose.
   kindId: z.coerce.number().int().min(1, 'Choose a kind'),
   airlineId: optionalInt(),
-  allianceCode: z.string().optional(),
 })
 
 // The form holds raw input values (coerced fields are `unknown` until parsed);
@@ -80,12 +79,11 @@ export function LoyaltyProgramForm({ id, airlineId, onDone }: { id?: number; air
       // one rather than the form silently saving a different kind.
       kindId: kinds.find(k => k.code === existing.kind)?.id,
       airlineId: existing.airlineId ?? undefined,
-      allianceCode: existing.allianceCode ?? '',
     })
   }, [existing, kinds, reset])
 
   const onSubmit = (data: FormData) => {
-    const payload = { ...data, allianceCode: data.allianceCode || undefined }
+    const payload = { ...data }
     if (id !== undefined) {
       updateMutation.mutate({ id, data: payload }, { onSuccess: () => onDone() })
     } else {
@@ -164,10 +162,6 @@ export function LoyaltyProgramForm({ id, airlineId, onDone }: { id?: number; air
               {Number(watch('airlineId')) > 0 && (
                 <p className="text-xs text-gray-500"><AirlineName id={Number(watch('airlineId'))} /></p>
               )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Alliance code</Label>
-              <Input {...register('allianceCode')} placeholder="STAR / OW / ST" />
             </div>
           </div>
           <div className="flex gap-3 pt-2">
