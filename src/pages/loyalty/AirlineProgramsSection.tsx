@@ -26,6 +26,12 @@ export function AirlineProgramsSection({ airlineId }: { airlineId: number }) {
   const { data: kinds } = useLoyaltyProgramKinds()
 
   const programs = (allPrograms ?? []).filter(p => p.airlineId === airlineId)
+  // An airline generally runs one loyalty program, so once it has one there is nothing to add:
+  // both ways in are dropped rather than disabled, and a line below says where the rare second
+  // one is added instead. Known only once the list has arrived — neither control flickers in
+  // while it is loading.
+  const loaded = !isError && !isLoading
+  const canAdd = loaded && programs.length === 0
   // A program with no airline is free to claim. One that already has another airline is not
   // offered: moving it is a decision for that program's own page, not a side effect of this one.
   const unattached = (allPrograms ?? []).filter(p => p.airlineId == null)
@@ -38,9 +44,11 @@ export function AirlineProgramsSection({ airlineId }: { airlineId: number }) {
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
         <CardTitle className="text-base">Loyalty programs</CardTitle>
         {/* The create form, with this airline already filled in and this page to come back to. */}
-        <Button asChild size="sm" variant="outline">
-          <Link to={`/loyalty/new?airlineId=${airlineId}`}>New program</Link>
-        </Button>
+        {canAdd && (
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/loyalty/new?airlineId=${airlineId}`}>New program</Link>
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {isError ? (
@@ -79,7 +87,12 @@ export function AirlineProgramsSection({ airlineId }: { airlineId: number }) {
         )}
         {/* Nothing to attach from a list that never arrived: an empty picker would read as
             "every program already has an airline", which is not what went wrong. */}
-        {!isError && !isLoading && <AttachProgram airlineId={airlineId} programs={unattached} kinds={kinds} />}
+        {canAdd && <AttachProgram airlineId={airlineId} programs={unattached} kinds={kinds} />}
+        {loaded && programs.length > 0 && (
+          <p className="mt-4 border-t border-gray-100 pt-4 text-xs text-gray-500">
+            An airline normally runs one program. Add another from the program itself, if it really has one.
+          </p>
+        )}
       </CardContent>
     </Card>
   )

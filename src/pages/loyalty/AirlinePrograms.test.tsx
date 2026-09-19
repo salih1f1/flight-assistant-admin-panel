@@ -135,34 +135,95 @@ async function pick(user: ReturnType<typeof userEvent.setup>, name: RegExp | str
   await user.click(within(screen.getByRole('listbox')).getByRole('option', { name }))
 }
 
+describe('an airline that already has a program', () => {
+  it('does not offer to attach another one', async () => {
+    renderSection()
+
+    await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(screen.queryByRole('combobox', { name: 'Attach a program' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Attach' })).not.toBeInTheDocument()
+  })
+
+  it('does not offer to create another one', async () => {
+    renderSection()
+
+    await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(screen.queryByRole('link', { name: /new program/i })).not.toBeInTheDocument()
+  })
+
+  it('says why, so the missing controls read as deliberate', async () => {
+    renderSection()
+
+    await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(screen.getByText(/normally runs one program/i)).toBeInTheDocument()
+  })
+
+  it('still shows every program when the data holds more than one', async () => {
+    programs = programs.map(p => (p.id === 5 ? { ...p, airlineId: AIRLINE_ID } : p))
+
+    renderSection()
+
+    const table = await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(within(table).getByRole('link', { name: 'Executive Club' })).toBeInTheDocument()
+    expect(within(table).getByRole('link', { name: 'Flying Blue' })).toBeInTheDocument()
+  })
+})
+
+describe('an airline with no program yet', () => {
+  beforeEach(() => {
+    // Nothing points at this airline: the controls that add one are the point of the section.
+    programs = programs.map(p => (p.airlineId === AIRLINE_ID ? { ...p, airlineId: null } : p))
+  })
+
+  it('offers both ways to add one', async () => {
+    renderSection()
+
+    expect(await screen.findByRole('combobox', { name: 'Attach a program' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /new program/i })).toBeInTheDocument()
+    expect(screen.queryByText(/normally runs one program/i)).not.toBeInTheDocument()
+  })
+})
+
 describe('creating a program for an airline', () => {
+  // Both ways of adding a program are offered only to an airline that has none, so these
+  // start from an airline whose program was never attached.
+  beforeEach(() => {
+    programs = programs.map(p => (p.airlineId === AIRLINE_ID ? { ...p, airlineId: null } : p))
+  })
+
   it('opens the create form with this airline already chosen', async () => {
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
 
     expect(screen.getByRole('link', { name: /new program/i })).toHaveAttribute('href', `/loyalty/new?airlineId=${AIRLINE_ID}`)
   })
 })
 
 describe('attaching an existing program to an airline', () => {
+  // Both ways of adding a program are offered only to an airline that has none, so these
+  // start from an airline whose program was never attached.
+  beforeEach(() => {
+    programs = programs.map(p => (p.airlineId === AIRLINE_ID ? { ...p, airlineId: null } : p))
+  })
+
   it('offers only the programs that have no airline yet', async () => {
     const user = userEvent.setup()
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
 
     await user.click(screen.getByRole('combobox', { name: 'Attach a program' }))
 
     const options = within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
     expect(options).toEqual(expect.arrayContaining([expect.stringContaining('Flying Blue'), expect.stringContaining('Priority Pass')]))
-    // Already this airline's, and already another airline's: neither is free to attach.
-    expect(options.join(' ')).not.toContain('Executive Club')
+    // Free to attach, now that nothing claims it; another airline's is still not offered.
+    expect(options.join(' ')).toContain('Executive Club')
     expect(options.join(' ')).not.toContain('Miles & More')
   })
 
   it('points the chosen program at this airline, and shows it in the list', async () => {
     const user = userEvent.setup()
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
 
     await pick(user, /Flying Blue/)
     await user.click(screen.getByRole('button', { name: 'Attach' }))
@@ -174,7 +235,7 @@ describe('attaching an existing program to an airline', () => {
   it('sends the program\'s other fields back unchanged, since the update replaces the whole program', async () => {
     const user = userEvent.setup()
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
 
     await pick(user, /Flying Blue/)
     await user.click(screen.getByRole('button', { name: 'Attach' }))
@@ -190,7 +251,7 @@ describe('attaching an existing program to an airline', () => {
     programs = programs.map(p => (p.id === 5 ? { ...p, kind: 'RETIRED_KIND' } : p))
     const user = userEvent.setup()
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
 
     await pick(user, /Flying Blue/)
 
@@ -202,7 +263,7 @@ describe('attaching an existing program to an airline', () => {
   it('reports a failed attach and keeps the choice, so it can be tried again', async () => {
     const user = userEvent.setup()
     renderSection()
-    await screen.findByRole('table', { name: 'Loyalty programs' })
+    await screen.findByText(/no loyalty program points at this airline/i)
     failWrites = true
 
     await pick(user, /Flying Blue/)
