@@ -5,11 +5,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AirlineName } from '@/components/ReferenceNames'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdminCreateLoyaltyProgram, useAdminUpdateLoyaltyProgram } from '@/api/generated/admin'
+import { airlineLabel, useAirlines } from '@/api/airlineLookups'
 import { useLoyaltyProgram, useLoyaltyProgramKinds } from '@/api/loyaltyLookups'
 import { invalidateLoyaltyPrograms } from '@/api/cache'
 import { optionalInt } from '@/lib/formNumbers'
@@ -51,10 +53,11 @@ export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => 
   const queryClient = useQueryClient()
   const { data: existing } = useLoyaltyProgram(id)
   const { data: kinds, isError: kindsFailed } = useLoyaltyProgramKinds()
+  const { data: airlines, isLoading: airlinesLoading, isError: airlinesFailed } = useAirlines()
   const createMutation = useAdminCreateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
   const updateMutation = useAdminUpdateLoyaltyProgram({ mutation: { onSuccess: () => invalidateLoyaltyPrograms(queryClient) } })
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormInput, unknown, FormData>({
     resolver: zodResolver(schema),
   })
 
@@ -81,6 +84,23 @@ export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => 
     } else {
       createMutation.mutate({ data: payload }, { onSuccess: () => onDone() })
     }
+  }
+
+  const chosenAirline = String(watch('airlineId') ?? '')
+  const airlineOptions: ComboboxOption[] = [
+    { value: '', label: 'No airline' },
+    ...(airlines ?? []).map(a => ({
+      value: String(a.id),
+      label: airlineLabel(a),
+      // Codes are how an airline is usually known; both are searchable, only one is shown.
+      keywords: `${a.iata ?? ''} ${a.icao ?? ''}`,
+    })),
+  ]
+  // A program can point at an airline this list doesn't hold — removed since, or a list that failed
+  // to load. Offering it keeps the id on screen and in the form, rather than quietly rewriting the
+  // record to "no airline" on the next save.
+  if (chosenAirline && !airlineOptions.some(o => o.value === chosenAirline)) {
+    airlineOptions.push({ value: chosenAirline, label: `#${chosenAirline}` })
   }
 
   return (
@@ -122,9 +142,18 @@ export function LoyaltyProgramForm({ id, onDone }: { id?: number; onDone: () => 
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Airline ID</Label>
-              <Input type="number" {...register('airlineId')} placeholder="optional" />
-              {/* Which airline the number is, looked up as it's typed. */}
+              <Label htmlFor="airlineId">Airline</Label>
+              <Combobox
+                id="airlineId"
+                searchLabel="Search airlines"
+                searchPlaceholder="e.g. british, BA, DLH"
+                value={String(watch('airlineId') ?? '')}
+                onChange={next => setValue('airlineId', next)}
+                options={airlineOptions}
+                emptyMessage={airlinesLoading ? 'Loading airlines…' : 'Could not load airlines.'}
+              />
+              {airlinesFailed && <p className="text-xs text-red-500">Could not load airlines.</p>}
+              {/* The airline as a record of its own, one click from the program that points at it. */}
               {Number(watch('airlineId')) > 0 && (
                 <p className="text-xs text-gray-500"><AirlineName id={Number(watch('airlineId'))} /></p>
               )}
