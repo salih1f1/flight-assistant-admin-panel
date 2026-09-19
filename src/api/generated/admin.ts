@@ -44,6 +44,7 @@ import type {
   AdminGetLoyaltyProgramsParams,
   AdminGetStatsParams,
   AdminHealthDto,
+  AdminJobDto,
   AdminListVerificationRequestsParams,
   AdminListVerificationSourcesParams,
   AdminLoungeDto,
@@ -68,6 +69,7 @@ import type {
   CreateAirportRequest,
   CreateLoungeRequest,
   CreateLoyaltyProgramRequest,
+  CreateLoyaltyTierRequest,
   FlightSearchResultDto,
   HttpValidationProblemDetails,
   ImportAirlinesBody,
@@ -85,11 +87,13 @@ import type {
   RevealValueRequest,
   RevealedValueDto,
   StringObjectDictionaryPagedResult,
+  ToggleJobRequest,
   TrackFlightRequest,
   UpdateAirlineRequest,
   UpdateAirportRequest,
   UpdateLoungeRequest,
   UpdateLoyaltyProgramRequest,
+  UpdateLoyaltyTierRequest,
   VerificationEnqueueDto,
   VerificationNeedsAttentionDto,
   VerificationRequestDto,
@@ -1834,8 +1838,9 @@ export const exportAirports = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/airports`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/airports`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -1927,8 +1932,9 @@ export const exportAirlines = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/airlines`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/airlines`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2020,8 +2026,9 @@ export const exportAlliances = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/alliances`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/alliances`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2113,8 +2120,9 @@ export const exportCountries = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/countries`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/countries`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2206,8 +2214,9 @@ export const exportLounges = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/lounges`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/lounges`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2299,8 +2308,9 @@ export const exportLoungeProviders = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/lounge-providers`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/lounge-providers`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2392,8 +2402,9 @@ export const exportLoyaltyPrograms = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/loyalty-programs`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/loyalty-programs`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -2485,8 +2496,9 @@ export const exportLoyaltyProgramKinds = (
 ) => {
 
 
-      return apiRequest<void>(
-      {url: `/admin/export/loyalty-program-kinds`, method: 'GET', signal
+      return apiRequest<Blob>(
+      {url: `/admin/export/loyalty-program-kinds`, method: 'GET',
+        responseType: 'blob', signal
     },
       options);
     }
@@ -3918,6 +3930,170 @@ export const useImportLoyaltyPrograms = <TError = ErrorType<ProblemDetails>,
     }
 
 /**
+ * Both scheduled jobs: the deployment config ceiling, the runtime switch, and the effective state, alongside who last changed the switch and why. 'canToggle' is false when config has the job off — config is a hard ceiling and no toggle can start a job it has disabled.
+ * @summary The background jobs and whether they are running
+ */
+export const adminGetJobs = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminJobDto[]>(
+      {url: `/admin/jobs`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetJobsQueryKey = () => {
+    return [
+    `/admin/jobs`
+    ] as const;
+    }
+
+
+export const getAdminGetJobsQueryOptions = <TData = Awaited<ReturnType<typeof adminGetJobs>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetJobsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetJobs>>> = ({ signal }) => adminGetJobs(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetJobsQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetJobs>>>
+export type AdminGetJobsQueryError = ErrorType<unknown>
+
+
+export function useAdminGetJobs<TData = Awaited<ReturnType<typeof adminGetJobs>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetJobs>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetJobs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetJobs<TData = Awaited<ReturnType<typeof adminGetJobs>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetJobs>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetJobs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetJobs<TData = Awaited<ReturnType<typeof adminGetJobs>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary The background jobs and whether they are running
+ */
+
+export function useAdminGetJobs<TData = Awaited<ReturnType<typeof adminGetJobs>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetJobs>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetJobsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Stops or starts a job's scheduled loop. Worst case is the cache window plus one full loop interval, because a cycle already in flight is never aborted -- about 70 seconds for flight sync, about 40 for verification. Manual triggers are unaffected and keep working while a job is switched off. Audited. 409 when config has the job off, 404 when the job name is unknown.
+ * @summary Switch a background job on or off
+ */
+export const adminToggleJob = (
+    job: string,
+    toggleJobRequest: BodyType<ToggleJobRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminJobDto>(
+      {url: `/admin/jobs/${job}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: toggleJobRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminToggleJobMutationKey = () => ['adminToggleJob'] as const;
+
+export const getAdminToggleJobMutationOptions = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminToggleJob>>, TError,AdminToggleJobMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminToggleJob>>, TError,AdminToggleJobMutationVariables, TContext> => {
+
+const mutationKey = getAdminToggleJobMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminToggleJob>>, AdminToggleJobMutationVariables> = (props) => {
+          const {job,data} = props ?? {};
+
+          return  adminToggleJob(job,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminToggleJobMutationResult = NonNullable<Awaited<ReturnType<typeof adminToggleJob>>>
+    export type AdminToggleJobMutationBody = BodyType<ToggleJobRequest>
+    export type AdminToggleJobMutationError = ErrorType<ProblemDetails>
+    export type AdminToggleJobMutationVariables = {job: string;data: BodyType<ToggleJobRequest>}
+
+    /**
+ * @summary Switch a background job on or off
+ */
+export const useAdminToggleJob = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminToggleJob>>, TError,AdminToggleJobMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminToggleJob>>,
+        TError,
+        AdminToggleJobMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminToggleJobMutationOptions(options), queryClient);
+    }
+
+/**
  * @summary Verify or unverify a LoungeProvider
  */
 export const adminVerifyLoungeProvider = (
@@ -4743,6 +4919,215 @@ export const useAdminDeleteLoyaltyProgram = <TError = ErrorType<HttpValidationPr
         TContext
       > => {
       return useMutation(getAdminDeleteLoyaltyProgramMutationOptions(options), queryClient);
+    }
+
+/**
+ * 404 when the program does not exist. 409 when the program already has a tier with that code or at that rank — loyalty_tiers is unique on both, per program.
+ * @summary Add a tier to a loyalty program
+ */
+export const adminCreateLoyaltyTier = (
+    programId: number,
+    createLoyaltyTierRequest: BodyType<CreateLoyaltyTierRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/loyalty/programs/${programId}/tiers`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createLoyaltyTierRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminCreateLoyaltyTierMutationKey = () => ['adminCreateLoyaltyTier'] as const;
+
+export const getAdminCreateLoyaltyTierMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyTier>>, TError,AdminCreateLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyTier>>, TError,AdminCreateLoyaltyTierMutationVariables, TContext> => {
+
+const mutationKey = getAdminCreateLoyaltyTierMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminCreateLoyaltyTier>>, AdminCreateLoyaltyTierMutationVariables> = (props) => {
+          const {programId,data} = props ?? {};
+
+          return  adminCreateLoyaltyTier(programId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminCreateLoyaltyTierMutationResult = NonNullable<Awaited<ReturnType<typeof adminCreateLoyaltyTier>>>
+    export type AdminCreateLoyaltyTierMutationBody = BodyType<CreateLoyaltyTierRequest>
+    export type AdminCreateLoyaltyTierMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminCreateLoyaltyTierMutationVariables = {programId: number;data: BodyType<CreateLoyaltyTierRequest>}
+
+    /**
+ * @summary Add a tier to a loyalty program
+ */
+export const useAdminCreateLoyaltyTier = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCreateLoyaltyTier>>, TError,AdminCreateLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminCreateLoyaltyTier>>,
+        TError,
+        AdminCreateLoyaltyTierMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminCreateLoyaltyTierMutationOptions(options), queryClient);
+    }
+
+/**
+ * 404 when the program does not exist, or when the tier is not one of its tiers. 409 when another tier of the program already has that code or rank.
+ * @summary Update one of a loyalty program's tiers
+ */
+export const adminUpdateLoyaltyTier = (
+    programId: number,
+    tierId: number,
+    updateLoyaltyTierRequest: BodyType<UpdateLoyaltyTierRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/loyalty/programs/${programId}/tiers/${tierId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateLoyaltyTierRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminUpdateLoyaltyTierMutationKey = () => ['adminUpdateLoyaltyTier'] as const;
+
+export const getAdminUpdateLoyaltyTierMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>, TError,AdminUpdateLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>, TError,AdminUpdateLoyaltyTierMutationVariables, TContext> => {
+
+const mutationKey = getAdminUpdateLoyaltyTierMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>, AdminUpdateLoyaltyTierMutationVariables> = (props) => {
+          const {programId,tierId,data} = props ?? {};
+
+          return  adminUpdateLoyaltyTier(programId,tierId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminUpdateLoyaltyTierMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>>
+    export type AdminUpdateLoyaltyTierMutationBody = BodyType<UpdateLoyaltyTierRequest>
+    export type AdminUpdateLoyaltyTierMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminUpdateLoyaltyTierMutationVariables = {programId: number;tierId: number;data: BodyType<UpdateLoyaltyTierRequest>}
+
+    /**
+ * @summary Update one of a loyalty program's tiers
+ */
+export const useAdminUpdateLoyaltyTier = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>, TError,AdminUpdateLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminUpdateLoyaltyTier>>,
+        TError,
+        AdminUpdateLoyaltyTierMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminUpdateLoyaltyTierMutationOptions(options), queryClient);
+    }
+
+/**
+ * 404 when the program does not exist, or when the tier is not one of its tiers. Travelers holding the tier keep their membership and lose the tier: a membership's TierId is set to null rather than the delete failing.
+ * @summary Delete one of a loyalty program's tiers
+ */
+export const adminDeleteLoyaltyTier = (
+    programId: number,
+    tierId: number,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<void>(
+      {url: `/admin/loyalty/programs/${programId}/tiers/${tierId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminDeleteLoyaltyTierMutationKey = () => ['adminDeleteLoyaltyTier'] as const;
+
+export const getAdminDeleteLoyaltyTierMutationOptions = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>, TError,AdminDeleteLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>, TError,AdminDeleteLoyaltyTierMutationVariables, TContext> => {
+
+const mutationKey = getAdminDeleteLoyaltyTierMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>, AdminDeleteLoyaltyTierMutationVariables> = (props) => {
+          const {programId,tierId} = props ?? {};
+
+          return  adminDeleteLoyaltyTier(programId,tierId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminDeleteLoyaltyTierMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>>
+
+    export type AdminDeleteLoyaltyTierMutationError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+    export type AdminDeleteLoyaltyTierMutationVariables = {programId: number;tierId: number}
+
+    /**
+ * @summary Delete one of a loyalty program's tiers
+ */
+export const useAdminDeleteLoyaltyTier = <TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>, TError,AdminDeleteLoyaltyTierMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminDeleteLoyaltyTier>>,
+        TError,
+        AdminDeleteLoyaltyTierMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminDeleteLoyaltyTierMutationOptions(options), queryClient);
     }
 
 /**

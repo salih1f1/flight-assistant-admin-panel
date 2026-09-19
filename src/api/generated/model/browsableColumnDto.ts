@@ -12,4 +12,5 @@ export interface BrowsableColumnDto {
   kind?: string | null;
   /** @nullable */
   values?: string[] | null;
+  sensitive?: boolean;
 }
