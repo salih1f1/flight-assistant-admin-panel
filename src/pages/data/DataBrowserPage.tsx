@@ -9,6 +9,7 @@ import { TableSkeleton } from '@/components/TableSkeleton'
 import { MaskedBadge, RevealableValue } from '@/components/RevealableValue'
 import { AirlineName, AirportName, LoungeName, LoungeProviderName } from '@/components/ReferenceNames'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import {
   adminRetryVerificationRequest, adminSyncFlightStatus, getAdminGetBrowsableTableDataQueryKey,
@@ -806,22 +807,28 @@ function FilterForm({ columns, published, allowed, appliedColumns, onAdd }: {
         setComparison('gte')
       }}
     >
-      <select
-        aria-label="Filter column"
+      {/* A wide table offers forty filterable columns; the picker is typed into rather than scrolled. */}
+      <Combobox
+        id="filter-column"
+        ariaLabel="Filter column"
+        searchLabel="Search columns"
+        searchPlaceholder="e.g. name, utc, status"
+        className="w-56"
         value={chosen}
-        onChange={e => {
-          setColumn(e.target.value)
+        onChange={next => {
+          setColumn(next)
           // The value belongs to the column it was typed for: a date left behind in an enum picker,
           // or "Pending" left in a date box, would apply as a filter nobody asked for.
           setValue('')
           setComparison('gte')
         }}
-        className={SELECT_CLASS}
-      >
-        {options.map(option => (
-          <option key={option.name} value={option.name}>{columnLabel(option.name)}</option>
-        ))}
-      </select>
+        options={options.map(option => ({
+          value: option.name,
+          // Searchable by the raw column name too, which is what the API and the URL call it.
+          label: columnLabel(option.name),
+          keywords: option.name,
+        }))}
+      />
 
       {control === 'date' && (
         <select aria-label="Date comparison" value={comparison} onChange={e => setComparison(e.target.value)} className={SELECT_CLASS}>

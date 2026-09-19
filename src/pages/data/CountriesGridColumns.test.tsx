@@ -7,6 +7,15 @@ import { httpError, installFakeApi, pagedResult } from '@/test/fakeApi'
 import { DataBrowserPage } from './DataBrowserPage'
 import { RecordPage } from './RecordPage'
 
+/** What the filter picker is offering right now, read from its open panel. */
+async function filterColumnOptions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
+  await user.keyboard('{Escape}')
+  return shown
+}
+
+
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
 }))
@@ -111,8 +120,6 @@ const dataHeaders = () => within(screen.getByRole('table'))
   .map(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim())
   .filter((name): name is string => !!name)
 
-const filterOptions = () => within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
-
 beforeEach(install)
 
 describe('The countries grid, as a list', () => {
@@ -154,10 +161,11 @@ describe('The countries grid, as a list', () => {
 describe('Filtering countries', () => {
   /** The picker offers what the grid shows (#149), so the list decides both. */
   it('offers the six columns the list is about', async () => {
+    const user = userEvent.setup()
     renderAt('/data/countries')
     await screen.findByRole('table')
 
-    expect(filterOptions()).toEqual(['Code', 'Name', 'Alpha3', 'NumericCode', 'Region', 'Subregion'])
+    expect(await filterColumnOptions(user)).toEqual(['Code', 'Name', 'Alpha3', 'NumericCode', 'Region', 'Subregion'])
   })
 
   /**
@@ -171,7 +179,7 @@ describe('Filtering countries', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show 10 hidden columns' }))
 
-    expect(filterOptions()).toEqual(COLUMN_NAMES)
+    expect(await filterColumnOptions(user)).toEqual(COLUMN_NAMES)
   })
 })
 

@@ -157,6 +157,17 @@ describe('Combobox', () => {
     expect(optionLabels()).toHaveLength(3)
   })
 
+  it('takes a label of its own where no visible label names it', async () => {
+    const user = userEvent.setup()
+    render(
+      <Combobox id="columns" value="" onChange={() => {}} options={PROGRAMS} ariaLabel="Filter column" searchLabel="Search columns" />,
+    )
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+
+    expect(screen.getByRole('textbox', { name: 'Search columns' })).toBeInTheDocument()
+  })
+
   it('stays shut while it is disabled', async () => {
     const user = userEvent.setup()
     render(<Harness disabled />)

@@ -6,6 +6,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { DataBrowserPage } from './DataBrowserPage'
 
+/**
+ * Picks a filter column by the name the API knows it as, which is what these tests hold: the
+ * picker shows a friendlier label, so the raw name is typed into its search and matched there.
+ */
+async function chooseFilterColumn(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  await user.type(screen.getByRole('textbox', { name: 'Search columns' }), name)
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option')
+  if (shown.length !== 1) throw new Error(`"${name}" matched ${shown.length} columns, not one`)
+  await user.click(shown[0])
+}
+
+/** What the filter picker is offering right now, read from its open panel. */
+async function filterColumnOptions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)
+  await user.keyboard('{Escape}')
+  return shown
+}
+
+
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
 }))
@@ -80,8 +101,6 @@ const dataHeaders = () => within(screen.getByRole('table'))
   .map(h => h.querySelector('button')?.textContent?.replace(/[↑↓]/g, '').trim())
   .filter((name): name is string => !!name)
 
-const filterOptions = () => within(screen.getByLabelText('Filter column')).getAllByRole('option').map(o => o.textContent)
-
 describe('The flights grid, as a list', () => {
   beforeEach(install)
 
@@ -109,18 +128,20 @@ describe('The flights grid, as a list', () => {
   })
 
   it('offers only the columns worth filtering a flight by', async () => {
+    const user = userEvent.setup()
     renderAt('/data/flights')
     await screen.findByRole('table')
 
-    expect(filterOptions()).toEqual(['Airline', 'FlightNumber', 'From', 'To', 'ServiceDateUtc', 'SyncMode'])
+    expect(await filterColumnOptions(user)).toEqual(['Airline', 'FlightNumber', 'From', 'To', 'ServiceDateUtc', 'SyncMode'])
   })
 
   /** The toggle means "show me everything" in both places, so it is also how you reach the rest. */
   it('offers every column to filter on once all columns are shown', async () => {
+    const user = userEvent.setup()
     renderAt('/data/flights?columns=all')
     await screen.findByRole('table')
 
-    expect(filterOptions()).toEqual(FLIGHT_COLUMNS.map(c => c.name === 'AirlineId' ? 'Airline'
+    expect(await filterColumnOptions(user)).toEqual(FLIGHT_COLUMNS.map(c => c.name === 'AirlineId' ? 'Airline'
       : c.name === 'DepartureAirportId' ? 'From' : c.name === 'ArrivalAirportId' ? 'To' : c.name))
   })
 
@@ -131,11 +152,12 @@ describe('The flights grid, as a list', () => {
    * with no way to filter on that column again.
    */
   it('keeps showing a column a shared link filters on, off the list or not', async () => {
+    const user = userEvent.setup()
     renderAt('/data/flights?filter=LastSyncedUtc:2026-09-29')
     await screen.findByRole('table')
 
     expect(screen.getByText('LastSyncedUtc: 2026-09-29')).toBeInTheDocument()
-    expect(filterOptions()).toContain('LastSyncedUtc')
+    expect(await filterColumnOptions(user)).toContain('LastSyncedUtc')
   })
 
   it('still filters on the column name the API knows, whatever the picker calls it', async () => {
@@ -143,7 +165,7 @@ describe('The flights grid, as a list', () => {
     const router = renderAt('/data/flights')
     await screen.findByRole('table')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await chooseFilterColumn(user, 'DepartureAirportId')
     await user.type(screen.getByLabelText('Filter value'), '2276')
     await user.click(screen.getByRole('button', { name: 'Add filter' }))
 
@@ -156,7 +178,7 @@ describe('The flights grid, as a list', () => {
     renderAt('/data/flights')
     await screen.findByRole('table')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await chooseFilterColumn(user, 'DepartureAirportId')
     await user.type(screen.getByLabelText('Filter value'), '2276')
 
     expect(await screen.findByRole('link', { name: 'London Gatwick (LGW)' })).toBeInTheDocument()
@@ -169,7 +191,7 @@ describe('The flights grid, as a list', () => {
     renderAt('/data/flights')
     await screen.findByRole('table')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'DepartureAirportId')
+    await chooseFilterColumn(user, 'DepartureAirportId')
     await user.type(screen.getByLabelText('Filter value'), '2276')
     await screen.findByRole('link', { name: 'London Gatwick (LGW)' })
 

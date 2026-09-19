@@ -6,6 +6,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { httpError, installFakeApi, pagedResult, type SentRequest } from '@/test/fakeApi'
 import { DataBrowserPage } from './DataBrowserPage'
 
+/**
+ * Picks a filter column by the name the API knows it as, which is what these tests hold: the
+ * picker shows a friendlier label, so the raw name is typed into its search and matched there.
+ */
+async function chooseFilterColumn(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Filter column' }))
+  await user.type(screen.getByRole('textbox', { name: 'Search columns' }), name)
+  const shown = within(screen.getByRole('listbox')).getAllByRole('option')
+  if (shown.length !== 1) throw new Error(`"${name}" matched ${shown.length} columns, not one`)
+  await user.click(shown[0])
+}
+
+
 vi.mock('@/api/client', () => ({
   apiClient: { request: vi.fn() },
 }))
@@ -157,7 +170,7 @@ describe('The lounge provider links grid', () => {
     renderAt('/data/lounge-provider-links')
     await screen.findByRole('table')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'LoungeId')
+    await chooseFilterColumn(user, 'LoungeId')
     await user.type(screen.getByLabelText('Filter value'), '3')
 
     expect(await filterForm().findByRole('link', { name: 'Clubrooms · LGW' })).toBeInTheDocument()
@@ -168,7 +181,7 @@ describe('The lounge provider links grid', () => {
     renderAt('/data/lounge-provider-links')
     await screen.findByRole('table')
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'ProviderId')
+    await chooseFilterColumn(user, 'ProviderId')
     await user.type(screen.getByLabelText('Filter value'), '7')
 
     expect(await filterForm().findByRole('link', { name: 'Plaza Premium' })).toBeInTheDocument()
@@ -180,7 +193,7 @@ describe('The lounge provider links grid', () => {
     await screen.findByRole('table')
     const user = userEvent.setup()
 
-    await user.selectOptions(screen.getByLabelText('Filter column'), 'ProviderId')
+    await chooseFilterColumn(user, 'ProviderId')
     await user.type(screen.getByLabelText('Filter value'), '9')
 
     expect(await filterForm().findByText('#9, not found')).toBeInTheDocument()
