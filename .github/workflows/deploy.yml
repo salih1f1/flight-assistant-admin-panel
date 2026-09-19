@@ -1,0 +1,117 @@
+name: Deploy panel
+
+# Only after merge. ci.yml is what gates a pull request; this is what ships main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two merges in quick succession must not race each other onto the same app. Not cancel-in-progress:
+# a half-finished deploy that loses to a newer one leaves the app serving whichever files happened
+# to land first, which is worse than waiting.
+concurrency:
+  group: deploy-panel
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the deployment package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Vite inlines these at build time, so an unset one produces a bundle that builds and deploys
+      # happily and then fails at sign-in with an error pointing at Entra rather than at the missing
+      # variable. They are variables, not secrets: public identifiers that end up in the bundle
+      # regardless.
+      - name: Check the build variables are set
+        env:
+          VITE_B2C_CLIENT_ID: ${{ vars.VITE_B2C_CLIENT_ID }}
+          VITE_B2C_AUTHORITY: ${{ vars.VITE_B2C_AUTHORITY }}
+          VITE_B2C_KNOWN_AUTHORITY: ${{ vars.VITE_B2C_KNOWN_AUTHORITY }}
+          VITE_REDIRECT_URI: ${{ vars.VITE_REDIRECT_URI }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_SCOPE: ${{ vars.VITE_API_SCOPE }}
+        run: |
+          missing=""
+          for name in VITE_B2C_CLIENT_ID VITE_B2C_AUTHORITY VITE_B2C_KNOWN_AUTHORITY \
+                      VITE_REDIRECT_URI VITE_API_BASE_URL VITE_API_SCOPE; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Repository variables not set:$missing"
+            exit 1
+          fi
+
+      - name: Build
+        env:
+          VITE_B2C_CLIENT_ID: ${{ vars.VITE_B2C_CLIENT_ID }}
+          VITE_B2C_AUTHORITY: ${{ vars.VITE_B2C_AUTHORITY }}
+          VITE_B2C_KNOWN_AUTHORITY: ${{ vars.VITE_B2C_KNOWN_AUTHORITY }}
+          VITE_REDIRECT_URI: ${{ vars.VITE_REDIRECT_URI }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_SCOPE: ${{ vars.VITE_API_SCOPE }}
+        run: npm run build
+
+      # The layout the server expects: server.js resolves ./dist relative to itself, so the two must
+      # sit side by side at the package root, with package.deploy.json becoming the manifest that
+      # names the start command.
+      - name: Assemble the deployment package
+        run: |
+          mkdir -p package
+          cp -r dist package/dist
+          cp server/server.js package/server.js
+          cp server/package.deploy.json package/package.json
+
+      # Fails the build rather than the deploy if the layout above ever drifts — a missing file here
+      # surfaces in production as a container that will not start, with no obvious cause.
+      - name: Check the package layout
+        run: |
+          for file in package/package.json package/server.js package/dist/index.html; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Deployment package is missing $file"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel
+          path: package
+
+  deploy:
+    name: Deploy to App Service
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required to request the OIDC token azure/login exchanges
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel
+          path: package
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_PANEL_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_PANEL_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_PANEL_SUBSCRIPTION_ID }}
+
+      # Deploys through the SCM (Kudu) endpoint from a runner whose IP changes every run, which is
+      # why the app's SCM site must never inherit the main site's IP restrictions.
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: flight-assistant-dev-panel
+          package: package

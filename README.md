@@ -61,6 +61,62 @@ The port is fixed (`strictPort`), because sign-in redirects back to `VITE_REDIRE
 - Stop it with Ctrl+C in its terminal. Ctrl+Z only suspends it, and it keeps the port.
 - `lsof -i :5175` shows what holds the port.
 
+## Deployment
+
+`main` deploys to `https://flight-assistant-dev-panel.azurewebsites.net` via
+`.github/workflows/deploy.yml`. It builds the bundle, assembles a package of `dist/`, `server.js`
+and a manifest, and ships it to a Linux Web App on the same App Service plan as the dev API — so it
+costs nothing beyond the plan that was already running.
+
+**The panel is not publicly reachable.** Three separate things have to agree before a page loads:
+
+| Layer | What it checks | Where it is configured |
+|---|---|---|
+| Access restrictions | your IP is allowlisted | App Service → Networking |
+| Easy Auth | your account is named in `allowedPrincipals.identities` | App Service → Authentication |
+| The API | your access token carries the `admin` role | unchanged, `AdminOnly` policy |
+
+### The server
+
+`server/server.js` serves the build: SPA fallback so client routes survive a refresh, `immutable`
+caching for hashed assets and `no-cache` for `index.html`, and `noindex` plus the usual hardening
+headers. It has no dependencies, so nothing is installed between the build and production. Linux
+App Service has no static-site runtime, and Node images after 14 LTS no longer auto-start an app
+with PM2, which is why the package carries a server at all.
+
+`server/package.deploy.json` is the manifest that ships **inside the package** — it is not this
+repository's own `package.json`.
+
+The Content-Security-Policy comes from the `CONTENT_SECURITY_POLICY` app setting and is omitted
+when unset. If a policy change breaks the app, clear that setting to recover.
+
+### When your public IP changes
+
+Consumer ISPs rotate them, and the symptom is a flat `403` before any sign-in redirect:
+
+```sh
+az webapp config access-restriction add -g flight-assistant-dev -n flight-assistant-dev-panel \
+  --rule-name "$(whoami)-$(date +%Y%m%d)" --action Allow --priority 100 \
+  --ip-address "$(curl -s https://api.ipify.org)/32"
+```
+
+**Never restrict the SCM site.** Deployments reach Kudu from GitHub runners whose IPs change every
+run, so mirroring the main site's rules there breaks every deploy after the first.
+
+### To admit another admin
+
+Add their object ID to `allowedPrincipals.identities` in the app's authentication settings, **and**
+make sure the account holds the `admin` app role. The gate and the API check different things: an
+account that passes the gate without the role gets a panel that loads and then refuses every
+request.
+
+### When the API's origin list changes
+
+The API allows the panel's origin through `AdminPanel:AllowedOrigins` in the backend's
+`appsettings.Development.json` — a list, because the deployed dev API also runs as `Development`
+and therefore reads the same file a developer does. Adding an environment means adding its origin
+there, not replacing the existing one.
+
 ## Scripts
 
 | Script | What it does |
@@ -146,4 +202,5 @@ src/lib/                Form number coercion, API error messages, class-name hel
 src/pages/              One folder per section; list and form pages with their tests
 src/test/               Test setup, fake API, render helper
 src/router.tsx          Routes, all behind RequireAdmin
+server/                 The static server that ships with the deployment, and its manifest
 ```
