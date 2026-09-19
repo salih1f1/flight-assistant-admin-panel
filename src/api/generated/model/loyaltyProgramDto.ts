@@ -17,7 +17,5 @@ export interface LoyaltyProgramDto {
   /** @nullable */
   airlineId?: number | null;
   /** @nullable */
-  allianceCode?: string | null;
-  /** @nullable */
   tiers?: LoyaltyTierDto[] | null;
 }

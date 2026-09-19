@@ -62,7 +62,6 @@ export function AirlineProgramsSection({ airlineId }: { airlineId: number }) {
                 <TableHead>Name</TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead>Kind</TableHead>
-                <TableHead>Alliance</TableHead>
                 <TableHead className="w-20 text-right">Tiers</TableHead>
               </TableRow>
             </TableHeader>
@@ -76,7 +75,6 @@ export function AirlineProgramsSection({ airlineId }: { airlineId: number }) {
                   </TableCell>
                   <TableCell className="font-mono text-xs">{program.code ?? '—'}</TableCell>
                   <TableCell>{kindName(program.kind)}</TableCell>
-                  <TableCell>{program.allianceCode ?? '—'}</TableCell>
                   <TableCell className="text-right">{program.tiers?.length ?? 0}</TableCell>
                 </TableRow>
               ))}
@@ -134,7 +132,6 @@ function AttachProgram({ airlineId, programs, kinds }: {
           name: chosen.name,
           kindId,
           airlineId,
-          allianceCode: chosen.allianceCode ?? undefined,
         },
       },
       {

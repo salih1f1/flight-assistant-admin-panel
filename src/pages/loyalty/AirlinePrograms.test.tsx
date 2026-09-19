@@ -92,15 +92,24 @@ describe('an airline\'s loyalty programs', () => {
     expect(within(table).getByText('EXEC_CLUB')).toBeInTheDocument()
   })
 
-  it('shows what tells one program from another: its kind, alliance and how many tiers it has', async () => {
+  it('shows what tells one program from another: its kind and how many tiers it has', async () => {
     renderSection()
 
     const table = await screen.findByRole('table', { name: 'Loyalty programs' })
     const row = within(table).getByRole('row', { name: /Executive Club/ })
     // The kind arrives as a code; the kinds table is what turns it into a name.
     expect(within(row).getByText('Airline programme')).toBeInTheDocument()
-    expect(within(row).getByText('ONEWORLD')).toBeInTheDocument()
     expect(within(row).getByText('1')).toBeInTheDocument()
+  })
+
+  // #184: the API moved a program's alliance onto its airline, so there is no per-program value
+  // to show. This section lists one airline's programs, which makes the column redundant anyway —
+  // every row would have repeated the same alliance, the airline's own.
+  it('does not show an alliance per program', async () => {
+    renderSection()
+
+    const table = await screen.findByRole('table', { name: 'Loyalty programs' })
+    expect(within(table).queryByRole('columnheader', { name: /alliance/i })).not.toBeInTheDocument()
   })
 
   it('leaves out programs that point at another airline or at none', async () => {

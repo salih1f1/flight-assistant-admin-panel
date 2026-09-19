@@ -41,6 +41,7 @@ import type {
   AdminGetAuditLogParams,
   AdminGetBrowsableTableDataParams,
   AdminGetCiRunsParams,
+  AdminGetFlightDataUsageParams,
   AdminGetLoyaltyProgramsParams,
   AdminGetStatsParams,
   AdminHealthDto,
@@ -61,6 +62,7 @@ import type {
   AirportAdminDtoPagedResult,
   AllianceAdminDto,
   AllianceDetailAdminDto,
+  AzureBudgetDto,
   BrowsableTableDto,
   CiRunDto,
   CiTestReportDto,
@@ -70,6 +72,7 @@ import type {
   CreateLoungeRequest,
   CreateLoyaltyProgramRequest,
   CreateLoyaltyTierRequest,
+  FlightDataUsageDto,
   FlightSearchResultDto,
   HttpValidationProblemDetails,
   ImportAirlinesBody,
@@ -3372,7 +3375,7 @@ if(importAlliancesBody?.file !== undefined) {
 
 export const getImportAlliancesMutationKey = () => ['importAlliances'] as const;
 
-export const getImportAlliancesMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportAlliancesMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAlliances>>, TError,ImportAlliancesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importAlliances>>, TError,ImportAlliancesMutationVariables, TContext> => {
 
@@ -3401,13 +3404,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportAlliancesMutationResult = NonNullable<Awaited<ReturnType<typeof importAlliances>>>
     export type ImportAlliancesMutationBody = BodyType<ImportAlliancesBody> | undefined
-    export type ImportAlliancesMutationError = ErrorType<ProblemDetails>
+    export type ImportAlliancesMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportAlliancesMutationVariables = {data?: BodyType<ImportAlliancesBody>}
 
     /**
  * @summary Import alliances from CSV (run before countries, airports, airlines). Upserts by Code.
  */
-export const useImportAlliances = <TError = ErrorType<ProblemDetails>,
+export const useImportAlliances = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAlliances>>, TError,ImportAlliancesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importAlliances>>,
@@ -3445,7 +3448,7 @@ if(importCountriesBody?.file !== undefined) {
 
 export const getImportCountriesMutationKey = () => ['importCountries'] as const;
 
-export const getImportCountriesMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportCountriesMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importCountries>>, TError,ImportCountriesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importCountries>>, TError,ImportCountriesMutationVariables, TContext> => {
 
@@ -3474,13 +3477,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportCountriesMutationResult = NonNullable<Awaited<ReturnType<typeof importCountries>>>
     export type ImportCountriesMutationBody = BodyType<ImportCountriesBody> | undefined
-    export type ImportCountriesMutationError = ErrorType<ProblemDetails>
+    export type ImportCountriesMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportCountriesMutationVariables = {data?: BodyType<ImportCountriesBody>}
 
     /**
  * @summary Import countries from CSV (run after alliances). Upserts by Code.
  */
-export const useImportCountries = <TError = ErrorType<ProblemDetails>,
+export const useImportCountries = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importCountries>>, TError,ImportCountriesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importCountries>>,
@@ -3518,7 +3521,7 @@ if(importAirportsBody?.file !== undefined) {
 
 export const getImportAirportsMutationKey = () => ['importAirports'] as const;
 
-export const getImportAirportsMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportAirportsMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAirports>>, TError,ImportAirportsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importAirports>>, TError,ImportAirportsMutationVariables, TContext> => {
 
@@ -3547,13 +3550,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportAirportsMutationResult = NonNullable<Awaited<ReturnType<typeof importAirports>>>
     export type ImportAirportsMutationBody = BodyType<ImportAirportsBody> | undefined
-    export type ImportAirportsMutationError = ErrorType<ProblemDetails>
+    export type ImportAirportsMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportAirportsMutationVariables = {data?: BodyType<ImportAirportsBody>}
 
     /**
  * @summary Import airports from CSV (run after countries). Upserts by IATA.
  */
-export const useImportAirports = <TError = ErrorType<ProblemDetails>,
+export const useImportAirports = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAirports>>, TError,ImportAirportsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importAirports>>,
@@ -3591,7 +3594,7 @@ if(importAirlinesBody?.file !== undefined) {
 
 export const getImportAirlinesMutationKey = () => ['importAirlines'] as const;
 
-export const getImportAirlinesMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportAirlinesMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAirlines>>, TError,ImportAirlinesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importAirlines>>, TError,ImportAirlinesMutationVariables, TContext> => {
 
@@ -3620,13 +3623,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportAirlinesMutationResult = NonNullable<Awaited<ReturnType<typeof importAirlines>>>
     export type ImportAirlinesMutationBody = BodyType<ImportAirlinesBody> | undefined
-    export type ImportAirlinesMutationError = ErrorType<ProblemDetails>
+    export type ImportAirlinesMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportAirlinesMutationVariables = {data?: BodyType<ImportAirlinesBody>}
 
     /**
  * @summary Import airlines from CSV (run after airports). Upserts by IATA, fallback ICAO.
  */
-export const useImportAirlines = <TError = ErrorType<ProblemDetails>,
+export const useImportAirlines = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importAirlines>>, TError,ImportAirlinesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importAirlines>>,
@@ -3664,7 +3667,7 @@ if(importLoungeProvidersBody?.file !== undefined) {
 
 export const getImportLoungeProvidersMutationKey = () => ['importLoungeProviders'] as const;
 
-export const getImportLoungeProvidersMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportLoungeProvidersMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoungeProviders>>, TError,ImportLoungeProvidersMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importLoungeProviders>>, TError,ImportLoungeProvidersMutationVariables, TContext> => {
 
@@ -3693,13 +3696,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportLoungeProvidersMutationResult = NonNullable<Awaited<ReturnType<typeof importLoungeProviders>>>
     export type ImportLoungeProvidersMutationBody = BodyType<ImportLoungeProvidersBody> | undefined
-    export type ImportLoungeProvidersMutationError = ErrorType<ProblemDetails>
+    export type ImportLoungeProvidersMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportLoungeProvidersMutationVariables = {data?: BodyType<ImportLoungeProvidersBody>}
 
     /**
  * @summary Import lounge providers from CSV (run after airlines). Upserts by Code.
  */
-export const useImportLoungeProviders = <TError = ErrorType<ProblemDetails>,
+export const useImportLoungeProviders = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoungeProviders>>, TError,ImportLoungeProvidersMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importLoungeProviders>>,
@@ -3737,7 +3740,7 @@ if(importLoyaltyProgramKindsBody?.file !== undefined) {
 
 export const getImportLoyaltyProgramKindsMutationKey = () => ['importLoyaltyProgramKinds'] as const;
 
-export const getImportLoyaltyProgramKindsMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportLoyaltyProgramKindsMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyProgramKinds>>, TError,ImportLoyaltyProgramKindsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyProgramKinds>>, TError,ImportLoyaltyProgramKindsMutationVariables, TContext> => {
 
@@ -3766,13 +3769,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportLoyaltyProgramKindsMutationResult = NonNullable<Awaited<ReturnType<typeof importLoyaltyProgramKinds>>>
     export type ImportLoyaltyProgramKindsMutationBody = BodyType<ImportLoyaltyProgramKindsBody> | undefined
-    export type ImportLoyaltyProgramKindsMutationError = ErrorType<ProblemDetails>
+    export type ImportLoyaltyProgramKindsMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportLoyaltyProgramKindsMutationVariables = {data?: BodyType<ImportLoyaltyProgramKindsBody>}
 
     /**
  * @summary Import loyalty program kinds from CSV (run after airlines). Upserts by Code.
  */
-export const useImportLoyaltyProgramKinds = <TError = ErrorType<ProblemDetails>,
+export const useImportLoyaltyProgramKinds = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyProgramKinds>>, TError,ImportLoyaltyProgramKindsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importLoyaltyProgramKinds>>,
@@ -3810,7 +3813,7 @@ if(importLoungesBody?.file !== undefined) {
 
 export const getImportLoungesMutationKey = () => ['importLounges'] as const;
 
-export const getImportLoungesMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportLoungesMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLounges>>, TError,ImportLoungesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importLounges>>, TError,ImportLoungesMutationVariables, TContext> => {
 
@@ -3839,13 +3842,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportLoungesMutationResult = NonNullable<Awaited<ReturnType<typeof importLounges>>>
     export type ImportLoungesMutationBody = BodyType<ImportLoungesBody> | undefined
-    export type ImportLoungesMutationError = ErrorType<ProblemDetails>
+    export type ImportLoungesMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportLoungesMutationVariables = {data?: BodyType<ImportLoungesBody>}
 
     /**
  * @summary Import lounges from CSV (run after lounge-providers). Providers column is JSON-encoded. Upserts by Name+AirportIata+Terminal.
  */
-export const useImportLounges = <TError = ErrorType<ProblemDetails>,
+export const useImportLounges = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLounges>>, TError,ImportLoungesMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importLounges>>,
@@ -3883,7 +3886,7 @@ if(importLoyaltyProgramsBody?.file !== undefined) {
 
 export const getImportLoyaltyProgramsMutationKey = () => ['importLoyaltyPrograms'] as const;
 
-export const getImportLoyaltyProgramsMutationOptions = <TError = ErrorType<ProblemDetails>,
+export const getImportLoyaltyProgramsMutationOptions = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyPrograms>>, TError,ImportLoyaltyProgramsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
 ): UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyPrograms>>, TError,ImportLoyaltyProgramsMutationVariables, TContext> => {
 
@@ -3912,13 +3915,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ImportLoyaltyProgramsMutationResult = NonNullable<Awaited<ReturnType<typeof importLoyaltyPrograms>>>
     export type ImportLoyaltyProgramsMutationBody = BodyType<ImportLoyaltyProgramsBody> | undefined
-    export type ImportLoyaltyProgramsMutationError = ErrorType<ProblemDetails>
+    export type ImportLoyaltyProgramsMutationError = ErrorType<HttpValidationProblemDetails>
     export type ImportLoyaltyProgramsMutationVariables = {data?: BodyType<ImportLoyaltyProgramsBody>}
 
     /**
  * @summary Import loyalty programs from CSV (run after loyalty-program-kinds and airlines). Tiers column is JSON-encoded. Upserts by Code.
  */
-export const useImportLoyaltyPrograms = <TError = ErrorType<ProblemDetails>,
+export const useImportLoyaltyPrograms = <TError = ErrorType<HttpValidationProblemDetails>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importLoyaltyPrograms>>, TError,ImportLoyaltyProgramsMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof importLoyaltyPrograms>>,
@@ -6133,7 +6136,7 @@ export const getAdminGetAeroApiUsageQueryKey = (params?: AdminGetAeroApiUsagePar
     }
 
 
-export const getAdminGetAeroApiUsageQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<ProblemDetails>>(params?: AdminGetAeroApiUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+export const getAdminGetAeroApiUsageQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(params?: AdminGetAeroApiUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -6152,10 +6155,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type AdminGetAeroApiUsageQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetAeroApiUsage>>>
-export type AdminGetAeroApiUsageQueryError = ErrorType<ProblemDetails>
+export type AdminGetAeroApiUsageQueryError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
 
 
-export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
  params: undefined |  AdminGetAeroApiUsageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof adminGetAeroApiUsage>>,
@@ -6165,7 +6168,7 @@ export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminG
       >, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
  params?: AdminGetAeroApiUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof adminGetAeroApiUsage>>,
@@ -6175,7 +6178,7 @@ export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminG
       >, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
  params?: AdminGetAeroApiUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -6183,12 +6186,201 @@ export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminG
  * @summary AeroAPI account usage and spend
  */
 
-export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<ProblemDetails>>(
+export function useAdminGetAeroApiUsage<TData = Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
  params?: AdminGetAeroApiUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAeroApiUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getAdminGetAeroApiUsageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * What #364's Phase 4 decisions need and GET /admin/usage/aeroapi cannot answer: the same AeroAPI spend for the range, alongside how many distinct flights the status loop is still polling, how those flights are distributed across sync modes, and how many status events the window's polls actually produced. Optional 'start' and 'end' are UTC instants defaulting to the current UTC month to date, resolved and cached exactly as the aeroapi report is — so this costs no extra upstream call. The 'derived' figures are calculated, not measured: AeroAPI exposes no per-request identifier and bills per page, so nothing here attributes a page to a flight; they are whole-window spend over a whole-window denominator, and are null when that denominator is zero. 'byStoredSyncMode' reports each flight's stored mode, which can be up to one loop interval stale, so its total may differ slightly from 'activeTrackedFlights', which is recomputed from times and status.
+ * @summary AeroAPI spend paired with our own sync activity
+ */
+export const adminGetFlightDataUsage = (
+    params?: AdminGetFlightDataUsageParams,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<FlightDataUsageDto>(
+      {url: `/admin/usage/flight-data`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetFlightDataUsageQueryKey = (params?: AdminGetFlightDataUsageParams,) => {
+    return [
+    `/admin/usage/flight-data`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getAdminGetFlightDataUsageQueryOptions = <TData = Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(params?: AdminGetFlightDataUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetFlightDataUsageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetFlightDataUsage>>> = ({ signal }) => adminGetFlightDataUsage(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetFlightDataUsageQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetFlightDataUsage>>>
+export type AdminGetFlightDataUsageQueryError = ErrorType<HttpValidationProblemDetails | ProblemDetails>
+
+
+export function useAdminGetFlightDataUsage<TData = Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params: undefined |  AdminGetFlightDataUsageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetFlightDataUsage>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetFlightDataUsage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetFlightDataUsage<TData = Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetFlightDataUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetFlightDataUsage>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetFlightDataUsage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetFlightDataUsage<TData = Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetFlightDataUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary AeroAPI spend paired with our own sync activity
+ */
+
+export function useAdminGetFlightDataUsage<TData = Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError = ErrorType<HttpValidationProblemDetails | ProblemDetails>>(
+ params?: AdminGetFlightDataUsageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetFlightDataUsage>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetFlightDataUsageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * The subscription's budget as defined in Azure Cost Management, with spend against it. 'state' says what the API could actually read: Ok, NoBudget when none is defined, NotConfigured when no subscription is set, NotAuthorized when the managed identity lacks the Cost Management Reader role, or Unavailable. Azure reports cost on a delay of roughly 8-24 hours, but neither Cost Management endpoint behind this reports its own freshness, so 'dataAsOfUtc' is always null today — the delay is real, just unmeasurable from the response. Amounts are in 'currency', which is the subscription's billing currency and not necessarily USD. Cached for an hour, except refusals and outages, which are not cached.
+ * @summary Azure subscription budget and month-to-date spend
+ */
+export const adminGetAzureBudget = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AzureBudgetDto>(
+      {url: `/admin/usage/azure`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetAzureBudgetQueryKey = () => {
+    return [
+    `/admin/usage/azure`
+    ] as const;
+    }
+
+
+export const getAdminGetAzureBudgetQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAzureBudget>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetAzureBudgetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetAzureBudget>>> = ({ signal }) => adminGetAzureBudget(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetAzureBudgetQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetAzureBudget>>>
+export type AdminGetAzureBudgetQueryError = ErrorType<unknown>
+
+
+export function useAdminGetAzureBudget<TData = Awaited<ReturnType<typeof adminGetAzureBudget>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAzureBudget>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAzureBudget>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAzureBudget<TData = Awaited<ReturnType<typeof adminGetAzureBudget>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetAzureBudget>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetAzureBudget>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetAzureBudget<TData = Awaited<ReturnType<typeof adminGetAzureBudget>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Azure subscription budget and month-to-date spend
+ */
+
+export function useAdminGetAzureBudget<TData = Awaited<ReturnType<typeof adminGetAzureBudget>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetAzureBudget>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetAzureBudgetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
