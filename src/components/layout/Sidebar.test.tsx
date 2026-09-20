@@ -29,7 +29,7 @@ const GROUPS: [string, [string, string][]][] = [
   // /data/loyalty-tiers if something links there.
   ['Loyalty', [['Loyalty Programs', '/data/loyalty-programs'], ['Program Kinds', '/data/loyalty-program-kinds']]],
   ['Reference data', [['Airlines', '/data/airlines'], ['Airports', '/data/airports'], ['Alliances', '/data/alliances'], ['Countries', '/data/countries'], ['Flight Statuses', '/data/flight-statuses']]],
-  ['System', [['System health', '/health'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Data Source Status', '/data/data-source-status'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
+  ['System', [['System health', '/health'], ['Providers', '/providers'], ['Import', '/import'], ['Audit log', '/audit'], ['Verification Requests', '/data/verification-requests'], ['Data Source Status', '/data/data-source-status'], ['Tests', '/tests'], ['Seed Versions', '/data/seed-versions']]],
 ]
 
 describe('Sidebar', () => {

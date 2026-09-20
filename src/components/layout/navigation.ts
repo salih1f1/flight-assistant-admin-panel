@@ -74,6 +74,9 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { label: 'System health', to: '/health' },
+      // Beside System health rather than under Flights: the switches move whichever provider serves
+      // a job, and the page's subject is spend and providers, not any one bounded context.
+      { label: 'Providers', to: '/providers' },
       { label: 'Import', to: '/import' },
       { label: 'Audit log', to: '/audit' },
       table('Verification Requests', 'verification-requests'),

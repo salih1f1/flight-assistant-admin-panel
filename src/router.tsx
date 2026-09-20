@@ -12,6 +12,7 @@ import { LoungeFormPage } from '@/pages/lounges/LoungeFormPage'
 import { DataBrowserRoute } from '@/pages/data/DataBrowserPage'
 import { RecordPage, RedirectToRecord } from '@/pages/data/RecordPage'
 import { SystemHealthPage } from './pages/health/SystemHealthPage'
+import { ProvidersPage } from '@/pages/providers/ProvidersPage'
 import { ImportPage } from '@/pages/import/ImportPage'
 import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 import { TestsPage } from '@/pages/tests/TestsPage'
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
           { path: '/data/:table', element: <DataBrowserRoute /> },
           { path: '/data/:table/:id', element: <RecordPage /> },
           { path: '/health', element: <SystemHealthPage /> },
+          { path: '/providers', element: <ProvidersPage /> },
           { path: '/import', element: <ImportPage /> },
           { path: '/audit', element: <AuditLogPage /> },
           { path: '/tests', element: <TestsPage /> },
