@@ -50,6 +50,8 @@ import type {
   AdminListVerificationSourcesParams,
   AdminLoungeDto,
   AdminLoungeDtoPagedResult,
+  AdminProviderMapDto,
+  AdminProviderRouteDto,
   AdminSearchFlightsParams,
   AdminStatsDto,
   AdminTravelerDetailDto,
@@ -90,6 +92,7 @@ import type {
   QueueVerificationRequestsRequest,
   RevealValueRequest,
   RevealedValueDto,
+  SetProviderRouteRequest,
   StringObjectDictionaryPagedResult,
   ToggleJobRequest,
   TrackFlightRequest,
@@ -5364,6 +5367,170 @@ export const useAdminVerifyLoyaltyProgram = <TError = ErrorType<ProblemDetails>,
         TContext
       > => {
       return useMutation(getAdminVerifyLoyaltyProgramMutationOptions(options), queryClient);
+    }
+
+/**
+ * Every routing decision an admin can change, its current providers, and whether the value came from an operator or from configuration. 'canChange' is false when this environment configures no alternative — for route search, when AeroDataBox has no credential configured — and configuration is a hard ceiling no change can lift. Also returns the full call map, including the operations whose provider is fixed and why, and each provider's remaining headroom. AeroDataBox quota is null until this instance has called it — unknown, not exhausted — and is per instance. List prices are authored and carry their own date; neither provider publishes a price list through an API.
+ * @summary Which provider serves each routing decision
+ */
+export const adminGetProviderRoutes = (
+
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminProviderMapDto>(
+      {url: `/admin/providers`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminGetProviderRoutesQueryKey = () => {
+    return [
+    `/admin/providers`
+    ] as const;
+    }
+
+
+export const getAdminGetProviderRoutesQueryOptions = <TData = Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetProviderRoutesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetProviderRoutes>>> = ({ signal }) => adminGetProviderRoutes(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type AdminGetProviderRoutesQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetProviderRoutes>>>
+export type AdminGetProviderRoutesQueryError = ErrorType<unknown>
+
+
+export function useAdminGetProviderRoutes<TData = Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetProviderRoutes>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetProviderRoutes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetProviderRoutes<TData = Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof adminGetProviderRoutes>>,
+          TError,
+          Awaited<ReturnType<typeof adminGetProviderRoutes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useAdminGetProviderRoutes<TData = Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Which provider serves each routing decision
+ */
+
+export function useAdminGetProviderRoutes<TData = Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof adminGetProviderRoutes>>, TError, TData>>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getAdminGetProviderRoutesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+/**
+ * Takes effect within the 10-second read cache for searches not already cached. Cached search results are unaffected and are not wrong: the search cache key carries the provider, so the two providers never serve each other's rows. A verification key affects newly queued requests and track-time provisioning only -- the job uses each request's own stored sources, so requests already in the queue keep the sources they were queued with. Audited. 400 when a provider is not an option for this key, when more than one is named for a key that honours only one (route search: a verification key does take an ordered list), or when a value is longer than its column allows; 404 when the key is unknown; 409 when this environment configures no alternative.
+ * @summary Choose which provider serves a routing decision
+ */
+export const adminSetProviderRoute = (
+    job: string,
+    setProviderRouteRequest: BodyType<SetProviderRouteRequest>,
+ options?: SecondParameter<typeof apiRequest>,signal?: AbortSignal
+) => {
+
+
+      return apiRequest<AdminProviderRouteDto>(
+      {url: `/admin/providers/${job}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: setProviderRouteRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getAdminSetProviderRouteMutationKey = () => ['adminSetProviderRoute'] as const;
+
+export const getAdminSetProviderRouteMutationOptions = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSetProviderRoute>>, TError,AdminSetProviderRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminSetProviderRoute>>, TError,AdminSetProviderRouteMutationVariables, TContext> => {
+
+const mutationKey = getAdminSetProviderRouteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminSetProviderRoute>>, AdminSetProviderRouteMutationVariables> = (props) => {
+          const {job,data} = props ?? {};
+
+          return  adminSetProviderRoute(job,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminSetProviderRouteMutationResult = NonNullable<Awaited<ReturnType<typeof adminSetProviderRoute>>>
+    export type AdminSetProviderRouteMutationBody = BodyType<SetProviderRouteRequest>
+    export type AdminSetProviderRouteMutationError = ErrorType<ProblemDetails>
+    export type AdminSetProviderRouteMutationVariables = {job: string;data: BodyType<SetProviderRouteRequest>}
+
+    /**
+ * @summary Choose which provider serves a routing decision
+ */
+export const useAdminSetProviderRoute = <TError = ErrorType<ProblemDetails>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminSetProviderRoute>>, TError,AdminSetProviderRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiRequest>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminSetProviderRoute>>,
+        TError,
+        AdminSetProviderRouteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdminSetProviderRouteMutationOptions(options), queryClient);
     }
 
 /**
