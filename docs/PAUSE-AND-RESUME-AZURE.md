@@ -44,6 +44,68 @@ they stop working too. Until you resume, use `docker compose up -d` in the backe
 `PostgresConnectionString` at `localhost` in user secrets. You can load the same dump into it (see
 "Resume", step 2).
 
+## The panel (front end) on its own
+
+The panel has **no bill of its own**. Every resource it uses is free, except the App Service plan
+it shares with the API:
+
+| Panel resource | Costs | What to do |
+|---|---|---|
+| Web app `flight-assistant-dev-panel` | Nothing by itself: App Service bills the **plan**, not the apps on it | Stop it |
+| Its share of the B1 plan | The whole B1 price, for as long as the plan is on B1, **whichever apps are running** | Reaches $0 only when the plan moves to F1 or is deleted. The plan is shared with the API, so decide this together with the backend |
+| Easy Auth, access restrictions, app settings | Free. They are part of the web app and survive a stop and a move to F1 | Nothing, but export them (below) in case the app is ever deleted |
+| Gate app registration and its client secret (in `flightassistantdev-kv`) | Free | Nothing. Check the secret's expiry date when you resume |
+| The panel's own sign-in app registration (`VITE_B2C_CLIENT_ID`) | Free | Nothing |
+| GitHub Actions (CI and deploy) | Free within the account's included minutes and storage. A $0 spending limit (GitHub's default) means GitHub blocks further runs rather than billing for them | Disable the **Deploy panel** workflow (below) |
+
+So stopping the panel alone saves nothing. **The panel costs $0 only once the plan is on F1 or
+deleted.** If the plan is deleted, the panel's web app has to go with it: an app cannot exist
+without a plan. That is why the export below matters.
+
+### Order of steps
+
+1. **Merge whatever is waiting for `main` first**, such as this PR. Each merge deploys the panel,
+   and that deploy needs the app to still exist.
+2. **Disable the deploy workflow**: GitHub → Actions → *Deploy panel* → ⋯ → *Disable workflow*.
+   Otherwise, every push to `main` while the app is paused tries to deploy. It fails if the app has
+   been deleted, and succeeds but serves nothing if the app is stopped. *CI* can stay enabled; it
+   does not touch Azure.
+3. Export the panel's settings, so it can be rebuilt as it was if it is ever deleted:
+
+   ```sh
+   RG=flight-assistant-dev; APP=flight-assistant-dev-panel
+   mkdir -p ~/fa-pause && cd ~/fa-pause
+   az webapp show -g "$RG" -n "$APP" > panel-app.json
+   az webapp config show -g "$RG" -n "$APP" > panel-config.json
+   az webapp config appsettings list -g "$RG" -n "$APP" > panel-appsettings.json
+   az webapp config access-restriction show -g "$RG" -n "$APP" > panel-ip-rules.json
+   az rest --method GET \
+     --uri "https://management.azure.com$(az webapp show -g "$RG" -n "$APP" --query id -o tsv)/config/authsettingsV2?api-version=2022-03-01" \
+     > panel-auth.json
+   ```
+
+   `panel-auth.json` holds the gate's allowlist (`allowedPrincipals.identities`) and its app
+   registration ID. The client secret itself stays in Key Vault; the auth config only refers to
+   it. `panel-appsettings.json` includes `CONTENT_SECURITY_POLICY`.
+4. Stop the app: `az webapp stop -g "$RG" -n "$APP"`.
+5. With the API stopped too, move the plan to F1 (step 2 under "Pause" below). That is the step
+   that brings the bill to $0.
+
+### Bringing the panel back
+
+- **If the plan was moved to F1:** move it back to B1, run `az webapp start -g "$RG" -n "$APP"`,
+  and enable the *Deploy panel* workflow again. Everything else is still configured.
+- **If the plan and app were deleted:** follow `docs/superpowers/specs/2026-09-19-panel-azure-deploy-design.md`
+  to recreate the web app, then restore its settings from the exported files: app settings, IP
+  rules, and the auth config (`az rest --method PUT` with `panel-auth.json`'s body). The deploy's
+  federated credential is on the deploy identity, not the app, so it survives. It only works if the
+  app has the same name again.
+- **Either way**, check the gate's client secret has not expired, in Entra → the gate's app
+  registration → *Certificates & secrets*. An expired secret makes sign-in fail after the tenant
+  step, and the error looks like an allowlist problem. To fix it, create a new secret and put it
+  into the Key Vault secret the auth config refers to.
+- Add your current IP to the access restrictions if it has changed.
+
 ## Pause
 
 You need the `az` CLI signed in to the subscription (`az login`), and `pg_dump` from **PostgreSQL 16
