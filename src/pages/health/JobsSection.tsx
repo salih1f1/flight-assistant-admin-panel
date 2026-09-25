@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { getAdminGetJobsQueryKey, useAdminGetAppServiceStatus, useAdminGetJobs, useAdminToggleJob } from '@/api/generated/admin'
+import { useAdminGetAppServiceStatus, useAdminGetJobs, useAdminToggleJob } from '@/api/generated/admin'
 import type { AdminJobDto, AppServiceStatusDto } from '@/api/generated/model'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -117,21 +116,21 @@ function JobsError({ error }: { error: unknown }) {
 }
 
 function JobRow({ job }: { job: AdminJobDto }) {
-  const queryClient = useQueryClient()
   const [askingReason, setAskingReason] = useState(false)
   const [reason, setReason] = useState('')
   const [failure, setFailure] = useState<string | null>(null)
 
   const toggle = useAdminToggleJob({
     mutation: {
+      // Deliberately no invalidateQueries call here: the app's QueryClient refetches everything
+      // after every successful mutation (`refreshAfterWrite`, #180), so a key-scoped call would be
+      // a second, narrower copy of that rule. The refetch still matters — the row also carries
+      // heartbeat state the toggle does not change, and a stale "last run" beside a freshly
+      // changed state would read like the toggle half-worked.
       onSuccess: () => {
         setAskingReason(false)
         setReason('')
         setFailure(null)
-        // Refetch rather than trusting the response: the row also carries heartbeat state the
-        // toggle does not change, and a stale "last run" beside a freshly changed state reads
-        // like the toggle half-worked.
-        void queryClient.invalidateQueries({ queryKey: getAdminGetJobsQueryKey() })
       },
       // A refusal is not a state change. The row keeps showing what the API still believes, and
       // the reason it gave is rendered verbatim — a 409 here means the config ceiling barred it,

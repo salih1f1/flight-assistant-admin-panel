@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -61,13 +61,12 @@ export function ImportPage() {
 
 function ImportStepCard({ step, number }: { step: ImportStep; number: number }) {
   const [file, setFile] = useState<File | null>(null)
-  const queryClient = useQueryClient()
   const upload = useMutation({
     // The API accepts only a text/csv part, and browsers don't agree on a .csv file's type
     // (Windows often reports application/vnd.ms-excel), so the file is re-labelled before sending.
     mutationFn: (picked: File) => step.run({ file: new File([picked], picked.name, { type: 'text/csv' }) }),
-    // Imported rows can appear in any list, count or data browser view.
-    onSuccess: () => queryClient.invalidateQueries(),
+    // Imported rows can appear in any list, count or data browser view; the app's QueryClient
+    // refetches all of them after every successful mutation (`refreshAfterWrite`, #180).
   })
   const fileName = upload.variables?.name ?? ''
 

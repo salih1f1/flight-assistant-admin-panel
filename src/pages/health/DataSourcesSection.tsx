@@ -1,8 +1,7 @@
 import { Fragment, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { getAdminGetDataSourcesQueryKey, useAdminGetDataSources, useAdminProbeDataSource } from '@/api/generated/admin'
+import { useAdminGetDataSources, useAdminProbeDataSource } from '@/api/generated/admin'
 import type { AdminDataSourceDto } from '@/api/generated/model'
 import { apiErrorMessage } from '@/lib/apiError'
 import { formatUtcMinute } from '@/lib/formatUtc'
@@ -161,18 +160,16 @@ function SourceRow({ source }: { source: AdminDataSourceDto }) {
  * second press rather than spending on the first.
  */
 function CheckNow({ source }: { source: AdminDataSourceDto }) {
-  const queryClient = useQueryClient()
   const [confirming, setConfirming] = useState(false)
   const key = source.key
 
   const probe = useAdminProbeDataSource({
     mutation: {
-      // The response is the refreshed row, but the list is what the table renders — refetching it
-      // keeps one source of truth instead of patching a single row into a cached list.
-      onSuccess: () => {
-        setConfirming(false)
-        void queryClient.invalidateQueries({ queryKey: getAdminGetDataSourcesQueryKey() })
-      },
+      // The response is the refreshed row, but the list is what the table renders. No
+      // invalidateQueries call here: the app's QueryClient refetches everything after every
+      // successful mutation (`refreshAfterWrite`, #180), which keeps the list the one source of
+      // truth instead of patching a single row into a cached list.
+      onSuccess: () => setConfirming(false),
     },
   })
 
