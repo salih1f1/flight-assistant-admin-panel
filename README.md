@@ -2,6 +2,8 @@
 
 The admin panel for the FlightAssistant API: travelers, flights, airlines, airports, countries, loyalty programs and lounges.
 
+**Coming back after a break?** Start with [docs/HANDOFF.md](docs/HANDOFF.md): what state the project was left in and how to pick it up again.
+
 React 19, Vite 7, TypeScript, TanStack Query and Table, Tailwind 4 with shadcn/ui components, and MSAL for sign-in. The API client is generated from the backend's OpenAPI spec.
 
 ## Prerequisites
