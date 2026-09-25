@@ -43,8 +43,9 @@ table in the backend's `BrowsableTables`, verification requests, and the CI test
 2. `npm run lint && npm run build && npm test` should be green before you change anything.
 3. Pull the backend and resync the client: `npm run api:sync && npm run api:generate && npm run build`.
    Commit `openapi/openapi.json` and `src/api/generated/` together if anything changed.
-4. Check that the dev App Service, the dev API and the database are still running. The B1 plan
-   may have been stopped or scaled down to save money. If the panel gives a flat `403`, your IP
+4. Check that the dev App Service, the dev API and the database are still running. If you paused
+   them to save money, follow [PAUSE-AND-RESUME-AZURE.md](PAUSE-AND-RESUME-AZURE.md), under
+   "Resume". If the panel gives a flat `403`, your IP
    has probably changed (README → When your public IP changes).
 
 ## How work was done here
