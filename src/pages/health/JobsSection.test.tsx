@@ -280,7 +280,9 @@ describe('JobsSection', () => {
     expect(await screen.findByText(/2026-09-19 09:00 UTC/)).toBeInTheDocument()
   })
 
-  it('refetches after a successful toggle, so the row reflects the new state', async () => {
+  // The refetch is the app QueryClient's guarantee (refreshAfterWrite), not this component's: this
+  // pins that the view re-reads the jobs after a write rather than trusting the toggle's reply.
+  it('re-reads the jobs after a successful toggle rather than trusting the reply', async () => {
     renderWith([job()])
     await userEvent.click(await screen.findByRole('button', { name: /switch off/i }))
     await userEvent.click(screen.getByRole('button', { name: /confirm/i }))

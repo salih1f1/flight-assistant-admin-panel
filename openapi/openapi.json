@@ -4891,7 +4891,7 @@
           "Loyalty"
         ],
         "summary": "Update a loyalty membership",
-        "description": "Replaces the account number, tier, and tier expiry date for the specified membership. Route parameter: id — the membership ID returned when it was added. Only the authenticated traveler's own memberships can be updated. Returns 404 if no membership with that id exists, and 403 if it belongs to another traveler.",
+        "description": "Replaces the tier and tier expiry date for the specified membership, and the account number when one is sent. Route parameter: id — the membership ID returned when it was added. Body fields: AccountNumber (optional — omit it or send null to keep the current one; a blank value is a 400), TierId (optional, from the membership's program's tier list; omitting it clears the tier), TierExpiryDate (optional, YYYY-MM-DD; omitting it clears the date). Only the authenticated traveler's own memberships can be updated. Returns 404 if the traveler has no membership with that id — including one that belongs to another traveler, so the response never reveals whether an id exists (#550) — and 409 if TierId is not a tier of the membership's program (#548).",
         "operationId": "UpdateMembership",
         "parameters": [
           {
@@ -4928,8 +4928,8 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4938,8 +4938,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4955,7 +4955,7 @@
           "Loyalty"
         ],
         "summary": "Remove a loyalty membership",
-        "description": "Deletes a loyalty membership from the authenticated traveler's profile. Route parameter: id — the membership ID to remove. Idempotent: removing a membership that does not exist also returns 204, so there is no 404. Returns 403 if the membership belongs to another traveler.",
+        "description": "Deletes a loyalty membership from the authenticated traveler's profile. Route parameter: id — the membership ID to remove. Idempotent: removing a membership that does not exist also returns 204, so there is no 404. Another traveler's membership is treated the same way — 204, nothing deleted — so the response never reveals whether an id exists (#550).",
         "operationId": "RemoveMembership",
         "parameters": [
           {
@@ -4978,16 +4978,6 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -5050,18 +5040,8 @@
           "Travelers"
         ],
         "summary": "Register traveler",
-        "description": "Creates a traveler profile linked to the authenticated Azure AD B2C identity. Idempotent — safe to call on every login; does nothing if the traveler already exists.",
+        "description": "Creates a traveler profile linked to the authenticated Azure AD B2C identity. Takes no request body: the email and display name are read from the sign-in token (the 'email', 'preferred_username' or 'emails' claim, and 'name'), so they always match the authenticated identity. Idempotent — safe to call on every login, and each call re-reads those claims, which is the only thing that refreshes them locally when they change in Azure. A token carrying no email claim at all is refused as unauthenticated; one whose claim is not an address — a phone sign-in, say — is a 400.",
         "operationId": "RegisterTraveler",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterTravelerRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "201": {
             "description": "Created",
@@ -7850,20 +7830,6 @@
             "items": {
               "type": "string"
             },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RegisterTravelerRequest": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "displayName": {
-            "type": "string",
             "nullable": true
           }
         },
