@@ -169,6 +169,8 @@ there, not replacing the existing one.
 | `npm run api:sync` | Copies `../flight-assistant-backend/spec/openapi.json` to `openapi/openapi.json`. |
 | `npm run api:generate` | Regenerates `src/api/generated/` from `openapi/openapi.json` with orval. |
 | `npm run preview` | Serves the built `dist/`. |
+| `scripts/resume-panel.sh` | Brings the paused panel back in Azure, then checks it. Dry run unless `--guided` or `--apply`. See [docs/PAUSE-AND-RESUME-AZURE.md](docs/PAUSE-AND-RESUME-AZURE.md). |
+| `scripts/pause-panel.sh` | The reverse: exports the panel's settings, stops it, disables the deploy workflow. Same modes. |
 
 ## The API client
 

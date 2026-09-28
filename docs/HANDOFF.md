@@ -1,16 +1,23 @@
 # Handoff: where the panel stands
 
-Written 2026-09-25, when active work was paused. Read this first when you come back, then the
-README for setup and conventions.
+Written 2026-09-25, when active work was paused; updated 2026-09-26, when the Azure dev
+environment was paused too. Read this first when you come back, then the README for setup and
+conventions.
 
 ## State
 
-The panel is **feature-complete for what it was built to do** and deployed.
+The panel is **feature-complete for what it was built to do** and deployed (currently paused, below).
 
 - `main` is green: lint (2 known warnings in the shadcn `ui/` files, no errors), `tsc -b`, and 78 test files and 831 tests.
-- `main` deploys to `https://flight-assistant-dev-panel.azurewebsites.net` on every push. The
-  last deploy (#197, the Providers page) succeeded. See README → Deployment for the three locks
-  and what to do when your IP changes. Nothing on the Azure side was changed in this handoff.
+- **The Azure dev environment is paused (since 2026-09-26).** The panel's web app
+  `flight-assistant-dev-panel` is stopped but not deleted: its IP allowlist, Easy Auth allowlist and
+  app settings are intact. The shared App Service plan is on F1 (free), not deleted. The *Deploy
+  panel* workflow is disabled, so pushes to `main` do not deploy; *CI* still runs. Exports and a
+  log of every step, with its undo, are in the encrypted backup kit in iCloud Drive. See
+  [PAUSE-AND-RESUME-AZURE.md](PAUSE-AND-RESUME-AZURE.md).
+- Before the pause, `main` deployed to `https://flight-assistant-dev-panel.azurewebsites.net` on
+  every push; the last deploy (#197, the Providers page) succeeded. See README → Deployment for the
+  three locks and what to do when your IP changes.
 - `openapi/openapi.json` matches the backend's `development` branch as of this date. The last sync changed
   only traveler-facing operations (loyalty memberships, register), so `src/api/generated/` did
   not change.
@@ -23,8 +30,8 @@ table in the backend's `BrowsableTables`, verification requests, and the CI test
 
 ## Open issues
 
-- **#190** (deploy to Azure): the work is done and running. Close it once you have loaded the
-  deployed panel from a browser again and it still works.
+- **#190** (deploy to Azure): the work is done and running. Close it once you have resumed the panel
+  and loaded it from a browser again and it still works.
 - **#198** (redundant `invalidateQueries`) — fixed by the commit that added this file:
   `JobsSection`, `DataSourcesSection` and `ImportPage` no longer duplicate `refreshAfterWrite`,
   and the jobs test says what it really pins. `VerifyDialog` keeps its call on purpose.
@@ -43,10 +50,15 @@ table in the backend's `BrowsableTables`, verification requests, and the CI test
 2. `npm run lint && npm run build && npm test` should be green before you change anything.
 3. Pull the backend and resync the client: `npm run api:sync && npm run api:generate && npm run build`.
    Commit `openapi/openapi.json` and `src/api/generated/` together if anything changed.
-4. Check that the dev App Service, the dev API and the database are still running. If you paused
-   them to save money, follow [PAUSE-AND-RESUME-AZURE.md](PAUSE-AND-RESUME-AZURE.md), under
-   "Resume". If the panel gives a flat `403`, your IP
-   has probably changed (README → When your public IP changes).
+4. Bring Azure back:
+   - **everything** (plan, database, API, panel, both deploy workflows): the backend's
+     `scripts/resume-azure.sh`;
+   - **the panel only**: `scripts/resume-panel.sh` here. Start with the dry run, then `--guided`.
+
+   Either way, `scripts/resume-panel.sh` (dry run) afterwards checks the gate's client secret,
+   your IP against the allowlist and that the panel answers with the sign-in redirect. Details in
+   [PAUSE-AND-RESUME-AZURE.md](PAUSE-AND-RESUME-AZURE.md). A flat `403` means your IP has changed
+   (README → When your public IP changes).
 
 ## How work was done here
 
